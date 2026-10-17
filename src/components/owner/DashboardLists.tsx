@@ -2,7 +2,9 @@ import { Link } from 'react-router-dom'
 import { Phone } from 'lucide-react'
 import { Card } from '@/components/Card'
 import { buttonStyles } from '@/components/Button'
+import { ShiftBadge } from '@/components/ShiftTabs'
 import { formatDate } from '@/domain/dates'
+import type { Shift } from '@/domain/types'
 
 export type DashMember = {
   id: string
@@ -12,6 +14,8 @@ export type DashMember = {
   daysLeft: number
   /** For recent joins. */
   startDate?: string
+  /** The shift this membership is for; shown as a badge so a two-shift student reads once per shift. */
+  shift?: Pick<Shift, 'name'> & { isActive?: boolean }
 }
 
 function seatText(n: number | null) {
@@ -63,7 +67,10 @@ export function ExpiringList({
           {members.map((m) => (
             <li key={m.id} className="flex items-center gap-3 p-4 sm:px-5">
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{m.name}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate font-medium">{m.name}</p>
+                  {m.shift && <ShiftBadge shift={m.shift} />}
+                </div>
                 <p className="text-sm text-ink-muted tabular-nums">
                   {seatText(m.seatNumber)} ·{' '}
                   <span className={tone === 'danger' ? 'text-danger' : 'text-warning-ink'}>
@@ -95,7 +102,10 @@ export function RecentJoins({ members }: { members: DashMember[] }) {
           {members.map((m) => (
             <li key={m.id} className="flex items-center justify-between gap-3 p-4 sm:px-5">
               <div className="min-w-0">
-                <p className="truncate font-medium">{m.name}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate font-medium">{m.name}</p>
+                  {m.shift && <ShiftBadge shift={m.shift} />}
+                </div>
                 <p className="text-sm text-ink-muted tabular-nums">{seatText(m.seatNumber)}</p>
               </div>
               {m.startDate && (

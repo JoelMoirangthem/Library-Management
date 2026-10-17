@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Phone } from 'lucide-react'
 import { Button } from '@/components/Button'
@@ -7,6 +7,7 @@ import { TextField } from '@/components/Fields'
 import { Modal } from '@/components/Modal'
 import { PageHeader } from '@/components/PageParts'
 import { SeatGrid } from '@/components/SeatGrid'
+import { ShiftBadge, ShiftTabs } from '@/components/ShiftTabs'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
@@ -16,9 +17,10 @@ import {
   ExpiryBadge,
   RenewModal,
 } from '@/components/owner/members'
-import { buildSeatCells } from '@/domain/seatCells'
+import { buildSeatCells, seatCounts } from '@/domain/seatCells'
 import { todayIST, formatDate } from '@/domain/dates'
-import type { Member } from '@/domain/types'
+import { sortShifts } from '@/domain/shifts'
+import type { Member, Shift } from '@/domain/types'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
 import { useOwnerLibrary } from '@/hooks/useOwnerLibrary'
@@ -44,35 +46,56 @@ export default function Seats() {
 
   const seatsQ = useAsync(() => services.listSeats(libraryId), [libraryId])
   const membersQ = useAsync(() => services.listMembers(libraryId), [libraryId])
+  const shiftsQ = useAsync(() => services.listShifts(libraryId), [libraryId])
 
   const members = useMemo(() => membersQ.data ?? [], [membersQ.data])
   const seats = useMemo(() => seatsQ.data ?? [], [seatsQ.data])
+  const shifts = useMemo(() => sortShifts(shiftsQ.data ?? []), [shiftsQ.data])
 
-  const cells = useMemo(() => buildSeatCells(seats, members, today), [seats, members, today])
+  const [selectedShiftId, setSelectedShiftId] = useState('')
+  useEffect(() => {
+    if (shifts.length === 0) return
+    setSelectedShiftId((cur) => (shifts.some((s) => s.id === cur) ? cur : shifts[0].id))
+  }, [shifts])
+
+  const selectedShift = shifts.find((s) => s.id === selectedShiftId) ?? null
+
+  const cells = useMemo(
+    () => (selectedShiftId ? buildSeatCells(seats, members, today, selectedShiftId) : []),
+    [seats, members, today, selectedShiftId],
+  )
+  const counts = useMemo(() => seatCounts(cells), [cells])
 
   const activeMembers = useMemo(() => members.filter((m) => m.status === 'active'), [members])
+
+  // Active member holding each seat, in the selected shift.
   const memberBySeat = useMemo(() => {
     const map = new Map<string, Member>()
-    for (const m of activeMembers) if (m.seatId) map.set(m.seatId, m)
+    for (const m of activeMembers) if (m.seatId && m.shiftId === selectedShiftId) map.set(m.seatId, m)
     return map
-  }, [activeMembers])
+  }, [activeMembers, selectedShiftId])
 
-  // Active students with no seat, for the "assign" select.
+  // Active students of THIS shift with no seat, for the "assign" select.
   const studentsWithoutSeat = useMemo(
-    () => activeMembers.filter((m) => !m.seatId),
-    [activeMembers],
-  )
-  const freeSeats = useMemo(
-    () =>
-      cells
-        .filter((c) => c.state === 'free')
-        .map((c) => ({ id: c.id, seatNumber: c.number })),
-    [cells],
+    () => activeMembers.filter((m) => m.shiftId === selectedShiftId && !m.seatId),
+    [activeMembers, selectedShiftId],
   )
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selectedCell = cells.find((c) => c.id === selectedId) ?? null
   const selectedMember = selectedId ? memberBySeat.get(selectedId) ?? null : null
+
+  // Who holds the same physical seat in OTHER shifts, for context.
+  const sameSeatOtherShifts = useMemo(() => {
+    if (!selectedId) return []
+    const out: { shift: Shift; name: string }[] = []
+    for (const s of shifts) {
+      if (s.id === selectedShiftId) continue
+      const m = activeMembers.find((mm) => mm.seatId === selectedId && mm.shiftId === s.id)
+      if (m) out.push({ shift: s, name: m.name })
+    }
+    return out
+  }, [selectedId, selectedShiftId, shifts, activeMembers])
 
   const [addOpen, setAddOpen] = useState(false)
   const [addPresetSeatId, setAddPresetSeatId] = useState<string | null>(null)
@@ -90,8 +113,17 @@ export default function Seats() {
     setAssignTo('')
   }
 
-  const loading = seatsQ.loading || membersQ.loading
-  const error = seatsQ.error ?? membersQ.error
+  const shiftOff = selectedShift ? !selectedShift.isActive : false
+  const renewFeePaise = (m: Member | null) =>
+    (m && shifts.find((s) => s.id === m.shiftId)?.monthlyFeePaise) || 0
+
+  const loading = seatsQ.loading || membersQ.loading || shiftsQ.loading
+  const error = seatsQ.error ?? membersQ.error ?? shiftsQ.error
+
+  const fullNotice =
+    selectedShift && counts.total > 0 && counts.free === 0
+      ? `${selectedShift.name} is full. All ${counts.total} seats are taken.`
+      : null
 
   return (
     <>
@@ -106,21 +138,49 @@ export default function Seats() {
       {loading ? (
         <LoadingState label="Loading seats" />
       ) : error ? (
-        <ErrorState onRetry={() => { seatsQ.reload(); membersQ.reload() }} />
+        <ErrorState onRetry={() => { seatsQ.reload(); membersQ.reload(); shiftsQ.reload() }} />
       ) : seats.length === 0 ? (
         <EmptyState
           title="No seats yet"
           description="Set a capacity below to create your seats."
         />
       ) : (
-        <Card className="p-4 sm:p-6">
-          <SeatGrid
-            seats={cells}
-            selectedId={selectedId}
-            onSelect={(id) => setSelectedId(id)}
-            showLegend
-          />
-        </Card>
+        <div className="space-y-4">
+          {shifts.length > 0 && (
+            <ShiftTabs
+              shifts={shifts}
+              value={selectedShiftId}
+              onChange={(id) => {
+                setSelectedShiftId(id)
+                closeModal()
+              }}
+              detail={(s) => {
+                const c = seatCounts(buildSeatCells(seats, members, today, s.id))
+                return `${c.free} free`
+              }}
+            />
+          )}
+
+          {fullNotice && (
+            <p className="text-sm font-medium text-ink">{fullNotice}</p>
+          )}
+
+          {shiftOff && (
+            <p className="text-sm text-ink-muted">
+              {selectedShift!.name} is switched off. You can still renew, free and remove, but new
+              students can't be assigned to it.
+            </p>
+          )}
+
+          <Card className="p-4 sm:p-6">
+            <SeatGrid
+              seats={cells}
+              selectedId={selectedId}
+              onSelect={(id) => setSelectedId(id)}
+              showLegend
+            />
+          </Card>
+        </div>
       )}
 
       <SeatSettings libraryId={libraryId} seatCount={library!.capacity} canWrite={canWrite} />
@@ -130,6 +190,7 @@ export default function Seats() {
         open={!!selectedCell}
         onClose={closeModal}
         title={selectedCell ? `Seat ${selectedCell.number}` : 'Seat'}
+        description={selectedShift ? selectedShift.name : undefined}
       >
         {selectedCell && selectedCell.state === 'disabled' && (
           <p className="text-sm text-ink-muted">
@@ -141,15 +202,20 @@ export default function Seats() {
           <div className="space-y-4">
             {!canWrite ? (
               <ReadOnlyNotice />
+            ) : shiftOff ? (
+              <p className="text-sm text-ink-muted">
+                {selectedShift!.name} is switched off, so you can't assign this seat. Switch the
+                shift back on to add students to it.
+              </p>
             ) : (
               <>
                 <div>
                   <label htmlFor="assign-seat" className="mb-1.5 block text-sm font-medium">
-                    Assign to a student
+                    Assign to a student in {selectedShift?.name}
                   </label>
                   {studentsWithoutSeat.length === 0 ? (
                     <p className="text-sm text-ink-muted">
-                      Every active student already has a seat. Add a new student below.
+                      Every active student in this shift already has a seat. Add a new student below.
                     </p>
                   ) : (
                     <div className="flex flex-col gap-2 sm:flex-row">
@@ -194,13 +260,25 @@ export default function Seats() {
                 </div>
               </>
             )}
+            {sameSeatOtherShifts.length > 0 && (
+              <div className="border-t border-border pt-4 text-sm text-ink-muted">
+                {sameSeatOtherShifts.map((o) => (
+                  <p key={o.shift.id}>
+                    Seat {selectedCell.number} in {o.shift.name}: {o.name}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {selectedCell && selectedMember && selectedCell.state !== 'free' && selectedCell.state !== 'disabled' && (
           <div className="space-y-4">
             <div>
-              <p className="text-lg font-semibold">{selectedMember.name}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-lg font-semibold">{selectedMember.name}</p>
+                <ShiftBadge shift={selectedShift} />
+              </div>
               <a
                 href={`tel:${selectedMember.phone}`}
                 className="mt-1 inline-flex items-center gap-1.5 text-sm text-primary underline underline-offset-2"
@@ -220,6 +298,16 @@ export default function Seats() {
               </div>
             </dl>
             <ExpiryBadge member={selectedMember} today={today} />
+
+            {sameSeatOtherShifts.length > 0 && (
+              <div className="border-t border-border pt-4 text-sm text-ink-muted">
+                {sameSeatOtherShifts.map((o) => (
+                  <p key={o.shift.id}>
+                    Seat {selectedCell.number} in {o.shift.name}: {o.name}
+                  </p>
+                ))}
+              </div>
+            )}
 
             {!canWrite ? (
               <ReadOnlyNotice />
@@ -266,9 +354,11 @@ export default function Seats() {
           setAddPresetSeatId(null)
         }}
         libraryId={libraryId}
-        monthlyFeePaise={library!.monthlyFeePaise}
-        freeSeats={freeSeats}
+        shifts={shifts}
+        seats={seats}
+        members={members}
         presetSeatId={addPresetSeatId}
+        presetShiftId={selectedShiftId}
         today={today}
       />
 
@@ -276,7 +366,7 @@ export default function Seats() {
         open={!!renewMember}
         onClose={() => setRenewMember(null)}
         member={renewMember}
-        monthlyFeePaise={library!.monthlyFeePaise}
+        shiftFeePaise={renewFeePaise(renewMember)}
         today={today}
       />
 
@@ -352,9 +442,9 @@ function SeatSettings({
       </div>
       {update.error && <p className="mt-2 text-sm font-medium text-danger">{update.error.message}</p>}
       {!canWrite && (
-        <p className="mt-2">
+        <div className="mt-2">
           <ReadOnlyNotice />
-        </p>
+        </div>
       )}
     </Card>
   )

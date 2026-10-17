@@ -23,7 +23,27 @@ import { useNow } from '@/lib/devState'
 import { formatDate } from '@/domain/dates'
 import { formatRupees } from '@/domain/money'
 import { extendedActiveUntil, planState, TRIAL_DAYS } from '@/domain/plan'
-import type { AdminLibraryRow } from '@/domain/types'
+import { formatShiftRange, sortShifts } from '@/domain/shifts'
+import type { AdminLibraryRow, Shift } from '@/domain/types'
+
+/** Compact shift chips for the table and cards: 'Morning ₹800', switched-off ones muted with 'off'. */
+function ShiftChips({ shifts }: { shifts: Shift[] }) {
+  if (shifts.length === 0) return <span className="text-ink-muted">—</span>
+  return (
+    <ul className="flex flex-wrap gap-1.5">
+      {sortShifts(shifts).map((s) => (
+        <li key={s.id}>
+          <Badge tone={s.isActive ? 'primary' : 'neutral'}>
+            <span className="tabular-nums">
+              {s.name} {formatRupees(s.monthlyFeePaise)}
+              {!s.isActive && ' · off'}
+            </span>
+          </Badge>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 type Tab = 'pending' | 'live' | 'expired' | 'rejected' | 'all'
 
@@ -128,9 +148,9 @@ export default function Libraries() {
                       <th scope="col" className="px-4 py-3 font-medium">Library</th>
                       <th scope="col" className="px-4 py-3 font-medium">Owner</th>
                       <th scope="col" className="px-4 py-3 font-medium">Location</th>
-                      <th scope="col" className="px-4 py-3 font-medium">Seats</th>
-                      <th scope="col" className="px-4 py-3 font-medium">Fee</th>
-                      <th scope="col" className="px-4 py-3 font-medium">Submitted</th>
+                      <th scope="col" className="hidden px-4 py-3 font-medium 2xl:table-cell">Seats</th>
+                      <th scope="col" className="px-4 py-3 font-medium">Shifts</th>
+                      <th scope="col" className="hidden px-4 py-3 font-medium 2xl:table-cell">Submitted</th>
                       <th scope="col" className="px-4 py-3 font-medium">Status</th>
                       <th scope="col" className="px-4 py-3 text-right font-medium">Actions</th>
                     </tr>
@@ -162,9 +182,11 @@ export default function Libraries() {
                           <td className="px-4 py-3 text-ink-muted">
                             {row.areaName}, {row.cityName}
                           </td>
-                          <td className="px-4 py-3 tabular-nums">{row.library.capacity}</td>
-                          <td className="px-4 py-3 tabular-nums">{formatRupees(row.library.monthlyFeePaise)}</td>
-                          <td className="px-4 py-3 tabular-nums text-ink-muted">
+                          <td className="hidden px-4 py-3 tabular-nums 2xl:table-cell">{row.library.capacity}</td>
+                          <td className="px-4 py-3">
+                            <ShiftChips shifts={row.shifts} />
+                          </td>
+                          <td className="hidden px-4 py-3 tabular-nums text-ink-muted 2xl:table-cell">
                             {formatDate(row.library.createdAt.slice(0, 10))}
                           </td>
                           <td className="px-4 py-3">
@@ -266,9 +288,11 @@ function LibraryCard({
           <dt className="text-ink-muted">Seats</dt>
           <dd className="tabular-nums">{row.library.capacity}</dd>
         </div>
-        <div>
-          <dt className="text-ink-muted">Monthly fee</dt>
-          <dd className="tabular-nums">{formatRupees(row.library.monthlyFeePaise)}</dd>
+        <div className="col-span-2">
+          <dt className="text-ink-muted">Shifts</dt>
+          <dd className="mt-1">
+            <ShiftChips shifts={row.shifts} />
+          </dd>
         </div>
         <div className="col-span-2">
           <dt className="text-ink-muted">Submitted</dt>
@@ -342,8 +366,17 @@ function DetailModal({ row, now, onClose }: { row: AdminLibraryRow | null; now: 
         <DetailRow label="Seats">
           <span className="tabular-nums">{lib.capacity}</span>
         </DetailRow>
-        <DetailRow label="Monthly fee">
-          <span className="tabular-nums">{formatRupees(lib.monthlyFeePaise)}</span>
+        <DetailRow label="Shifts">
+          <ul className="space-y-1.5">
+            {sortShifts(row.shifts).map((s) => (
+              <li key={s.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="font-medium text-ink">{s.name}</span>
+                <span className="text-ink-muted tabular-nums">{formatShiftRange(s)}</span>
+                <span className="tabular-nums">· {formatRupees(s.monthlyFeePaise)} / month</span>
+                <Badge tone={s.isActive ? 'success' : 'neutral'}>{s.isActive ? 'On' : 'Off'}</Badge>
+              </li>
+            ))}
+          </ul>
         </DetailRow>
         <DetailRow label="Amenities">
           {lib.amenities.length ? lib.amenities.join(', ') : '—'}
@@ -392,6 +425,21 @@ function ApproveModal({ row, onClose }: { row: AdminLibraryRow | null; onClose: 
         {row.library.name} will go live and appear to students. The trial runs until{' '}
         <span className="font-medium text-ink tabular-nums">{trialEnds}</span>.
       </p>
+      {row.shifts.length > 0 && (
+        <div className="mt-4">
+          <p className="text-sm font-medium text-ink">Shifts the owner set up</p>
+          <ul className="mt-2 space-y-1.5 text-sm">
+            {sortShifts(row.shifts).map((s) => (
+              <li key={s.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="font-medium text-ink">{s.name}</span>
+                <span className="text-ink-muted tabular-nums">{formatShiftRange(s)}</span>
+                <span className="tabular-nums">· {formatRupees(s.monthlyFeePaise)} / month</span>
+                {!s.isActive && <Badge tone="neutral">Off</Badge>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </Modal>
   )
 }

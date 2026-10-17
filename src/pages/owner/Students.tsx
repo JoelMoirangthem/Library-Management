@@ -5,6 +5,7 @@ import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
 import { Card } from '@/components/Card'
 import { PageHeader } from '@/components/PageParts'
+import { ShiftBadge } from '@/components/ShiftTabs'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
@@ -19,8 +20,8 @@ import {
 import { formatDate, formatDateTime, todayIST } from '@/domain/dates'
 import { memberPhase } from '@/domain/members'
 import { formatRupees } from '@/domain/money'
-import { buildSeatCells } from '@/domain/seatCells'
-import type { FeePayment, Member } from '@/domain/types'
+import { sortShifts } from '@/domain/shifts'
+import type { FeePayment, Member, Shift } from '@/domain/types'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
 import { useOwnerLibrary } from '@/hooks/useOwnerLibrary'
@@ -28,7 +29,7 @@ import { services } from '@/lib/container'
 import { useNow } from '@/lib/devState'
 import { cx } from '@/lib/cx'
 
-type Filter = 'active' | 'expiring' | 'overdue' | 'noSeat'
+type StatusFilter = 'active' | 'expiring' | 'overdue' | 'noSeat'
 
 function ReadOnlyNotice({ className }: { className?: string }) {
   return (
@@ -50,10 +51,18 @@ export default function Students() {
   const seatsQ = useAsync(() => services.listSeats(libraryId), [libraryId])
   const membersQ = useAsync(() => services.listMembers(libraryId), [libraryId])
   const feesQ = useAsync(() => services.listLibraryFees(libraryId), [libraryId])
+  const shiftsQ = useAsync(() => services.listShifts(libraryId), [libraryId])
 
   const seats = useMemo(() => seatsQ.data ?? [], [seatsQ.data])
   const members = useMemo(() => membersQ.data ?? [], [membersQ.data])
   const fees = useMemo(() => feesQ.data ?? [], [feesQ.data])
+  const shifts = useMemo(() => sortShifts(shiftsQ.data ?? []), [shiftsQ.data])
+
+  const shiftById = useMemo(() => {
+    const m = new Map<string, Shift>()
+    for (const s of shifts) m.set(s.id, s)
+    return m
+  }, [shifts])
 
   const seatNumberById = useMemo(() => {
     const m = new Map<string, number>()
@@ -72,20 +81,38 @@ export default function Students() {
     return map
   }, [fees])
 
-  const freeSeats = useMemo(() => {
-    const cells = buildSeatCells(seats, members, today)
-    return cells.filter((c) => c.state === 'free').map((c) => ({ id: c.id, seatNumber: c.number }))
-  }, [seats, members, today])
-
   const activeMembers = useMemo(() => members.filter((m) => m.status === 'active'), [members])
   const removedMembers = useMemo(() => members.filter((m) => m.status === 'removed'), [members])
+
+  const [query, setQuery] = useState('')
+  const [status, setStatus] = useState<StatusFilter>('active')
+  const [shiftFilter, setShiftFilter] = useState<string>('all')
+  const [showRemoved, setShowRemoved] = useState(false)
+
+  const matchesStatus = (m: Member) => {
+    const phase = memberPhase(m, today)
+    if (status === 'active') return phase !== 'expired'
+    if (status === 'expiring') return phase === 'expiring'
+    if (status === 'overdue') return phase === 'expired'
+    if (status === 'noSeat') return !m.seatId
+    return true
+  }
+
+  // Status chip counts respect the current shift filter.
+  const byShift = useMemo(
+    () =>
+      shiftFilter === 'all'
+        ? activeMembers
+        : activeMembers.filter((m) => m.shiftId === shiftFilter),
+    [activeMembers, shiftFilter],
+  )
 
   const counts = useMemo(() => {
     let active = 0
     let expiring = 0
     let overdue = 0
     let noSeat = 0
-    for (const m of activeMembers) {
+    for (const m of byShift) {
       const phase = memberPhase(m, today)
       if (phase !== 'expired') active++
       if (phase === 'expiring') expiring++
@@ -93,29 +120,38 @@ export default function Students() {
       if (!m.seatId) noSeat++
     }
     return { active, expiring, overdue, noSeat }
-  }, [activeMembers, today])
+  }, [byShift, today])
 
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<Filter>('active')
-  const [showRemoved, setShowRemoved] = useState(false)
+  // Shift chip counts respect the current status filter + search.
+  const shiftCounts = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const matchesQuery = (m: Member) =>
+      !q || m.name.toLowerCase().includes(q) || m.phone.includes(q)
+    const base = activeMembers.filter((m) => matchesQuery(m) && matchesStatus(m))
+    const map = new Map<string, number>()
+    let all = 0
+    for (const m of base) {
+      all++
+      map.set(m.shiftId, (map.get(m.shiftId) ?? 0) + 1)
+    }
+    return { all, map }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMembers, query, status, today])
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const matches = (m: Member) =>
+    const matchesQuery = (m: Member) =>
       !q || m.name.toLowerCase().includes(q) || m.phone.includes(q)
 
     const filtered = activeMembers.filter((m) => {
-      if (!matches(m)) return false
-      const phase = memberPhase(m, today)
-      if (filter === 'active') return phase !== 'expired'
-      if (filter === 'expiring') return phase === 'expiring'
-      if (filter === 'overdue') return phase === 'expired'
-      if (filter === 'noSeat') return !m.seatId
-      return true
+      if (!matchesQuery(m)) return false
+      if (shiftFilter !== 'all' && m.shiftId !== shiftFilter) return false
+      return matchesStatus(m)
     })
 
     return filtered.sort((a, b) => a.expiryDate.localeCompare(b.expiryDate))
-  }, [activeMembers, query, filter, today])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMembers, query, status, shiftFilter, today])
 
   // Modal state
   const [addOpen, setAddOpen] = useState(false)
@@ -125,16 +161,19 @@ export default function Students() {
   const [removeMember, setRemoveMember] = useState<Member | null>(null)
 
   const remove = useMutation(services.removeMember, { success: 'Student removed' })
+  const feeFor = (m: Member | null) =>
+    (m && shiftById.get(m.shiftId)?.monthlyFeePaise) || 0
 
-  const loading = seatsQ.loading || membersQ.loading || feesQ.loading
-  const error = seatsQ.error ?? membersQ.error ?? feesQ.error
+  const loading = seatsQ.loading || membersQ.loading || feesQ.loading || shiftsQ.loading
+  const error = seatsQ.error ?? membersQ.error ?? feesQ.error ?? shiftsQ.error
   const reloadAll = () => {
     seatsQ.reload()
     membersQ.reload()
     feesQ.reload()
+    shiftsQ.reload()
   }
 
-  const chips: { key: Filter; label: string; count: number }[] = [
+  const statusChips: { key: StatusFilter; label: string; count: number }[] = [
     { key: 'active', label: 'All active', count: counts.active },
     { key: 'expiring', label: 'Expiring in 7 days', count: counts.expiring },
     { key: 'overdue', label: 'Overdue', count: counts.overdue },
@@ -185,16 +224,16 @@ export default function Students() {
               aria-label="Search students by name or phone"
               className="block min-h-11 w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-base text-ink placeholder:text-ink-muted/70"
             />
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Filter students">
-              {chips.map((c) => (
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
+              {statusChips.map((c) => (
                 <button
                   key={c.key}
                   type="button"
-                  aria-pressed={filter === c.key}
-                  onClick={() => setFilter(c.key)}
+                  aria-pressed={status === c.key}
+                  onClick={() => setStatus(c.key)}
                   className={cx(
                     'inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
-                    filter === c.key
+                    status === c.key
                       ? 'border-primary bg-primary-soft text-primary-ink'
                       : 'border-border-strong bg-surface text-ink hover:bg-canvas',
                   )}
@@ -204,6 +243,42 @@ export default function Students() {
                 </button>
               ))}
             </div>
+            {shifts.length > 1 && (
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by shift">
+                <button
+                  type="button"
+                  aria-pressed={shiftFilter === 'all'}
+                  onClick={() => setShiftFilter('all')}
+                  className={cx(
+                    'inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
+                    shiftFilter === 'all'
+                      ? 'border-primary bg-primary-soft text-primary-ink'
+                      : 'border-border-strong bg-surface text-ink hover:bg-canvas',
+                  )}
+                >
+                  All shifts
+                  <span className="tabular-nums">{shiftCounts.all}</span>
+                </button>
+                {shifts.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    aria-pressed={shiftFilter === s.id}
+                    onClick={() => setShiftFilter(s.id)}
+                    className={cx(
+                      'inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
+                      shiftFilter === s.id
+                        ? 'border-primary bg-primary-soft text-primary-ink'
+                        : 'border-border-strong bg-surface text-ink hover:bg-canvas',
+                    )}
+                  >
+                    {s.name}
+                    {!s.isActive && ' (off)'}
+                    <span className="tabular-nums">{shiftCounts.map.get(s.id) ?? 0}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {visible.length === 0 ? (
@@ -219,6 +294,7 @@ export default function Students() {
                   <thead className="border-b border-border bg-canvas text-ink-muted">
                     <tr>
                       <th scope="col" className="px-4 py-3 font-medium">Student</th>
+                      <th scope="col" className="px-4 py-3 font-medium">Shift</th>
                       <th scope="col" className="px-4 py-3 font-medium">Seat</th>
                       <th scope="col" className="px-4 py-3 font-medium">Expires</th>
                       <th scope="col" className="px-4 py-3 font-medium">Fees</th>
@@ -240,6 +316,9 @@ export default function Students() {
                               <Phone aria-hidden className="size-3.5" />
                               <span className="tabular-nums">{m.phone}</span>
                             </a>
+                          </td>
+                          <td className="px-4 py-3">
+                            <ShiftBadge shift={shiftById.get(m.shiftId)} />
                           </td>
                           <td className="px-4 py-3 tabular-nums">
                             {seatNo ? `Seat ${seatNo}` : <span className="text-ink-muted">No seat</span>}
@@ -284,7 +363,10 @@ export default function Students() {
                       <Card className="p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="font-medium">{m.name}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium">{m.name}</p>
+                              <ShiftBadge shift={shiftById.get(m.shiftId)} />
+                            </div>
                             <a
                               href={`tel:${m.phone}`}
                               className="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-primary"
@@ -345,7 +427,10 @@ export default function Students() {
                   {removedMembers.map((m) => (
                     <li key={m.id} className="flex items-center justify-between gap-3 p-4 text-ink-muted">
                       <div>
-                        <p className="font-medium">{m.name}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{m.name}</p>
+                          <ShiftBadge shift={shiftById.get(m.shiftId)} />
+                        </div>
                         <span className="tabular-nums text-sm">{m.phone}</span>
                       </div>
                       <Badge tone="neutral">
@@ -365,15 +450,16 @@ export default function Students() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         libraryId={libraryId}
-        monthlyFeePaise={library!.monthlyFeePaise}
-        freeSeats={freeSeats}
+        shifts={shifts}
+        seats={seats}
+        members={members}
         today={today}
       />
       <RenewModal
         open={!!renewMember}
         onClose={() => setRenewMember(null)}
         member={renewMember}
-        monthlyFeePaise={library!.monthlyFeePaise}
+        shiftFeePaise={feeFor(renewMember)}
         today={today}
       />
       <EditStudentModal open={!!editMember} onClose={() => setEditMember(null)} member={editMember} />
@@ -381,7 +467,7 @@ export default function Students() {
         open={!!paymentsMember}
         onClose={() => setPaymentsMember(null)}
         member={paymentsMember}
-        monthlyFeePaise={library!.monthlyFeePaise}
+        shiftFeePaise={feeFor(paymentsMember)}
         today={today}
         canWrite={canWrite}
       />

@@ -19,14 +19,15 @@ type Props = {
   open: boolean
   onClose: () => void
   member: Member | null
-  monthlyFeePaise: number
+  /** The fee of the member's own shift, used as the default amount. */
+  shiftFeePaise: number
   /** Today in IST, default date for a new payment. */
   today: string
   /** When false (expired plan) the record/void forms are hidden. */
   canWrite: boolean
 }
 
-export function PaymentsModal({ open, onClose, member, monthlyFeePaise, today, canWrite }: Props) {
+export function PaymentsModal({ open, onClose, member, shiftFeePaise, today, canWrite }: Props) {
   const memberId = member?.id ?? null
   const fees = useAsync(
     () => (memberId && open ? services.listMemberFees(memberId) : Promise.resolve([])),
@@ -47,11 +48,11 @@ export function PaymentsModal({ open, onClose, member, monthlyFeePaise, today, c
     setVoidingId(null)
     setVoidReason('')
     setVoidError(undefined)
-    setAmount((monthlyFeePaise / 100).toString())
+    setAmount(shiftFeePaise ? (shiftFeePaise / 100).toString() : '')
     setPaidOn(today)
     setMode('cash')
     setRecordError(undefined)
-  }, [open, monthlyFeePaise, today])
+  }, [open, shiftFeePaise, today])
 
   const voidFee = useMutation(services.voidFee, {
     success: 'Payment voided',
@@ -63,7 +64,7 @@ export function PaymentsModal({ open, onClose, member, monthlyFeePaise, today, c
   const recordFee = useMutation(services.recordFee, {
     success: 'Payment recorded',
     onSuccess: () => {
-      setAmount((monthlyFeePaise / 100).toString())
+      setAmount(shiftFeePaise ? (shiftFeePaise / 100).toString() : '')
       setMode('cash')
     },
   })

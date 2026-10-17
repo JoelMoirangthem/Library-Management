@@ -2,10 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChipCheckbox, SelectField, TextAreaField, TextField } from '@/components/Fields'
 import { Button } from '@/components/Button'
 import { PhotoPicker } from '@/components/owner/profile/PhotoPicker'
+import { ExistingShiftsEditor, NewShiftsField } from '@/components/owner/profile/ShiftsEditor'
+import {
+  defaultShiftDrafts,
+  draftsToShiftInputs,
+  type ShiftDraft,
+} from '@/components/owner/profile/shiftDrafts'
 import { AMENITIES } from '@/domain/constants'
-import { formatRupees } from '@/domain/money'
-import type { Area, City, Library, LibraryInput } from '@/domain/types'
-import { rupeesToPaise, validateLibraryInput, type FieldErrors } from '@/domain/validation'
+import { validateShiftFields, validateShiftSet } from '@/domain/shifts'
+import type { Area, City, Library, LibraryInput, ShiftInput } from '@/domain/types'
+import { validateLibraryInput, type FieldErrors } from '@/domain/validation'
 
 type Draft = {
   name: string
@@ -16,7 +22,6 @@ type Draft = {
   pincode: string
   phone: string
   capacity: string
-  fee: string
   timings: string
   amenities: string[]
   photos: string[]
@@ -32,16 +37,14 @@ function toDraft(lib: Library | null): Draft {
     pincode: lib?.pincode ?? '',
     phone: lib?.phone ?? '',
     capacity: lib ? String(lib.capacity) : '',
-    fee: lib ? String(lib.monthlyFeePaise / 100) : '',
     timings: lib?.timings ?? '',
     amenities: lib?.amenities ?? [],
     photos: lib?.photos ?? [],
   }
 }
 
-/** Build the typed LibraryInput from the draft. Paise fields fall back to -1 so validation flags them. */
+/** Build the typed LibraryInput from the draft. */
 function toInput(d: Draft): LibraryInput {
-  const feePaise = rupeesToPaise(d.fee)
   const capacity = Number(d.capacity)
   return {
     name: d.name.trim(),
@@ -52,7 +55,6 @@ function toInput(d: Draft): LibraryInput {
     pincode: d.pincode.trim(),
     phone: d.phone.trim(),
     capacity: Number.isInteger(capacity) ? capacity : NaN,
-    monthlyFeePaise: feePaise ?? -1,
     timings: d.timings.trim(),
     amenities: d.amenities,
     photos: d.photos,
@@ -67,7 +69,6 @@ const FIELD_ORDER: (keyof LibraryInput)[] = [
   'pincode',
   'phone',
   'capacity',
-  'monthlyFeePaise',
   'timings',
 ]
 
@@ -77,7 +78,8 @@ type Props = {
   areas: Area[]
   /** Called when the chosen city changes, so the parent can reload areas. */
   onCityChange: (cityId: string) => void
-  onSubmit: (input: LibraryInput) => void
+  /** For a new library, `shifts` carries the owner's shift rows; existing libraries edit shifts separately. */
+  onSubmit: (input: LibraryInput, shifts?: ShiftInput[]) => void
   submitting: boolean
   submitLabel: string
   disabled?: boolean
@@ -98,6 +100,10 @@ export function LibraryForm({
 }: Props) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(library))
   const [errors, setErrors] = useState<FieldErrors<keyof LibraryInput>>({})
+  // New-library shift rows (local until the library is created).
+  const [shiftDrafts, setShiftDrafts] = useState<ShiftDraft[]>(() => defaultShiftDrafts())
+  const [shiftError, setShiftError] = useState<string | null>(null)
+  const [badRow, setBadRow] = useState<number | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
 
   // Re-seed the draft only if the library identity changes (not on every keystroke-driven re-render).
@@ -115,19 +121,43 @@ export function LibraryForm({
 
   const amenitySet = useMemo(() => new Set(draft.amenities), [draft.amenities])
 
+  function focusFirstBadField(found: FieldErrors<keyof LibraryInput>): boolean {
+    const firstKey = FIELD_ORDER.find((k) => found[k])
+    if (!firstKey) return false
+    const el = formRef.current?.querySelector<HTMLElement>(
+      `[data-field="${firstKey}"] input, [data-field="${firstKey}"] select, [data-field="${firstKey}"] textarea`,
+    )
+    el?.focus()
+    return true
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (disabled) return
     const input = toInput(draft)
     const found = validateLibraryInput(input)
     setErrors(found)
-    const firstKey = FIELD_ORDER.find((k) => found[k])
-    if (firstKey) {
-      const el = formRef.current?.querySelector<HTMLElement>(`[data-field="${firstKey}"] input, [data-field="${firstKey}"] select, [data-field="${firstKey}"] textarea`)
-      el?.focus()
+    if (focusFirstBadField(found)) return
+
+    // Existing libraries manage shifts in their own editor; the form submit never touches them.
+    if (isExisting) {
+      onSubmit(input)
       return
     }
-    onSubmit(input)
+
+    // New library: validate the shift rows too, then send both together.
+    const shiftInputs = draftsToShiftInputs(shiftDrafts)
+    const setProblem = validateShiftSet(shiftInputs)
+    if (setProblem) {
+      // Mark the first row whose own fields are wrong, if any.
+      const idx = shiftInputs.findIndex((s) => validateShiftFields(s) !== null)
+      setBadRow(idx >= 0 ? idx : null)
+      setShiftError(setProblem)
+      return
+    }
+    setShiftError(null)
+    setBadRow(null)
+    onSubmit(input, shiftInputs)
   }
 
   return (
@@ -230,7 +260,7 @@ export function LibraryForm({
         </section>
 
         <section className="space-y-5">
-          <h2 className="text-lg font-semibold">Seats, fee and hours</h2>
+          <h2 className="text-lg font-semibold">Seats and hours</h2>
           <div className="grid gap-5 sm:grid-cols-2">
             <div data-field="capacity">
               <TextField
@@ -249,32 +279,30 @@ export function LibraryForm({
                 error={errors.capacity}
               />
             </div>
-            <div data-field="monthlyFeePaise">
+            <div data-field="timings">
               <TextField
-                label="Monthly fee (₹)"
-                type="text"
-                inputMode="decimal"
-                hint={
-                  rupeesToPaise(draft.fee)
-                    ? `Students will see ${formatRupees(rupeesToPaise(draft.fee)!)} per month.`
-                    : 'Enter the monthly fee in rupees, e.g. 800.'
-                }
-                value={draft.fee}
-                onChange={(e) => set('fee', e.target.value)}
-                error={errors.monthlyFeePaise}
+                label="Timings"
+                hint="e.g. 6 am – 11 pm, all days"
+                value={draft.timings}
+                onChange={(e) => set('timings', e.target.value)}
+                error={errors.timings}
               />
             </div>
           </div>
-          <div data-field="timings">
-            <TextField
-              label="Timings"
-              hint="e.g. 6 am – 11 pm, all days"
-              value={draft.timings}
-              onChange={(e) => set('timings', e.target.value)}
-              error={errors.timings}
-            />
-          </div>
         </section>
+
+        {/* Shifts: existing libraries edit live shifts; new libraries fill local rows. */}
+        {isExisting && library ? (
+          <ExistingShiftsEditor libraryId={library.id} canEdit={!disabled} />
+        ) : (
+          <NewShiftsField
+            drafts={shiftDrafts}
+            onChange={setShiftDrafts}
+            error={shiftError}
+            badRow={badRow}
+            disabled={disabled}
+          />
+        )}
 
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">Amenities</h2>

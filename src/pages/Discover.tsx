@@ -118,6 +118,7 @@ export default function Discover() {
           <SelectField
             label="Max monthly fee"
             value={maxFee}
+            hint="Shows libraries with a shift at or under this fee"
             onChange={(e) => update({ maxFee: e.target.value })}
           >
             <option value="">Any</option>

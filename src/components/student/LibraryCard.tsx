@@ -5,14 +5,15 @@ import { Card } from '@/components/Card'
 import { SeatMark } from '@/components/Logo'
 import { SeatStrip } from '@/components/SeatGrid'
 import { formatRupees } from '@/domain/money'
-import type { PublicLibrary } from '@/domain/types'
+import { formatShiftRange } from '@/domain/shifts'
+import type { PublicLibrary, PublicShift } from '@/domain/types'
 import { cx } from '@/lib/cx'
 
-/** Seats-left badge: text always carries the meaning, colour only reinforces it. */
-function seatsBadge(seatsLeft: number): { tone: BadgeTone; label: string } {
+/** Per-shift seats text: text always carries the meaning, colour only reinforces it. */
+function shiftSeatsLabel(seatsLeft: number): { tone: BadgeTone; label: string } {
   if (seatsLeft === 0) return { tone: 'neutral', label: 'Full' }
-  if (seatsLeft <= 5) return { tone: 'warning', label: `${seatsLeft} ${seatsLeft === 1 ? 'seat' : 'seats'} free` }
-  return { tone: 'success', label: `${seatsLeft} seats free` }
+  if (seatsLeft <= 5) return { tone: 'warning', label: `${seatsLeft} free` }
+  return { tone: 'success', label: `${seatsLeft} free` }
 }
 
 /** A tasteful placeholder built from the seat motif when a library has no photo. */
@@ -27,10 +28,30 @@ function PhotoPlaceholder() {
   )
 }
 
+/** One compact row per active shift: name, time range and a seats pill. */
+function ShiftRow({ shift }: { shift: PublicShift }) {
+  const seats = shiftSeatsLabel(shift.seatsLeft)
+  return (
+    <li className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium">{shift.name}</p>
+        <p className="text-xs tabular-nums text-ink-muted">{formatShiftRange(shift)}</p>
+      </div>
+      <Badge tone={seats.tone}>{seats.label}</Badge>
+    </li>
+  )
+}
+
 export function LibraryCard({ library }: { library: PublicLibrary }) {
-  const badge = seatsBadge(library.seatsLeft)
   const extraAmenities = Math.max(0, library.amenities.length - 3)
   const photo = library.photos[0]
+
+  const allFull = library.shifts.length > 0 && library.shifts.every((s) => s.seatsLeft === 0)
+  // Keep one SeatStrip for the shift with the most free seats.
+  const strongestShift = library.shifts.reduce<PublicShift | null>(
+    (best, s) => (best === null || s.seatsLeft > best.seatsLeft ? s : best),
+    null,
+  )
 
   return (
     <Card className="group relative overflow-hidden transition-colors hover:border-border-strong">
@@ -45,9 +66,11 @@ export function LibraryCard({ library }: { library: PublicLibrary }) {
         ) : (
           <PhotoPlaceholder />
         )}
-        <div className="absolute right-3 top-3">
-          <Badge tone={badge.tone}>{badge.label}</Badge>
-        </div>
+        {allFull && (
+          <div className="absolute right-3 top-3">
+            <Badge tone="neutral">All shifts full</Badge>
+          </div>
+        )}
       </div>
 
       <div className="space-y-3 p-4 sm:p-5">
@@ -67,11 +90,22 @@ export function LibraryCard({ library }: { library: PublicLibrary }) {
         </div>
 
         <p className="text-sm text-ink">
-          <span className="font-semibold tabular-nums">{formatRupees(library.monthlyFeePaise)}</span>
+          <span className="text-ink-muted">from </span>
+          <span className="font-semibold tabular-nums">{formatRupees(library.fromFeePaise)}</span>
           <span className="text-ink-muted"> / month</span>
         </p>
 
-        <SeatStrip total={library.totalSeats} free={library.seatsLeft} />
+        {library.shifts.length > 0 && (
+          <ul className="space-y-1.5">
+            {library.shifts.map((s) => (
+              <ShiftRow key={s.id} shift={s} />
+            ))}
+          </ul>
+        )}
+
+        {strongestShift && (
+          <SeatStrip total={strongestShift.totalSeats} free={strongestShift.seatsLeft} />
+        )}
 
         {library.amenities.length > 0 && (
           <ul className="flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">

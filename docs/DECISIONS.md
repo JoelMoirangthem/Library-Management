@@ -28,3 +28,4 @@ Newest at the bottom. Each entry: decision, reason.
 - **D-022 All time comes from one place.** Pure rule functions take `now`/`today` as parameters; the app asks `getNow()` / `useNow()` (`src/lib/devState.ts`), which the Demo panel can shift. No business logic calls `new Date()` directly.
 - **D-023 A mock write bumps a data-version counter** so every mounted query refetches; pages rarely refetch by hand.
 - **D-024 Seat cells are built in one place** (`src/domain/seatCells.ts`), so the grid, dashboard and student list can never disagree.
+- **D-025 Shifts (3 max, no overlap, own fee each).** A seat is free or taken per shift (`unique (seat_id, shift_id)` for active members). Each library starts with Morning / Afternoon / Evening defaults. Shifts are never deleted, only switched off; their students stay tagged. One person in two shifts = two memberships. Library-wide `monthly_fee` is removed; the library list shows `from` the lowest shift fee.

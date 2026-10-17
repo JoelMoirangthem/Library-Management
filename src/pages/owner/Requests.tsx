@@ -7,6 +7,7 @@ import { Card } from '@/components/Card'
 import { SelectField, TextField } from '@/components/Fields'
 import { Modal } from '@/components/Modal'
 import { PageHeader } from '@/components/PageParts'
+import { ShiftBadge } from '@/components/ShiftTabs'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
@@ -15,7 +16,8 @@ import { FEE_MODES } from '@/domain/constants'
 import { addDays, formatDateTime, todayIST } from '@/domain/dates'
 import { formatRupees } from '@/domain/money'
 import { buildSeatCells, seatCounts } from '@/domain/seatCells'
-import type { FeeMode, RequestStatus, SeatRequest } from '@/domain/types'
+import { formatShiftRange } from '@/domain/shifts'
+import type { FeeMode, Member, RequestStatus, Seat, SeatRequest, Shift } from '@/domain/types'
 import { rupeesToPaise } from '@/domain/validation'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
@@ -40,17 +42,22 @@ export default function Requests() {
   const requestsQ = useAsync(() => services.listLibrarySeatRequests(libraryId), [libraryId])
   const seatsQ = useAsync(() => services.listSeats(libraryId), [libraryId])
   const membersQ = useAsync(() => services.listMembers(libraryId), [libraryId])
+  const shiftsQ = useAsync(() => services.listShifts(libraryId), [libraryId])
 
   const requests = useMemo(() => requestsQ.data ?? [], [requestsQ.data])
   const seats = useMemo(() => seatsQ.data ?? [], [seatsQ.data])
   const members = useMemo(() => membersQ.data ?? [], [membersQ.data])
+  const shifts = useMemo(() => shiftsQ.data ?? [], [shiftsQ.data])
 
-  const cells = useMemo(() => buildSeatCells(seats, members, today), [seats, members, today])
-  const counts = useMemo(() => seatCounts(cells), [cells])
-  const freeSeats: FreeSeat[] = useMemo(
-    () => cells.filter((c) => c.state === 'free').map((c) => ({ id: c.id, seatNumber: c.number })),
-    [cells],
-  )
+  const shiftById = useMemo(() => {
+    const m = new Map<string, Shift>()
+    for (const s of shifts) m.set(s.id, s)
+    return m
+  }, [shifts])
+
+  // Seats left per shift, computed from members scoped to that shift.
+  const seatsLeftInShift = (shiftId: string) =>
+    seatCounts(buildSeatCells(seats, members, today, shiftId)).free
 
   const pending = useMemo(
     () =>
@@ -72,12 +79,13 @@ export default function Requests() {
 
   const reject = useMutation(services.rejectSeatRequest, { success: 'Request declined' })
 
-  const loading = requestsQ.loading || seatsQ.loading || membersQ.loading
-  const error = requestsQ.error ?? seatsQ.error ?? membersQ.error
+  const loading = requestsQ.loading || seatsQ.loading || membersQ.loading || shiftsQ.loading
+  const error = requestsQ.error ?? seatsQ.error ?? membersQ.error ?? shiftsQ.error
   const reloadAll = () => {
     requestsQ.reload()
     seatsQ.reload()
     membersQ.reload()
+    shiftsQ.reload()
   }
 
   return (
@@ -106,38 +114,55 @@ export default function Requests() {
         <div className="space-y-8">
           {pending.length > 0 ? (
             <ul className="space-y-3">
-              {pending.map((r) => (
-                <li key={r.id}>
-                  <Card className="p-4 sm:p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium">{r.studentName}</p>
-                        <a
-                          href={`tel:${r.studentPhone}`}
-                          className="mt-0.5 inline-flex items-center gap-1.5 text-sm text-primary underline underline-offset-2"
-                        >
-                          <Phone aria-hidden className="size-4" />
-                          <span className="tabular-nums">{r.studentPhone}</span>
-                        </a>
-                        <p className="mt-1 text-sm text-ink-muted tabular-nums">
-                          Requested {formatDateTime(r.createdAt)}
-                        </p>
+              {pending.map((r) => {
+                const shift = shiftById.get(r.shiftId) ?? null
+                const left = shift ? seatsLeftInShift(shift.id) : 0
+                const off = shift ? !shift.isActive : false
+                return (
+                  <li key={r.id}>
+                    <Card className="p-4 sm:p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium">{r.studentName}</p>
+                            <ShiftBadge shift={shift} />
+                          </div>
+                          <a
+                            href={`tel:${r.studentPhone}`}
+                            className="mt-0.5 inline-flex items-center gap-1.5 text-sm text-primary underline underline-offset-2"
+                          >
+                            <Phone aria-hidden className="size-4" />
+                            <span className="tabular-nums">{r.studentPhone}</span>
+                          </a>
+                          {shift && (
+                            <p className="mt-1 text-sm text-ink-muted tabular-nums">
+                              {shift.name} · {formatShiftRange(shift)} · {formatRupees(shift.monthlyFeePaise)} / month
+                            </p>
+                          )}
+                          <p className="mt-1 text-sm text-ink-muted tabular-nums">
+                            Requested {formatDateTime(r.createdAt)}
+                          </p>
+                        </div>
+                        <Badge tone={off ? 'neutral' : left > 0 ? 'primary' : 'warning'}>
+                          {shift
+                            ? off
+                              ? `${shift.name} is off`
+                              : `${left} seats left in ${shift.name}`
+                            : 'Shift unavailable'}
+                        </Badge>
                       </div>
-                      <Badge tone={counts.free > 0 ? 'primary' : 'warning'}>
-                        <span className="tabular-nums">{counts.free}</span> seats left
-                      </Badge>
-                    </div>
-                    {canWrite && (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <Button onClick={() => setApproveReq(r)}>Approve</Button>
-                        <Button variant="secondary" onClick={() => setDeclineReq(r)}>
-                          Decline
-                        </Button>
-                      </div>
-                    )}
-                  </Card>
-                </li>
-              ))}
+                      {canWrite && (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <Button onClick={() => setApproveReq(r)}>Approve</Button>
+                          <Button variant="secondary" onClick={() => setDeclineReq(r)}>
+                            Decline
+                          </Button>
+                        </div>
+                      )}
+                    </Card>
+                  </li>
+                )
+              })}
             </ul>
           ) : (
             <p className="text-ink-muted">No pending requests right now.</p>
@@ -152,7 +177,10 @@ export default function Requests() {
                   return (
                     <li key={r.id} className="flex items-center justify-between gap-3 p-4">
                       <div>
-                        <p className="font-medium">{r.studentName}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{r.studentName}</p>
+                          <ShiftBadge shift={shiftById.get(r.shiftId)} />
+                        </div>
                         <p className="text-sm text-ink-muted tabular-nums">
                           {formatDateTime(r.decidedAt ?? r.createdAt)}
                         </p>
@@ -170,8 +198,9 @@ export default function Requests() {
       <ApproveModal
         request={approveReq}
         onClose={() => setApproveReq(null)}
-        freeSeats={freeSeats}
-        monthlyFeePaise={library!.monthlyFeePaise}
+        shift={approveReq ? shiftById.get(approveReq.shiftId) ?? null : null}
+        seats={seats}
+        members={members}
         today={today}
       />
 
@@ -195,14 +224,16 @@ export default function Requests() {
 function ApproveModal({
   request,
   onClose,
-  freeSeats,
-  monthlyFeePaise,
+  shift,
+  seats,
+  members,
   today,
 }: {
   request: SeatRequest | null
   onClose: () => void
-  freeSeats: FreeSeat[]
-  monthlyFeePaise: number
+  shift: Shift | null
+  seats: Seat[]
+  members: Member[]
   today: string
 }) {
   const [seatId, setSeatId] = useState('')
@@ -212,16 +243,27 @@ function ApproveModal({
   const [mode, setMode] = useState<FeeMode>('cash')
   const [error, setError] = useState<string>()
 
+  const feePaise = shift?.monthlyFeePaise ?? 0
+  const shiftOff = shift ? !shift.isActive : false
+
+  // Seats free in the request's shift only.
+  const freeSeats: FreeSeat[] = useMemo(() => {
+    if (!shift) return []
+    return buildSeatCells(seats, members, today, shift.id)
+      .filter((c) => c.state === 'free')
+      .map((c) => ({ id: c.id, seatNumber: c.number }))
+  }, [shift, seats, members, today])
+
   useEffect(() => {
     if (!request) return
     setSeatId(freeSeats[0]?.id ?? '')
     setStartDate(today)
     setExpiryDate(addDays(today, 30))
-    setAmount((monthlyFeePaise / 100).toString())
+    setAmount(feePaise ? (feePaise / 100).toString() : '')
     setMode('cash')
     setError(undefined)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [request, today, monthlyFeePaise])
+  }, [request, today, feePaise])
 
   const toastName = request?.studentName ?? ''
   const toastSeat = freeSeats.find((s) => s.id === seatId)?.seatNumber
@@ -233,6 +275,7 @@ function ApproveModal({
   })
 
   const noSeats = freeSeats.length === 0
+  const blocked = shiftOff || noSeats
 
   const submit = async () => {
     setError(undefined)
@@ -265,27 +308,32 @@ function ApproveModal({
       open={!!request}
       onClose={onClose}
       title={request ? `Approve ${request.studentName}` : 'Approve request'}
-      description="Assign a seat and record their first month."
+      description={shift ? `${shift.name}, ${formatShiftRange(shift)}` : 'Assign a seat and record their first month.'}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={() => void submit()} loading={approve.loading} disabled={noSeats}>
+          <Button onClick={() => void submit()} loading={approve.loading} disabled={blocked}>
             Approve and assign
           </Button>
         </>
       }
     >
-      {noSeats ? (
+      {shiftOff ? (
         <p className="text-sm text-ink-muted">
-          No seats are free. Free a seat or raise your capacity on the Seats page, then approve this
-          request.
+          {shift!.name} is switched off, so you can't approve this request. Switch the shift back on,
+          or decline the request.
+        </p>
+      ) : noSeats ? (
+        <p className="text-sm text-ink-muted">
+          {shift ? `${shift.name} is full.` : 'No seats are free.'} Free a seat in this shift or raise
+          your capacity on the Seats page, then approve this request. You can also decline it.
         </p>
       ) : (
         <div className="space-y-4">
           <SelectField
-            label={`Seat (${freeSeats.length} free)`}
+            label={`Seat (${freeSeats.length} free in ${shift?.name ?? 'this shift'})`}
             value={seatId}
             onChange={(e) => setSeatId(e.target.value)}
           >
@@ -309,7 +357,7 @@ function ApproveModal({
               inputMode="decimal"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              hint={`Suggested: ${formatRupees(monthlyFeePaise)}. Use 0 to skip.`}
+              hint={`Suggested: ${formatRupees(feePaise)}. Use 0 to skip.`}
             />
             <SelectField label="Payment mode" value={mode} onChange={(e) => setMode(e.target.value as FeeMode)}>
               {FEE_MODES.map((m) => (

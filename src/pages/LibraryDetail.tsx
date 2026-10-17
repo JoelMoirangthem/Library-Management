@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import {
   Armchair,
@@ -18,11 +19,13 @@ import { LoadingState } from '@/components/states/LoadingState'
 import { NotFoundState } from '@/components/states/NotFoundState'
 import { mapsLink } from '@/domain/constants'
 import { formatRupees } from '@/domain/money'
-import type { PublicLibrary } from '@/domain/types'
+import { formatShiftRange } from '@/domain/shifts'
+import type { PublicLibrary, PublicShift } from '@/domain/types'
 import { services } from '@/lib/container'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
 import { useAuth } from '@/hooks/useAuth'
+import { cx } from '@/lib/cx'
 
 function PhotoGallery({ library }: { library: PublicLibrary }) {
   if (library.photos.length === 0) {
@@ -54,15 +57,17 @@ function PhotoGallery({ library }: { library: PublicLibrary }) {
   )
 }
 
-/** The seat-request action, which differs by who is viewing. */
+/** The seat-request action for the SELECTED shift, which differs by who is viewing. */
 function RequestAction({
   library,
+  shift,
   pendingRequestId,
   isMemberHere,
   requestsReady,
   membershipsReady,
 }: {
   library: PublicLibrary
+  shift: PublicShift
   pendingRequestId: string | null
   isMemberHere: boolean
   requestsReady: boolean
@@ -71,14 +76,14 @@ function RequestAction({
   const { user } = useAuth()
   const location = useLocation()
 
-  const requestSeat = useMutation(() => services.requestSeat(library.id), {
+  const requestSeat = useMutation(() => services.requestSeat(library.id, shift.id), {
     success: 'Request sent',
   })
   const cancelRequest = useMutation((id: string) => services.cancelSeatRequest(id), {
     success: 'Request cancelled',
   })
 
-  const full = library.seatsLeft === 0
+  const full = shift.seatsLeft === 0
 
   // Signed out.
   if (!user) {
@@ -110,12 +115,12 @@ function RequestAction({
     return <LoadingState label="Checking your requests" count={1} />
   }
 
-  // Already a member here.
+  // Already a member of this shift.
   if (isMemberHere) {
     return (
       <div className="space-y-3">
         <Badge tone="success" icon={<CheckCircle2 />}>
-          You&rsquo;re a member
+          You&rsquo;re a member of this shift
         </Badge>
         <Link to="/student/membership" className={buttonStyles('secondary', 'w-full')}>
           View membership
@@ -124,7 +129,7 @@ function RequestAction({
     )
   }
 
-  // Pending request here.
+  // Pending request for this shift.
   if (pendingRequestId) {
     return (
       <div className="space-y-3">
@@ -146,12 +151,12 @@ function RequestAction({
     )
   }
 
-  // No request yet.
+  // No request yet for this shift.
   return (
     <div className="space-y-3">
       {full && (
         <p className="text-sm text-ink-muted">
-          All seats are taken right now. You can still request one &mdash; the owner will reply
+          {shift.name} is full right now. You can still request a seat &mdash; the owner will reply
           when a seat opens.
         </p>
       )}
@@ -161,9 +166,54 @@ function RequestAction({
         loading={requestSeat.loading}
         onClick={() => void requestSeat.run()}
       >
-        Request a seat
+        Request a seat in {shift.name}
       </Button>
     </div>
+  )
+}
+
+/** Selectable radio-styled card for one shift. */
+function ShiftOption({
+  shift,
+  selected,
+  onSelect,
+}: {
+  shift: PublicShift
+  selected: boolean
+  onSelect: () => void
+}) {
+  const full = shift.seatsLeft === 0
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onSelect}
+      className={cx(
+        'flex w-full flex-col gap-2 rounded-card border p-4 text-left transition-colors',
+        selected
+          ? 'border-primary bg-primary-soft'
+          : 'border-border-strong bg-surface hover:bg-canvas',
+      )}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-semibold leading-tight">{shift.name}</p>
+          <p className="flex items-center gap-1 text-xs tabular-nums text-ink-muted">
+            <Clock aria-hidden className="size-3" />
+            {formatShiftRange(shift)}
+          </p>
+        </div>
+        <p className="text-sm font-semibold tabular-nums">
+          {formatRupees(shift.monthlyFeePaise)}
+          <span className="font-normal text-ink-muted"> / month</span>
+        </p>
+      </div>
+      <p className="text-sm font-medium tabular-nums">
+        {full ? 'Full' : `${shift.seatsLeft} of ${shift.totalSeats} seats free`}
+      </p>
+      <SeatStrip total={shift.totalSeats} free={shift.seatsLeft} />
+    </button>
   )
 }
 
@@ -183,6 +233,18 @@ export default function LibraryDetail() {
     () => (isStudent ? services.listMyMemberships() : Promise.resolve([])),
     [isStudent],
   )
+
+  const shifts = useMemo(() => library.data?.shifts ?? [], [library.data])
+
+  // Default the selected shift to the first shift with a free seat, else the first shift.
+  const defaultShiftId = useMemo(() => {
+    const firstFree = shifts.find((s) => s.seatsLeft > 0)
+    return (firstFree ?? shifts[0])?.id ?? ''
+  }, [shifts])
+
+  const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null)
+  const selectedShift =
+    shifts.find((s) => s.id === (selectedShiftId ?? defaultShiftId)) ?? shifts[0] ?? null
 
   if (library.loading) {
     return (
@@ -221,19 +283,34 @@ export default function LibraryDetail() {
   const requestsReady = !myRequests.loading
   const membershipsReady = !myMemberships.loading
 
-  const pendingRequestId =
-    myRequests.data?.find((r) => r.libraryId === lib.id && r.status === 'pending')?.id ?? null
+  // Request/membership state is per shift.
+  const pendingRequestId = selectedShift
+    ? (myRequests.data?.find(
+        (r) => r.libraryId === lib.id && r.shiftId === selectedShift.id && r.status === 'pending',
+      )?.id ?? null)
+    : null
   const isMemberHere = Boolean(
-    myMemberships.data?.some((m) => m.library?.id === lib.id && m.member.status === 'active'),
+    selectedShift &&
+      myMemberships.data?.some(
+        (m) =>
+          m.library?.id === lib.id &&
+          m.member.shiftId === selectedShift.id &&
+          m.member.status === 'active',
+      ),
   )
 
-  const actionProps = {
-    library: lib,
-    pendingRequestId,
-    isMemberHere,
-    requestsReady,
-    membershipsReady,
-  }
+  const actionCard = selectedShift ? (
+    <RequestAction
+      library={lib}
+      shift={selectedShift}
+      pendingRequestId={pendingRequestId}
+      isMemberHere={isMemberHere}
+      requestsReady={requestsReady}
+      membershipsReady={membershipsReady}
+    />
+  ) : (
+    <p className="text-sm text-ink-muted">This library has no shifts open right now.</p>
+  )
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 pb-28 sm:px-6 lg:pb-8">
@@ -256,18 +333,31 @@ export default function LibraryDetail() {
           </div>
 
           <Card className="p-4 sm:p-5">
-            <h2 className="mb-2 text-lg font-semibold">Seats</h2>
-            <p className="text-2xl font-semibold tabular-nums">
-              {lib.seatsLeft} of {lib.totalSeats} seats free
+            <h2 className="mb-1 text-lg font-semibold">Shifts</h2>
+            <p className="mb-3 text-sm text-ink-muted">
+              Pick a shift to request a seat. Each shift has its own fee and seats.
             </p>
-            <SeatStrip total={lib.totalSeats} free={lib.seatsLeft} className="mt-3" />
+            {shifts.length > 0 ? (
+              <div role="radiogroup" aria-label="Choose a shift" className="grid gap-3 sm:grid-cols-2">
+                {shifts.map((s) => (
+                  <ShiftOption
+                    key={s.id}
+                    shift={s}
+                    selected={selectedShift?.id === s.id}
+                    onSelect={() => setSelectedShiftId(s.id)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-ink-muted">No shifts are open right now.</p>
+            )}
           </Card>
 
           <dl className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-card border border-border bg-surface p-4">
               <dt className="text-sm text-ink-muted">Monthly fee</dt>
               <dd className="mt-1 text-lg font-semibold tabular-nums">
-                {formatRupees(lib.monthlyFeePaise)}
+                from {formatRupees(lib.fromFeePaise)}
                 <span className="text-sm font-normal text-ink-muted"> / month</span>
               </dd>
             </div>
@@ -322,9 +412,11 @@ export default function LibraryDetail() {
           <Card className="sticky top-20 space-y-4 p-5">
             <div className="flex items-center gap-2 text-primary">
               <Armchair aria-hidden className="size-5" />
-              <span className="font-semibold">Request a seat</span>
+              <span className="font-semibold">
+                {selectedShift ? `Request a seat in ${selectedShift.name}` : 'Request a seat'}
+              </span>
             </div>
-            <RequestAction {...actionProps} />
+            {actionCard}
             <a href={`tel:${lib.phone}`} className={buttonStyles('secondary', 'w-full')}>
               <Phone aria-hidden className="size-4" />
               Call
@@ -340,9 +432,7 @@ export default function LibraryDetail() {
             <Phone aria-hidden className="size-4" />
             Call
           </a>
-          <div className="flex-1">
-            <RequestAction {...actionProps} />
-          </div>
+          <div className="flex-1">{actionCard}</div>
         </div>
       </div>
     </div>

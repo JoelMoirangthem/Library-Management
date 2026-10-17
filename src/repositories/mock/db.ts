@@ -111,14 +111,25 @@ export function requireActiveOwner(libraryId: string): Library {
   return lib
 }
 
-export function seatsLeft(libraryId: string): { total: number; left: number } {
-  const active = db.seats.filter((s) => s.libraryId === libraryId && s.isActive)
+export function activeSeats(libraryId: string) {
+  return getDb().seats.filter((s) => s.libraryId === libraryId && s.isActive)
+}
+
+/** Seats not held by an active member IN THIS SHIFT. The same seat can be free in one shift and taken in another. */
+export function seatsLeftInShift(libraryId: string, shiftId: string): { total: number; left: number } {
+  const db = getDb()
+  const active = activeSeats(libraryId)
   const taken = new Set(
-    db.members.filter((m) => m.libraryId === libraryId && m.status === 'active' && m.seatId).map((m) => m.seatId),
+    db.members
+      .filter((m) => m.libraryId === libraryId && m.shiftId === shiftId && m.status === 'active' && m.seatId)
+      .map((m) => m.seatId),
   )
   return { total: active.length, left: active.filter((s) => !taken.has(s.id)).length }
 }
 
+export function shiftsOf(libraryId: string) {
+  return getDb().shifts.filter((s) => s.libraryId === libraryId)
+}
 export function createSeats(libraryId: string, from: number, to: number) {
   for (let n = from; n <= to; n++) {
     db.seats.push({ id: `${libraryId}_s${n}`, libraryId, seatNumber: n, isActive: true })

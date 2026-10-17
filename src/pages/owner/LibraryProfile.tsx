@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/PageParts'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
 import { LibraryForm } from '@/components/owner/profile/LibraryForm'
-import type { ApprovalStatus, LibraryInput } from '@/domain/types'
+import type { ApprovalStatus, LibraryInput, ShiftInput } from '@/domain/types'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
 import { useOwnerLibrary } from '@/hooks/useOwnerLibrary'
@@ -33,10 +33,13 @@ export default function LibraryProfile() {
     [effectiveCityId],
   )
 
-  const createLib = useMutation((input: LibraryInput) => services.createLibrary(input), {
-    silent: true,
-    onSuccess: () => setCreated(true),
-  })
+  const createLib = useMutation(
+    (input: LibraryInput, shifts: ShiftInput[]) => services.createLibrary(input, shifts),
+    {
+      silent: true,
+      onSuccess: () => setCreated(true),
+    },
+  )
   const updateLib = useMutation(
     (input: LibraryInput) => services.updateLibrary(library!.id, input),
     { success: 'Changes saved' },
@@ -104,8 +107,8 @@ export default function LibraryProfile() {
       ? 'Save and resubmit'
       : 'Save changes'
 
-  function handleSubmit(input: LibraryInput) {
-    if (isNone) void createLib.run(input)
+  function handleSubmit(input: LibraryInput, shifts?: ShiftInput[]) {
+    if (isNone) void createLib.run(input, shifts ?? [])
     else if (isRejected) void saveAndResubmit.run(input)
     else void updateLib.run(input)
   }

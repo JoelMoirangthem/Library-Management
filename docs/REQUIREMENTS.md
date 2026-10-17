@@ -21,8 +21,12 @@ Library owners manage their study library (seats, students, fees, expiry). Stude
 - **BR-7** Users choose `student` or `owner` exactly once. The client can never change the role afterwards. `admin` is set only via SQL.
 - **BR-8** One library per owner (v1).
 - **BR-9** Money and membership records are never hard-deleted (fees are voided, members are removed, seats are deactivated).
-- **BR-10** A seat can be held by at most one active member. A seat stays occupied while its member is `active`, even past expiry, until the owner frees it.
+- **BR-10** A seat can be held by at most one active member **per shift**. A seat stays occupied in a shift while its member is `active`, even past expiry, until the owner frees it.
 - **BR-11** Member "expired" and "fee due" are derived from `expiry_date` vs today in `Asia/Kolkata`, never stored.
+- **BR-12** A library runs 1 to 3 active **shifts** (defaults Morning 8:30 am to 12:30 pm, Afternoon 1 to 5 pm, Evening 6 to 9 pm; the owner edits names and times). Active shifts never overlap; a shift may cross midnight.
+- **BR-13** Each shift has its own monthly fee, set by the owner. There is no library-wide fee.
+- **BR-14** Shifts are never deleted. Switching one off hides it from new students; students already in it stay tagged to it and keep their seats. At least one shift stays on.
+- **BR-15** A student who wants two shifts has two memberships (separate expiry and fees). The same person cannot be in the same shift twice. Seat requests are per shift.
 
 ## Features
 
@@ -52,7 +56,9 @@ Library owners manage their study library (seats, students, fees, expiry). Stude
 - **SEAT-3** Seat grid: free / occupied; tap to assign or free.
 
 ### Members (MEM)
-- **MEM-1** Add member (name, phone, seat, start date, expiry date, optional first fee).
+- **MEM-1** Add member (name, phone, shift, seat free in that shift, start date, expiry date, optional first fee).
+- **SHIFT-1** Owner defines up to 3 shifts with times and fees at setup, and can edit, switch off or switch on later.
+- **SHIFT-2** Seats, Students, Requests and Dashboard are organised by shift; a full shift leaves the other shifts' seats free.
 - **MEM-2** Edit, search, filter by expiring in 7 days / expired (due).
 - **MEM-3** Renew: records fee and extends expiry in one atomic call.
 - **MEM-4** Remove member (status `removed`, seat freed).
@@ -74,11 +80,11 @@ Library owners manage their study library (seats, students, fees, expiry). Stude
 
 ### Discovery (DISC)
 - **DISC-1** City and area dropdowns; fee and amenity filters.
-- **DISC-2** Library cards with seats left (from `public_libraries`).
+- **DISC-2** Library cards with "from ?X" and seats left per shift (from `public_libraries`).
 - **DISC-3** Detail page: photos, fees, timings, Call button, "Open in Google Maps" link from text address.
 
 ### Seat requests (REQ)
-- **REQ-1** Student requests a seat at an active library (one pending request per library).
+- **REQ-1** Student requests a seat in a chosen shift of an active library (one pending request per shift).
 - **REQ-2** Student can cancel a pending request.
 - **REQ-3** Owner approves (creates member + assigns seat + optional fee, atomically) or rejects.
 - **REQ-4** Student sees My Requests and My Membership.

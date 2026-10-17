@@ -17,6 +17,8 @@ import type {
   Role,
   Seat,
   SeatRequest,
+  Shift,
+  ShiftInput,
   Subscription,
 } from '@/domain/types'
 
@@ -54,7 +56,8 @@ export interface CatalogRepository {
 export interface LibraryRepository {
   getMine(): Promise<Library | null>
   getById(id: string): Promise<Library | null>
-  create(input: LibraryInput): Promise<Library>
+  /** Creates the library and its 1-3 starting shifts together. */
+  create(input: LibraryInput, shifts: ShiftInput[]): Promise<Library>
   update(id: string, input: LibraryInput): Promise<Library>
   /** rejected -> pending. */
   submitForReview(id: string): Promise<Library>
@@ -64,6 +67,15 @@ export interface LibraryRepository {
   listForAdmin(): Promise<AdminLibraryRow[]>
   approve(id: string): Promise<void>
   reject(id: string, reason: string): Promise<void>
+}
+
+export interface ShiftRepository {
+  /** All shifts including switched-off ones, in clock order. Owner or admin. */
+  listByLibrary(libraryId: string): Promise<Shift[]>
+  add(libraryId: string, input: ShiftInput): Promise<Shift>
+  update(shiftId: string, input: ShiftInput): Promise<Shift>
+  /** Shifts are never deleted. Off = hidden from new students; existing students stay tagged. */
+  setActive(shiftId: string, isActive: boolean): Promise<void>
 }
 
 export interface SubscriptionRepository {
@@ -90,6 +102,7 @@ export type NewMember = {
   libraryId: string
   name: string
   phone: string
+  shiftId: string
   seatId: string | null
   startDate: string
   expiryDate: string
@@ -135,7 +148,7 @@ export type ApproveRequestInput = {
 }
 
 export interface SeatRequestRepository {
-  create(libraryId: string): Promise<SeatRequest>
+  create(libraryId: string, shiftId: string): Promise<SeatRequest>
   cancel(requestId: string): Promise<void>
   listMine(): Promise<MySeatRequest[]>
   listByLibrary(libraryId: string): Promise<SeatRequest[]>

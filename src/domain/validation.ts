@@ -15,9 +15,6 @@ export function validateLibraryInput(i: LibraryInput): FieldErrors<keyof Library
   if (!Number.isInteger(i.capacity) || i.capacity < 1 || i.capacity > 500) {
     e.capacity = 'Enter between 1 and 500 seats.'
   }
-  if (!Number.isInteger(i.monthlyFeePaise) || i.monthlyFeePaise <= 0) {
-    e.monthlyFeePaise = 'Enter the monthly fee in rupees.'
-  }
   if (!i.timings.trim()) e.timings = 'Enter your opening hours.'
   return e
 }

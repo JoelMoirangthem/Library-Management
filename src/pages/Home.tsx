@@ -3,26 +3,31 @@ import { Link } from 'react-router-dom'
 import {
   ArrowRight,
   BellRing,
+  Clock,
   ClipboardCheck,
   Eye,
   IndianRupee,
   LayoutGrid,
   ListChecks,
-  MapPin,
   Users,
 } from 'lucide-react'
 import { buttonStyles } from '@/components/Button'
 import { Card } from '@/components/Card'
-import { SeatStrip } from '@/components/SeatGrid'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
 import { HeroSeatGrid } from '@/components/landing/HeroSeatGrid'
+import { LibraryTeaserCard } from '@/components/landing/LibraryTeaserCard'
 import { formatRupees } from '@/domain/money'
 import { PLAN_PRICE_PAISE } from '@/domain/plan'
 import type { PublicLibrary } from '@/domain/types'
 import { useAsync } from '@/hooks/useAsync'
 import { services } from '@/lib/container'
+
+/** Total seats free across a library's active shifts — used to rank the teaser list. */
+function totalSeatsLeft(library: PublicLibrary): number {
+  return library.shifts.reduce((sum, s) => sum + s.seatsLeft, 0)
+}
 
 export default function Home() {
   return (
@@ -46,9 +51,9 @@ function Hero() {
             Find a study library with a free seat, or run yours without paper registers.
           </h1>
           <p className="mt-5 max-w-prose text-lg text-ink-muted">
-            Students search by city and area and request a seat in a few taps. Owners track
-            seats, students, fees and expiry dates in one place — on the phone, between
-            students.
+            Students search by city and area and request a seat in a few taps. Owners rent
+            each seat by shift — morning, afternoon and evening — and track students, fees
+            and expiry dates in one place, on the phone, between students.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link to="/discover" className={buttonStyles('primary', 'text-base')}>
@@ -81,7 +86,8 @@ function HowItWorks() {
     'Request a seat; the owner confirms and you are in.',
   ]
   const ownerSteps = [
-    'List your library and set your seats and fee.',
+    'List your library and set your seats and shifts.',
+    'Rent each seat by shift: morning, afternoon, evening, with your own times and fees.',
     'Add students or approve seat requests as they come.',
     'See who is paid, who is expiring, and who is overdue at a glance.',
   ]
@@ -145,7 +151,7 @@ function SeatsFreeNow() {
 
   const top = (data ?? [])
     .slice()
-    .sort((a, b) => b.seatsLeft - a.seatsLeft)
+    .sort((a, b) => totalSeatsLeft(b) - totalSeatsLeft(a))
     .slice(0, 3)
 
   return (
@@ -197,36 +203,9 @@ function SeatsFreeNow() {
   )
 }
 
-function LibraryTeaserCard({ library }: { library: PublicLibrary }) {
-  return (
-    <Link
-      to={`/library/${library.id}`}
-      className="group block h-full rounded-card border border-border bg-surface p-5 transition-colors hover:border-border-strong"
-    >
-      <h3 className="text-base font-semibold text-ink group-hover:text-primary">{library.name}</h3>
-      <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-muted">
-        <MapPin aria-hidden className="size-4 shrink-0" />
-        {library.areaName}, {library.cityName}
-      </p>
-
-      <div className="mt-4">
-        <SeatStrip total={library.totalSeats} free={library.seatsLeft} />
-        <p className="mt-2 text-sm font-medium tabular-nums">
-          <span className="text-primary-ink">{library.seatsLeft} free</span>
-          <span className="text-ink-muted"> of {library.totalSeats} seats</span>
-        </p>
-      </div>
-
-      <p className="mt-4 text-sm text-ink-muted tabular-nums">
-        {formatRupees(library.monthlyFeePaise)}
-        <span className="text-ink-muted"> / month</span>
-      </p>
-    </Link>
-  )
-}
-
 function OwnersSection() {
   const benefits = [
+    { icon: <Clock className="size-5" />, title: 'Rent by shift', body: 'Rent each seat by shift: morning, afternoon, evening, with your own times and fees.' },
     { icon: <LayoutGrid className="size-5" />, title: 'A live seat map', body: 'See free, occupied, expiring and overdue seats at a glance — no register to flip through.' },
     { icon: <Users className="size-5" />, title: 'Your student list', body: 'Every student with their seat, start date and expiry, searchable and sortable.' },
     { icon: <BellRing className="size-5" />, title: 'Expiry reminders', body: 'Know who is expiring in the next 7 days and who is already overdue, before they ask.' },
@@ -297,6 +276,10 @@ const FAQS: { q: string; a: ReactNode }[] = [
   {
     q: 'How does the free trial work?',
     a: 'When your library is approved, you get 14 days free with every feature unlocked. Nothing is charged automatically — when the trial ends you choose whether to pay for a month.',
+  },
+  {
+    q: 'How do shifts work?',
+    a: 'Owners rent each seat by shift — up to three a day, like morning, afternoon and evening — with their own times and fee for each. A seat can be taken in one shift and free in another, so students pick the shift that suits them and pay only for that one.',
   },
   {
     q: 'How do I pay?',

@@ -154,3 +154,11 @@ Must hold:
 - Verifying the same payment twice adds 30 days once.
 - Paying during the trial keeps remaining trial days; early renewal stacks.
 - After `active_until` passes, the library is absent from `public_libraries`.
+
+## Shifts (added after the first draft)
+
+- **shifts**: `id`, `library_id`, `name`, `start_time`, `end_time` (may cross midnight), `monthly_fee_paise` (> 0), `is_active`. Never deleted. At most 3 active per library, no overlap between active shifts (enforced in a function/trigger), names unique per library.
+- **libraries**: `monthly_fee_paise` is removed (fees live on shifts).
+- **members** and **seat_requests** gain `shift_id` (not null, same library as the row).
+- Occupancy rule changes to `unique (seat_id, shift_id) where status = 'active' and seat_id is not null`. `public_libraries` returns seats left per active shift and the lowest fee.
+- `approve_seat_request` takes the shift from the request. `set_capacity` only deactivates seats free in every shift. Shift writes follow the profile rule (allowed unless the plan has expired).

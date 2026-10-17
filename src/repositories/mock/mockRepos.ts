@@ -1,6 +1,7 @@
 import { AppError } from '@/domain/errors'
 import { todayIST } from '@/domain/dates'
-import { PLAN_PRICE_PAISE, extendedActiveUntil, newTrial } from '@/domain/plan'
+import { PLAN_PRICE_PAISE, canEditProfile, extendedActiveUntil, newTrial } from '@/domain/plan'
+import { MAX_ACTIVE_SHIFTS, sortShifts, validateShiftFields, validateShiftSet } from '@/domain/shifts'
 import { isValidUtr } from '@/domain/constants'
 import type {
   AdminLibraryRow,
@@ -17,8 +18,11 @@ import type {
   Profile,
   PublicLibrary,
   PublicSearchFilter,
+  PublicShift,
   Seat,
   SeatRequest,
+  Shift,
+  ShiftInput,
 } from '@/domain/types'
 import { getNow } from '@/lib/devState'
 import type {
@@ -34,6 +38,7 @@ import type {
   RenewInput,
   SeatRepository,
   SeatRequestRepository,
+  ShiftRepository,
   SubscriptionRepository,
 } from '@/repositories/interfaces'
 import {
@@ -48,7 +53,9 @@ import {
   requireRole,
   requireUser,
   run,
-  seatsLeft,
+  seatsLeftInShift,
+  shiftsOf,
+  stateOf,
   subscriptionOf,
   uid,
 } from '@/repositories/mock/db'
@@ -59,7 +66,20 @@ const nowIso = () => getNow().toISOString()
 
 function toPublic(lib: Library): PublicLibrary {
   const db = getDb()
-  const { total, left } = seatsLeft(lib.id)
+  const shifts: PublicShift[] = sortShifts(shiftsOf(lib.id))
+    .filter((s) => s.isActive)
+    .map((s) => {
+      const { total, left } = seatsLeftInShift(lib.id, s.id)
+      return {
+        id: s.id,
+        name: s.name,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        monthlyFeePaise: s.monthlyFeePaise,
+        totalSeats: total,
+        seatsLeft: left,
+      }
+    })
   return {
     id: lib.id,
     name: lib.name,
@@ -71,15 +91,14 @@ function toPublic(lib: Library): PublicLibrary {
     pincode: lib.pincode,
     landmark: lib.landmark,
     phone: lib.phone,
-    monthlyFeePaise: lib.monthlyFeePaise,
+    fromFeePaise: shifts.length ? Math.min(...shifts.map((s) => s.monthlyFeePaise)) : 0,
     timings: lib.timings,
     amenities: lib.amenities,
     photos: lib.photos,
-    totalSeats: total,
-    seatsLeft: left,
+    totalSeats: shifts[0]?.totalSeats ?? 0,
+    shifts,
   }
 }
-
 function assertLibraryInput(input: LibraryInput) {
   const db = getDb()
   const area = db.areas.find((a) => a.id === input.areaId)
@@ -88,9 +107,6 @@ function assertLibraryInput(input: LibraryInput) {
   }
   if (!Number.isInteger(input.capacity) || input.capacity < 1 || input.capacity > 500) {
     throw new AppError('invalid', 'Seats must be a whole number between 1 and 500.')
-  }
-  if (!Number.isInteger(input.monthlyFeePaise) || input.monthlyFeePaise <= 0) {
-    throw new AppError('invalid', 'Monthly fee must be more than zero.')
   }
 }
 
@@ -131,19 +147,43 @@ function applyCapacity(lib: Library, capacity: number) {
   lib.capacity = capacity
 }
 
-function assertSeatFree(libraryId: string, seatId: string, exceptMemberId?: string) {
+/** A seat is free for a shift when no ACTIVE member of that same shift holds it. */
+function assertSeatFree(libraryId: string, seatId: string, shiftId: string, exceptMemberId?: string) {
   const db = getDb()
   const seat = db.seats.find((s) => s.id === seatId && s.libraryId === libraryId)
   if (!seat || !seat.isActive) throw new AppError('invalid', 'That seat is not available.')
   const holder = db.members.find(
-    (m) => m.seatId === seatId && m.status === 'active' && m.id !== exceptMemberId,
+    (m) => m.seatId === seatId && m.shiftId === shiftId && m.status === 'active' && m.id !== exceptMemberId,
   )
-  if (holder) throw new AppError('conflict', `Seat ${seat.seatNumber} is already taken by ${holder.name}.`)
+  if (holder) {
+    const shiftName = db.shifts.find((x) => x.id === shiftId)?.name ?? 'this shift'
+    throw new AppError('conflict', `Seat ${seat.seatNumber} is already taken in ${shiftName} by ${holder.name}.`)
+  }
 }
 
+/** The shift must belong to the library and be switched on for new students. */
+function requireActiveShift(libraryId: string, shiftId: string): Shift {
+  const shift = getDb().shifts.find((s) => s.id === shiftId && s.libraryId === libraryId)
+  if (!shift) throw new AppError('invalid', 'Choose a shift.')
+  if (!shift.isActive) throw new AppError('invalid', `${shift.name} is switched off for new students.`)
+  return shift
+}
 function assertMemberFields(name: string, phone: string) {
   if (!name.trim()) throw new AppError('invalid', 'Enter the student’s name.')
   if (!/^[6-9]\d{9}$/.test(phone.trim())) throw new AppError('invalid', 'Enter a 10-digit mobile number.')
+}
+
+function shiftOrThrow(id: string): Shift {
+  const s = getDb().shifts.find((x) => x.id === id)
+  if (!s) throw new AppError('not_found', 'Shift not found.')
+  return s
+}
+
+/** Shifts are part of the library profile (BR-6): editable while pending, rejected or active, not once expired. */
+function assertCanEditShifts(lib: Library) {
+  if (!canEditProfile(stateOf(lib))) {
+    throw new AppError('forbidden', 'Your plan has expired. Renew to make changes.')
+  }
 }
 
 function memberOrThrow(id: string): Member {
@@ -298,7 +338,7 @@ export class MockLibraryRepository implements LibraryRepository {
       return lib
     })
   }
-  create(input: LibraryInput) {
+  create(input: LibraryInput, shiftInputs: ShiftInput[]) {
     return run((): Library => {
       const user = requireRole('owner')
       const db = getDb()
@@ -306,6 +346,8 @@ export class MockLibraryRepository implements LibraryRepository {
         throw new AppError('conflict', 'You already have a library.')
       }
       assertLibraryInput(input)
+      const shiftProblem = validateShiftSet(shiftInputs)
+      if (shiftProblem) throw new AppError('invalid', shiftProblem)
       const lib: Library = {
         ...input,
         id: uid('lib'),
@@ -315,6 +357,9 @@ export class MockLibraryRepository implements LibraryRepository {
         createdAt: nowIso(),
       }
       db.libraries.push(lib)
+      for (const s of shiftInputs) {
+        db.shifts.push({ ...s, name: s.name.trim(), id: uid('sh'), libraryId: lib.id, isActive: true })
+      }
       commit()
       return lib
     })
@@ -351,10 +396,17 @@ export class MockLibraryRepository implements LibraryRepository {
         .filter((l) => db.areas.find((a) => a.id === l.areaId)?.isActive)
         .filter((l) => !filter.cityId || l.cityId === filter.cityId)
         .filter((l) => !filter.areaId || l.areaId === filter.areaId)
-        .filter((l) => !filter.maxFeePaise || l.monthlyFeePaise <= filter.maxFeePaise)
+        .filter(
+          (l) =>
+            !filter.maxFeePaise ||
+            shiftsOf(l.id).some((s) => s.isActive && s.monthlyFeePaise <= filter.maxFeePaise!),
+        )
         .filter((l) => !filter.amenities?.length || filter.amenities.every((a) => l.amenities.includes(a)))
         .map(toPublic)
-        .sort((a, b) => b.seatsLeft - a.seatsLeft)
+        .sort(
+          (a, b) =>
+            b.shifts.reduce((n, s) => n + s.seatsLeft, 0) - a.shifts.reduce((n, s) => n + s.seatsLeft, 0),
+        )
     })
   }
   getPublic(id: string) {
@@ -376,6 +428,7 @@ export class MockLibraryRepository implements LibraryRepository {
           cityName: db.cities.find((c) => c.id === library.cityId)?.name ?? '',
           areaName: db.areas.find((a) => a.id === library.areaId)?.name ?? '',
           subscription: subscriptionOf(library.id),
+          shifts: sortShifts(shiftsOf(library.id)),
         }
       })
     })
@@ -407,6 +460,61 @@ export class MockLibraryRepository implements LibraryRepository {
   }
 }
 
+export class MockShiftRepository implements ShiftRepository {
+  listByLibrary(libraryId: string) {
+    return run((): Shift[] => {
+      const user = requireUser()
+      const lib = findLibrary(libraryId)
+      if (user.role !== 'admin' && lib.ownerId !== user.id) throw new AppError('forbidden', 'Not allowed.')
+      return sortShifts(shiftsOf(libraryId))
+    })
+  }
+  add(libraryId: string, input: ShiftInput) {
+    return run((): Shift => {
+      const lib = requireOwner(libraryId)
+      assertCanEditShifts(lib)
+      const active = shiftsOf(libraryId).filter((s) => s.isActive)
+      if (active.length >= MAX_ACTIVE_SHIFTS) {
+        throw new AppError('conflict', `You can run up to ${MAX_ACTIVE_SHIFTS} shifts. Switch one off first.`)
+      }
+      const problem = validateShiftSet([...active, input])
+      if (problem) throw new AppError('invalid', problem)
+      const shift: Shift = { ...input, name: input.name.trim(), id: uid('sh'), libraryId, isActive: true }
+      getDb().shifts.push(shift)
+      commit()
+      return shift
+    })
+  }
+  update(shiftId: string, input: ShiftInput) {
+    return run((): Shift => {
+      const shift = shiftOrThrow(shiftId)
+      assertCanEditShifts(requireOwner(shift.libraryId))
+      const others = shiftsOf(shift.libraryId).filter((s) => s.isActive && s.id !== shiftId)
+      // A switched-off shift only needs valid fields; an active one must also fit with the others.
+      const problem = shift.isActive ? validateShiftSet([...others, input]) : validateShiftFields(input)
+      if (problem) throw new AppError('invalid', problem)
+      Object.assign(shift, { ...input, name: input.name.trim() })
+      commit()
+      return shift
+    })
+  }
+  setActive(shiftId: string, isActive: boolean) {
+    return run(() => {
+      const shift = shiftOrThrow(shiftId)
+      assertCanEditShifts(requireOwner(shift.libraryId))
+      if (shift.isActive === isActive) return
+      const active = shiftsOf(shift.libraryId).filter((s) => s.isActive)
+      if (!isActive && active.length <= 1) throw new AppError('conflict', 'Keep at least one shift on.')
+      if (isActive) {
+        const problem = validateShiftSet([...active, shift])
+        if (problem) throw new AppError('conflict', problem)
+      }
+      // Students already in this shift stay tagged to it and keep their seats; nothing is deleted.
+      shift.isActive = isActive
+      commit()
+    })
+  }
+}
 export class MockSubscriptionRepository implements SubscriptionRepository {
   getByLibrary(libraryId: string) {
     return run(() => {
@@ -543,13 +651,19 @@ export class MockMemberRepository implements MemberRepository {
       const lib = requireActiveOwner(input.libraryId)
       assertMemberFields(input.name, input.phone)
       if (input.expiryDate < input.startDate) throw new AppError('invalid', 'Expiry must be on or after the start date.')
-      if (input.seatId) assertSeatFree(lib.id, input.seatId)
+      const shift = requireActiveShift(lib.id, input.shiftId)
+      if (input.seatId) assertSeatFree(lib.id, input.seatId, shift.id)
       if (input.firstFee && input.firstFee.amountPaise <= 0) throw new AppError('invalid', 'Fee must be more than zero.')
       const db = getDb()
+      // The same person can join several shifts, but only once per shift.
+      if (db.members.some((m) => m.libraryId === lib.id && m.shiftId === shift.id && m.status === 'active' && m.phone === input.phone.trim())) {
+        throw new AppError('conflict', `This student is already in ${shift.name}. Add them to a different shift, or renew them.`)
+      }
       const member: Member = {
         id: uid('m'),
         libraryId: lib.id,
         studentId: null,
+        shiftId: shift.id,
         name: input.name.trim(),
         phone: input.phone.trim(),
         seatId: input.seatId,
@@ -596,7 +710,7 @@ export class MockMemberRepository implements MemberRepository {
       const m = memberOrThrow(memberId)
       requireActiveOwner(m.libraryId)
       if (m.status !== 'active') throw new AppError('conflict', 'This student was removed.')
-      if (seatId) assertSeatFree(m.libraryId, seatId, m.id)
+      if (seatId) assertSeatFree(m.libraryId, seatId, m.shiftId, m.id)
       m.seatId = seatId
       commit()
     })
@@ -626,6 +740,7 @@ export class MockMemberRepository implements MemberRepository {
           const lib = db.libraries.find((l) => l.id === member.libraryId)
           return {
             member,
+            shift: db.shifts.find((s) => s.id === member.shiftId) ?? null,
             library: lib ? toPublic(lib) : null,
             seatNumber: db.seats.find((s) => s.id === member.seatId)?.seatNumber ?? null,
             payments: db.feePayments
@@ -690,21 +805,23 @@ export class MockFeeRepository implements FeeRepository {
 // ---------------------------------------------------------------- seat requests
 
 export class MockSeatRequestRepository implements SeatRequestRepository {
-  create(libraryId: string) {
+  create(libraryId: string, shiftId: string) {
     return run((): SeatRequest => {
       const user = requireRole('student')
       const db = getDb()
       const lib = db.libraries.find((l) => l.id === libraryId)
       if (!lib || !isLibraryActive(lib)) throw new AppError('not_found', 'This library is not accepting requests.')
-      if (db.seatRequests.some((r) => r.studentId === user.id && r.libraryId === libraryId && r.status === 'pending')) {
-        throw new AppError('conflict', 'You already have a pending request here.')
+      const shift = requireActiveShift(libraryId, shiftId)
+      // One request per shift: a student can ask for Morning and Evening separately.
+      if (db.seatRequests.some((r) => r.studentId === user.id && r.shiftId === shiftId && r.status === 'pending')) {
+        throw new AppError('conflict', `You already asked for a seat in ${shift.name}.`)
       }
-      if (db.members.some((m) => m.studentId === user.id && m.libraryId === libraryId && m.status === 'active')) {
-        throw new AppError('conflict', 'You are already a member of this library.')
+      if (db.members.some((m) => m.studentId === user.id && m.shiftId === shiftId && m.status === 'active')) {
+        throw new AppError('conflict', `You are already a member of ${shift.name} here.`)
       }
       const req: SeatRequest = {
         id: uid('sr'), studentId: user.id, studentName: user.name, studentPhone: user.phone,
-        libraryId, status: 'pending', createdAt: nowIso(), decidedAt: null,
+        libraryId, shiftId, status: 'pending', createdAt: nowIso(), decidedAt: null,
       }
       db.seatRequests.push(req)
       commit()
@@ -736,6 +853,7 @@ export class MockSeatRequestRepository implements SeatRequestRepository {
             libraryName: lib.name,
             areaName: db.areas.find((a) => a.id === lib.areaId)?.name ?? '',
             cityName: db.cities.find((c) => c.id === lib.cityId)?.name ?? '',
+            shiftName: db.shifts.find((s) => s.id === r.shiftId)?.name ?? '',
           }
         })
     })
@@ -756,10 +874,10 @@ export class MockSeatRequestRepository implements SeatRequestRepository {
       const lib = requireActiveOwner(req.libraryId)
       if (req.status !== 'pending') throw new AppError('conflict', 'This request was already handled.')
       if (input.expiryDate < input.startDate) throw new AppError('invalid', 'Expiry must be on or after the start date.')
-      assertSeatFree(lib.id, input.seatId)
+      assertSeatFree(lib.id, input.seatId, req.shiftId)
       // Everything below happens together or not at all (the SQL function runs in one transaction).
       const member: Member = {
-        id: uid('m'), libraryId: lib.id, studentId: req.studentId, name: req.studentName, phone: req.studentPhone,
+        id: uid('m'), libraryId: lib.id, studentId: req.studentId, shiftId: req.shiftId, name: req.studentName, phone: req.studentPhone,
         seatId: input.seatId, startDate: input.startDate, expiryDate: input.expiryDate, status: 'active', removedAt: null,
       }
       db.members.push(member)

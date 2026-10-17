@@ -10,6 +10,7 @@ import {
   MockPlanPaymentRepository,
   MockSeatRepository,
   MockSeatRequestRepository,
+  MockShiftRepository,
   MockSubscriptionRepository,
 } from '@/repositories/mock/mockRepos'
 
@@ -33,6 +34,7 @@ export const services = createServices({
   catalog: new MockCatalogRepository(),
   libraries: new MockLibraryRepository(),
   subscriptions: new MockSubscriptionRepository(),
+  shifts: new MockShiftRepository(),
   planPayments: new MockPlanPaymentRepository(),
   seats: new MockSeatRepository(),
   members: new MockMemberRepository(),

@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Armchair,
@@ -13,14 +14,17 @@ import { buttonStyles } from '@/components/Button'
 import { Card } from '@/components/Card'
 import { PageHeader, StatCard } from '@/components/PageParts'
 import { SeatStrip } from '@/components/SeatGrid'
+import { ShiftTabs } from '@/components/ShiftTabs'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
 import { SetupState } from '@/components/states/SetupState'
 import { ExpiringList, RecentJoins, type DashMember } from '@/components/owner/DashboardLists'
 import { todayIST } from '@/domain/dates'
 import { memberDaysLeft, memberPhase } from '@/domain/members'
+import { formatRupees } from '@/domain/money'
 import { buildSeatCells, seatCounts } from '@/domain/seatCells'
-import type { Member, Seat } from '@/domain/types'
+import { formatShiftRange, sortShifts } from '@/domain/shifts'
+import type { Member, Seat, Shift } from '@/domain/types'
 import { useAsync } from '@/hooks/useAsync'
 import { useOwnerLibrary } from '@/hooks/useOwnerLibrary'
 import { services } from '@/lib/container'
@@ -30,7 +34,7 @@ function dayWord(n: number) {
   return `${n} day${n === 1 ? '' : 's'}`
 }
 
-function toDash(m: Member, seatNumber: number | null, today: string): DashMember {
+function toDash(m: Member, seatNumber: number | null, today: string, shift?: Shift): DashMember {
   return {
     id: m.id,
     name: m.name,
@@ -38,6 +42,7 @@ function toDash(m: Member, seatNumber: number | null, today: string): DashMember
     seatNumber,
     daysLeft: memberDaysLeft(m, today),
     startDate: m.startDate,
+    shift: shift ? { name: shift.name, isActive: shift.isActive } : undefined,
   }
 }
 
@@ -54,10 +59,20 @@ export default function Dashboard() {
     () => (library ? services.listMembers(library.id) : Promise.resolve([] as Member[])),
     [library?.id],
   )
+  const shiftsQ = useAsync(
+    () => (library ? services.listShifts(library.id) : Promise.resolve([] as Shift[])),
+    [library?.id],
+  )
   const requests = useAsync(
     () => (library ? services.listLibrarySeatRequests(library.id) : Promise.resolve([])),
     [library?.id],
   )
+
+  const shifts = useMemo(() => sortShifts(shiftsQ.data ?? []), [shiftsQ.data])
+  const firstActive = shifts.find((s) => s.isActive) ?? shifts[0]
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selectedShiftId = selectedId ?? firstActive?.id ?? null
+  const selectedShift = shifts.find((s) => s.id === selectedShiftId) ?? null
 
   if (loading) {
     return (
@@ -151,8 +166,8 @@ export default function Dashboard() {
   }
 
   // Approved states (trial / paid / expired): show the real numbers.
-  const dataLoading = seats.loading || members.loading
-  const dataError = seats.error ?? members.error
+  const dataLoading = seats.loading || members.loading || shiftsQ.loading
+  const dataError = seats.error ?? members.error ?? shiftsQ.error
 
   const planCard: ReactNode = (
     <Card className="flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5">
@@ -200,7 +215,7 @@ export default function Dashboard() {
         <PageHeader title="Dashboard" />
         {planCard}
         <div className="mt-6">
-          <ErrorState onRetry={() => { seats.reload(); members.reload() }} />
+          <ErrorState onRetry={() => { seats.reload(); members.reload(); shiftsQ.reload() }} />
         </div>
       </>
     )
@@ -210,30 +225,40 @@ export default function Dashboard() {
   const allMembers = members.data ?? []
   const activeMembers = allMembers.filter((m) => m.status === 'active')
 
-  const cells = buildSeatCells(allSeats, allMembers, today)
-  const counts = seatCounts(cells)
-
+  const shiftById = new Map(shifts.map((s) => [s.id, s]))
   const seatNumberById = new Map(allSeats.map((s) => [s.id, s.seatNumber]))
   const seatOf = (m: Member) => (m.seatId ? seatNumberById.get(m.seatId) ?? null : null)
 
-  // Expiring in the next 7 days: active members with phase 'expiring', soonest first.
+  // Selected-shift stat cards: counts match the Seats page (same buildSeatCells + seatCounts).
+  const selectedCells = selectedShiftId
+    ? buildSeatCells(allSeats, allMembers, today, selectedShiftId)
+    : []
+  const selectedCounts = seatCounts(selectedCells)
+  const selectedActive = selectedShiftId
+    ? activeMembers.filter((m) => m.shiftId === selectedShiftId).length
+    : 0
+
+  // "12 free" line on each tab.
+  const freeByShift = new Map(
+    shifts.map((s) => [s.id, seatCounts(buildSeatCells(allSeats, allMembers, today, s.id)).free]),
+  )
+
+  // Expiring / overdue / recent cover ALL shifts; a two-shift student appears once per membership.
   const expiring = activeMembers
     .filter((m) => memberPhase(m, today) === 'expiring')
-    .map((m) => toDash(m, seatOf(m), today))
+    .map((m) => toDash(m, seatOf(m), today, shiftById.get(m.shiftId)))
     .sort((a, b) => a.daysLeft - b.daysLeft)
 
-  // Overdue: expired but still seated.
   const overdue = activeMembers
     .filter((m) => m.seatId && memberPhase(m, today) === 'expired')
-    .map((m) => toDash(m, seatOf(m), today))
+    .map((m) => toDash(m, seatOf(m), today, shiftById.get(m.shiftId)))
     .sort((a, b) => a.daysLeft - b.daysLeft)
 
-  // Recent joins: last 5 by startDate.
   const recent = activeMembers
     .slice()
     .sort((a, b) => b.startDate.localeCompare(a.startDate))
     .slice(0, 5)
-    .map((m) => toDash(m, seatOf(m), today))
+    .map((m) => toDash(m, seatOf(m), today, shiftById.get(m.shiftId)))
 
   const pendingRequests = (requests.data ?? []).filter((r) => r.status === 'pending')
 
@@ -260,24 +285,99 @@ export default function Dashboard() {
         </Card>
       )}
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatCard label="Total seats" value={counts.total} icon={<Armchair />} />
-        <StatCard label="Occupied" value={counts.occupied} icon={<UserCheck />} tone="primary" />
-        <StatCard label="Available" value={counts.free} icon={<Armchair />} />
-        <StatCard label="Active students" value={activeMembers.length} icon={<Users />} tone="primary" />
+      {/* Pick a shift; the stat cards below are for this shift only. */}
+      {shifts.length > 0 && selectedShiftId && (
+        <div className="mt-6">
+          <ShiftTabs
+            shifts={shifts}
+            value={selectedShiftId}
+            onChange={setSelectedId}
+            detail={(s) => `${freeByShift.get(s.id) ?? 0} free`}
+          />
+        </div>
+      )}
+
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StatCard label="Total seats" value={selectedCounts.total} icon={<Armchair />} />
+        <StatCard
+          label={selectedShift ? `Occupied in ${selectedShift.name}` : 'Occupied'}
+          value={selectedCounts.occupied}
+          icon={<UserCheck />}
+          tone="primary"
+        />
+        <StatCard
+          label={selectedShift ? `Available in ${selectedShift.name}` : 'Available'}
+          value={selectedCounts.free}
+          icon={<Armchair />}
+        />
+        <StatCard
+          label={selectedShift ? `Students in ${selectedShift.name}` : 'Active students'}
+          value={selectedActive}
+          icon={<Users />}
+          tone="primary"
+        />
       </div>
 
-      {counts.total > 0 && (
+      {selectedCounts.total > 0 && selectedShift && (
         <Card className="mt-4 p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm font-medium tabular-nums">
-              {counts.free} free · {counts.occupied} occupied
+              {selectedShift.name}: {selectedCounts.free} free · {selectedCounts.occupied} occupied
             </p>
             <Link to="/owner/seats" className="text-sm font-medium text-primary hover:underline">
               Open seat grid
             </Link>
           </div>
-          <SeatStrip total={counts.total} free={counts.free} className="mt-3" />
+          <SeatStrip total={selectedCounts.total} free={selectedCounts.free} className="mt-3" />
+        </Card>
+      )}
+
+      {/* All shifts at a glance. */}
+      {shifts.length > 0 && (
+        <Card className="mt-6 overflow-hidden">
+          <div className="border-b border-border p-4 sm:px-5">
+            <h2 className="text-lg font-semibold">All shifts</h2>
+          </div>
+          <ul className="divide-y divide-border">
+            {shifts.map((s) => {
+              const counts = seatCounts(buildSeatCells(allSeats, allMembers, today, s.id))
+              const studentCount = activeMembers.filter((m) => m.shiftId === s.id).length
+              const taken = counts.total - counts.free
+              return (
+                <li
+                  key={s.id}
+                  className={`p-4 sm:px-5 ${s.isActive ? '' : 'bg-canvas/60 text-ink-muted'}`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="flex flex-wrap items-center gap-2 font-medium">
+                        {s.name}
+                        {!s.isActive && (
+                          <span className="rounded-full bg-border px-2 py-0.5 text-xs font-medium text-ink-muted">
+                            Off
+                          </span>
+                        )}
+                      </p>
+                      <p className="mt-0.5 text-sm text-ink-muted tabular-nums">
+                        {formatShiftRange(s)} · {formatRupees(s.monthlyFeePaise)} / month
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-right text-sm tabular-nums">
+                      <span className="font-medium">{taken} of {counts.total} seats taken</span>
+                      <br />
+                      <span className="text-ink-muted">
+                        {studentCount} student{studentCount === 1 ? '' : 's'}
+                        {!s.isActive && studentCount > 0 ? ' still tagged' : ''}
+                      </span>
+                    </p>
+                  </div>
+                  {counts.total > 0 && (
+                    <SeatStrip total={counts.total} free={counts.free} className="mt-3" />
+                  )}
+                </li>
+              )
+            })}
+          </ul>
         </Card>
       )}
 

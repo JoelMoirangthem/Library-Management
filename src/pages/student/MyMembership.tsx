@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { CalendarClock, MapPin, Phone, TriangleAlert } from 'lucide-react'
+import { CalendarClock, Clock, MapPin, Phone, TriangleAlert } from 'lucide-react'
 import { Badge, type BadgeTone } from '@/components/Badge'
 import { buttonStyles } from '@/components/Button'
 import { Card } from '@/components/Card'
@@ -11,6 +11,7 @@ import { formatDate, todayIST } from '@/domain/dates'
 import { memberDaysLeft, memberPhase } from '@/domain/members'
 import { FEE_MODES } from '@/domain/constants'
 import { formatRupees } from '@/domain/money'
+import { formatShiftRange } from '@/domain/shifts'
 import type { FeeMode, MyMembership as Membership } from '@/domain/types'
 import { services } from '@/lib/container'
 import { useAsync } from '@/hooks/useAsync'
@@ -32,6 +33,9 @@ function phaseBadge(phase: ReturnType<typeof memberPhase>): { tone: BadgeTone; l
 }
 
 function MembershipCard({ m, today }: { m: Membership; today: string }) {
+  // A membership whose shift we can't resolve shows nothing.
+  if (!m.shift) return null
+
   const phase = memberPhase(m.member, today)
   const daysLeft = memberDaysLeft(m.member, today)
   const badge = phaseBadge(phase)
@@ -53,13 +57,20 @@ function MembershipCard({ m, today }: { m: Membership; today: string }) {
                 libName
               )}
             </h2>
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <Badge tone="primary">{m.shift.name}</Badge>
+              <span className="flex items-center gap-1 text-sm tabular-nums text-ink-muted">
+                <Clock aria-hidden className="size-3.5" />
+                {formatShiftRange(m.shift)}
+              </span>
+            </p>
             {m.library ? (
-              <p className="mt-0.5 flex items-center gap-1.5 text-sm text-ink-muted">
+              <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-muted">
                 <MapPin aria-hidden className="size-4 shrink-0" />
                 {m.library.areaName}, {m.library.cityName}
               </p>
             ) : (
-              <p className="mt-0.5 text-sm text-ink-muted">This library is not currently listed.</p>
+              <p className="mt-1 text-sm text-ink-muted">This library is not currently listed.</p>
             )}
           </div>
           <Badge tone={badge.tone}>{badge.label}</Badge>

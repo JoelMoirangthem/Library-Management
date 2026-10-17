@@ -18,13 +18,20 @@ function expiryPhrase(days: number): string {
 }
 
 /**
- * Occupied seats are computed from active members, never stored on the seat, so the grid
- * can never disagree with the member list (BR-10). A seat stays occupied past expiry
+ * Occupied seats are computed from active members of ONE shift, never stored on the seat, so the grid
+ * can never disagree with the member list (BR-10). The same seat can be free in one shift and taken in another. A seat stays occupied past expiry
  * ("overdue") until the owner frees it.
  */
-export function buildSeatCells(seats: Seat[], members: Member[], today: string): SeatCell[] {
+export function buildSeatCells(
+  seats: Seat[],
+  members: Member[],
+  today: string,
+  shiftId: string,
+): SeatCell[] {
   const bySeat = new Map<string, Member>()
-  for (const m of members) if (m.status === 'active' && m.seatId) bySeat.set(m.seatId, m)
+  for (const m of members) {
+    if (m.status === 'active' && m.seatId && m.shiftId === shiftId) bySeat.set(m.seatId, m)
+  }
 
   return seats
     .slice()

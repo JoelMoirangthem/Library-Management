@@ -9,6 +9,7 @@ import {
   MockAuthRepository,
   MockPlanPaymentRepository,
   MockSeatRequestRepository,
+  MockShiftRepository,
   MockSubscriptionRepository,
   MockSeatRepository,
 } from '@/repositories/mock/mockRepos'
@@ -22,6 +23,7 @@ const payments = new MockPlanPaymentRepository()
 const requests = new MockSeatRequestRepository()
 const subs = new MockSubscriptionRepository()
 const seats = new MockSeatRepository()
+const shiftRepo = new MockShiftRepository()
 const auth = new MockAuthRepository()
 
 const code = async (p: Promise<unknown>) => {
@@ -121,7 +123,7 @@ describe('expired library is read-only (BR-6)', () => {
     expect(await code(members.listByLibrary('lib_scholars'))).toBe('ok')
     expect(
       await code(
-        members.add({ libraryId: 'lib_scholars', name: 'New Student', phone: '9876543210', seatId: null, startDate: '2026-10-01', expiryDate: '2026-11-01' }),
+        members.add({ libraryId: 'lib_scholars', shiftId: 'lib_scholars_sh1', name: 'New Student', phone: '9876543210', seatId: null, startDate: '2026-10-01', expiryDate: '2026-11-01' }),
       ),
     ).toBe('forbidden')
     expect(await code(payments.submit('lib_scholars', '777777777777'))).toBe('ok')
@@ -147,24 +149,24 @@ describe('expired library is read-only (BR-6)', () => {
 describe('seats and requests', () => {
   it('one seat cannot hold two active members', async () => {
     await login.signInAs('u_anil')
-    const taken = getDb().members.find((m) => m.libraryId === 'lib_gyan' && m.status === 'active' && m.seatId)!
+    const taken = getDb().members.find((m) => m.shiftId === 'lib_gyan_sh1' && m.status === 'active' && m.seatId)!
     expect(
       await code(
-        members.add({ libraryId: 'lib_gyan', name: 'Dup Seat', phone: '9876543210', seatId: taken.seatId, startDate: '2026-10-01', expiryDate: '2026-11-01' }),
+        members.add({ libraryId: 'lib_gyan', shiftId: 'lib_gyan_sh1', name: 'Dup Seat', phone: '9876543210', seatId: taken.seatId, startDate: '2026-10-01', expiryDate: '2026-11-01' }),
       ),
     ).toBe('conflict')
   })
 
   it('a student cannot request twice at the same library', async () => {
     await login.signInAs('u_aman')
-    expect(await code(requests.create('lib_gyan'))).toBe('conflict') // seeded pending
-    expect(await code(requests.create('lib_scholars'))).toBe('not_found') // expired
+    expect(await code(requests.create('lib_gyan', 'lib_gyan_sh2'))).toBe('conflict') // seeded pending
+    expect(await code(requests.create('lib_scholars', 'lib_scholars_sh1'))).toBe('not_found') // expired
   })
 
   it('approving a request creates the member, seat and fee together', async () => {
     await login.signInAs('u_anil')
     const free = getDb().seats.find(
-      (s) => s.libraryId === 'lib_gyan' && s.isActive && !getDb().members.some((m) => m.seatId === s.id && m.status === 'active'),
+      (s) => s.libraryId === 'lib_gyan' && s.isActive && !getDb().members.some((m) => m.seatId === s.id && m.shiftId === 'lib_gyan_sh2' && m.status === 'active'),
     )!
     await requests.approve({ requestId: 'sr_1', seatId: free.id, startDate: '2026-10-17', expiryDate: '2026-11-16', amountPaise: 100000, mode: 'cash' })
     const m = getDb().members.find((x) => x.studentId === 'u_aman' && x.libraryId === 'lib_gyan')!
@@ -174,22 +176,93 @@ describe('seats and requests', () => {
     expect(await code(requests.approve({ requestId: 'sr_1', seatId: free.id, startDate: '2026-10-17', expiryDate: '2026-11-16', amountPaise: 0, mode: 'cash' }))).toBe('conflict')
   })
 
-  it('lowering seats only deactivates free seats', async () => {
+  it('lowering seats only deactivates seats free in every shift', async () => {
     await login.signInAs('u_anil')
-    expect(await code(seats.setCapacity('lib_gyan', 5))).toBe('conflict')
-    await seats.setCapacity('lib_gyan', 35)
-    expect(getDb().seats.filter((s) => s.libraryId === 'lib_gyan' && s.isActive)).toHaveLength(35)
+    // Morning is completely full, so no seat can be removed.
+    expect(await code(seats.setCapacity('lib_gyan', 35))).toBe('conflict')
+    await login.signInAs('u_sunita')
+    await seats.setCapacity('lib_nalanda', 25)
+    expect(getDb().seats.filter((s) => s.libraryId === 'lib_nalanda' && s.isActive)).toHaveLength(25)
   })
 })
 
 describe('renewals', () => {
   it('renew records the fee and extends expiry together; removed members cannot renew', async () => {
     await login.signInAs('u_anil')
-    const m = getDb().members.find((x) => x.id === 'lib_gyan_m3')!
+    const m = getDb().members.find((x) => x.id === 'lib_gyan_sh1_m3')!
     const old = m.expiryDate
     await members.renew({ memberId: m.id, amountPaise: 100000, mode: 'upi', newExpiry: '2099-01-01' })
     expect(m.expiryDate).toBe('2099-01-01')
     expect(old < m.expiryDate).toBe(true)
     expect(await code(members.renew({ memberId: 'lib_gyan_mr', amountPaise: 100000, mode: 'cash', newExpiry: '2099-02-01' }))).toBe('conflict')
+  })
+})
+
+describe('shifts', () => {
+  it('a full morning leaves the other shifts completely free', async () => {
+    await login.signInAs('u_aman')
+    const gyan = (await libs.searchPublic({})).find((l) => l.id === 'lib_gyan')!
+    const [morning, afternoon, evening] = gyan.shifts
+    expect(morning.name).toBe('Morning')
+    expect(morning.seatsLeft).toBe(0)
+    expect(afternoon.seatsLeft).toBeGreaterThan(25)
+    expect(evening.seatsLeft).toBeGreaterThan(25)
+    expect(gyan.fromFeePaise).toBe(70000) // cheapest shift
+  })
+
+  it('the same seat can hold a different student in each shift, but only one per shift', async () => {
+    await login.signInAs('u_anil')
+    const seatId = 'lib_gyan_s39' // held in Morning, empty in Afternoon
+    const base = { libraryId: 'lib_gyan', seatId, startDate: '2026-10-01', expiryDate: '2026-11-01' }
+    expect(await code(members.add({ ...base, shiftId: 'lib_gyan_sh2', name: 'Afternoon Student', phone: '9111111111' }))).toBe('ok')
+    expect(await code(members.add({ ...base, shiftId: 'lib_gyan_sh2', name: 'Another One', phone: '9222222222' }))).toBe('conflict')
+    expect(await code(members.add({ ...base, shiftId: 'lib_gyan_sh1', name: 'Morning Clash', phone: '9333333333' }))).toBe('conflict')
+  })
+
+  it('one student can join several shifts, but not the same shift twice', async () => {
+    await login.signInAs('u_anil')
+    const base = { libraryId: 'lib_gyan', seatId: null, startDate: '2026-10-01', expiryDate: '2026-11-01', name: 'Twice Student', phone: '9444444444' }
+    expect(await code(members.add({ ...base, shiftId: 'lib_gyan_sh2' }))).toBe('ok')
+    expect(await code(members.add({ ...base, shiftId: 'lib_gyan_sh3' }))).toBe('ok')
+    expect(await code(members.add({ ...base, shiftId: 'lib_gyan_sh3' }))).toBe('conflict')
+    await login.signInAs('u_riya')
+    expect(await members.listMine()).toHaveLength(2) // Morning and Evening, each its own membership
+  })
+
+  it('requests are per shift', async () => {
+    await login.signInAs('u_aman')
+    expect(await code(requests.create('lib_gyan', 'lib_gyan_sh3'))).toBe('ok') // already pending for sh2
+    expect(await code(requests.create('lib_gyan', 'lib_gyan_sh3'))).toBe('conflict')
+    expect(await code(requests.create('lib_gyan', 'lib_nalanda_sh1'))).toBe('invalid') // shift of another library
+  })
+
+  it('shifts cannot overlap and there are at most three', async () => {
+    await login.signInAs('u_manoj') // Day 06:00-18:00 and Night 18:00-06:00 cover the whole day
+    expect(await code(shiftRepo.add('lib_quiet', { name: 'Early', startTime: '05:00', endTime: '07:00', monthlyFeePaise: 50000 }))).toBe('invalid')
+    await login.signInAs('u_rekha') // Study Nest has one shift
+    expect(await code(shiftRepo.add('lib_nest', { name: 'Afternoon', startTime: '13:00', endTime: '17:00', monthlyFeePaise: 50000 }))).toBe('ok')
+    expect(await code(shiftRepo.add('lib_nest', { name: 'Evening', startTime: '18:00', endTime: '21:00', monthlyFeePaise: 50000 }))).toBe('ok')
+    expect(await code(shiftRepo.add('lib_nest', { name: 'Late', startTime: '21:30', endTime: '23:00', monthlyFeePaise: 50000 }))).toBe('conflict')
+  })
+
+  it('switching a shift off never deletes it or its students', async () => {
+    await login.signInAs('u_anil')
+    const before = getDb().members.filter((m) => m.shiftId === 'lib_gyan_sh3' && m.status === 'active').length
+    await shiftRepo.setActive('lib_gyan_sh3', false)
+    expect(getDb().shifts.find((s) => s.id === 'lib_gyan_sh3')!.isActive).toBe(false)
+    expect(getDb().members.filter((m) => m.shiftId === 'lib_gyan_sh3' && m.status === 'active')).toHaveLength(before)
+    await login.signInAs('u_sana')
+    expect((await libs.getPublic('lib_gyan'))!.shifts.map((s) => s.id)).not.toContain('lib_gyan_sh3')
+    expect(await code(requests.create('lib_gyan', 'lib_gyan_sh3'))).toBe('invalid')
+  })
+
+  it('the last shift cannot be switched off', async () => {
+    await login.signInAs('u_rekha')
+    expect(await code(shiftRepo.setActive('lib_nest_sh1', false))).toBe('conflict')
+  })
+
+  it('an expired owner cannot change shifts', async () => {
+    await login.signInAs('u_farah')
+    expect(await code(shiftRepo.add('lib_scholars', { name: 'Evening', startTime: '18:00', endTime: '21:00', monthlyFeePaise: 50000 }))).toBe('forbidden')
   })
 })

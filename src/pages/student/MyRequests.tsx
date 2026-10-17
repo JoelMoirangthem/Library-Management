@@ -72,7 +72,7 @@ export default function MyRequests() {
                         </Link>
                       </h2>
                       <p className="mt-0.5 text-sm text-ink-muted">
-                        {r.areaName}, {r.cityName}
+                        {r.shiftName} · {r.areaName}, {r.cityName}
                       </p>
                       <p className="mt-2 text-sm text-ink-muted tabular-nums">
                         Requested {formatDateTime(r.createdAt)}

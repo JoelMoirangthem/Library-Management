@@ -7,6 +7,7 @@ import type {
   PlanPaymentRepository,
   SeatRepository,
   SeatRequestRepository,
+  ShiftRepository,
   SubscriptionRepository,
 } from '@/repositories/interfaces'
 
@@ -15,6 +16,7 @@ export type Repositories = {
   catalog: CatalogRepository
   libraries: LibraryRepository
   subscriptions: SubscriptionRepository
+  shifts: ShiftRepository
   planPayments: PlanPaymentRepository
   seats: SeatRepository
   members: MemberRepository
@@ -65,6 +67,12 @@ export function createServices(r: Repositories) {
     verifyPlanPayment: (id: string) => r.planPayments.verify(id),
     failPlanPayment: (id: string, reason: string) => r.planPayments.fail(id, reason),
 
+    // shifts (never deleted; switch off instead)
+    listShifts: (libraryId: string) => r.shifts.listByLibrary(libraryId),
+    addShift: r.shifts.add.bind(r.shifts),
+    updateShift: r.shifts.update.bind(r.shifts),
+    setShiftActive: (shiftId: string, on: boolean) => r.shifts.setActive(shiftId, on),
+
     // seats
     listSeats: (libraryId: string) => r.seats.listByLibrary(libraryId),
     setCapacity: (libraryId: string, capacity: number) => r.seats.setCapacity(libraryId, capacity),
@@ -85,7 +93,7 @@ export function createServices(r: Repositories) {
     voidFee: (feeId: string, reason: string) => r.fees.void(feeId, reason),
 
     // seat requests
-    requestSeat: (libraryId: string) => r.seatRequests.create(libraryId),
+    requestSeat: (libraryId: string, shiftId: string) => r.seatRequests.create(libraryId, shiftId),
     cancelSeatRequest: (id: string) => r.seatRequests.cancel(id),
     listMySeatRequests: () => r.seatRequests.listMine(),
     listLibrarySeatRequests: (libraryId: string) => r.seatRequests.listByLibrary(libraryId),

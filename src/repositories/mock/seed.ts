@@ -9,6 +9,7 @@ import type {
   Profile,
   Seat,
   SeatRequest,
+  Shift,
   Subscription,
 } from '@/domain/types'
 
@@ -19,6 +20,7 @@ export type DB = {
   areas: Area[]
   profiles: Profile[]
   libraries: Library[]
+  shifts: Shift[]
   subscriptions: Subscription[]
   planPayments: PlanPayment[]
   seats: Seat[]
@@ -27,17 +29,15 @@ export type DB = {
   seatRequests: SeatRequest[]
 }
 
-export const DB_VERSION = 1
+export const DB_VERSION = 2
 
 const DAY = 86_400_000
-const NAMES = [
-  'Aarav Mishra', 'Ishita Verma', 'Kabir Singh', 'Meera Pandey', 'Rohan Tiwari', 'Ananya Dubey',
-  'Vivek Yadav', 'Priya Nair', 'Arjun Chauhan', 'Neha Kapoor', 'Siddharth Rao', 'Pooja Saxena',
-  'Harsh Vardhan', 'Kavya Joshi', 'Nikhil Agarwal', 'Shreya Bansal', 'Yash Rathore', 'Tanvi Mehra',
-  'Devansh Gupta', 'Muskan Ansari', 'Karan Malhotra', 'Divya Shukla', 'Ayush Pathak', 'Simran Kaur',
-  'Pranav Desai', 'Ritika Sinha', 'Mohit Bhatt', 'Jaya Mukherjee', 'Abhay Thakur', 'Nandini Iyer',
-  'Sahil Khan', 'Bhavna Rawat', 'Tushar Jain', 'Komal Chaudhary', 'Utkarsh Dwivedi', 'Palak Sharma',
-]
+const FIRST = ['Aarav', 'Ishita', 'Kabir', 'Meera', 'Rohan', 'Ananya', 'Vivek', 'Priya', 'Arjun', 'Neha', 'Siddharth', 'Pooja', 'Harsh', 'Kavya', 'Nikhil', 'Shreya']
+const LAST = ['Mishra', 'Verma', 'Singh', 'Pandey', 'Tiwari', 'Dubey', 'Yadav', 'Nair', 'Chauhan', 'Kapoor', 'Rao', 'Saxena']
+
+function personName(i: number): string {
+  return `${FIRST[i % FIRST.length]} ${LAST[(i * 7 + Math.floor(i / FIRST.length)) % LAST.length]}`
+}
 
 function phone(n: number): string {
   return `9${String(800000000 + n * 7919).slice(0, 9)}`
@@ -97,7 +97,6 @@ export function createSeed(now: Date): DB {
     landmark: string
     phone: string
     capacity: number
-    fee: number
     timings: string
     amenities: string[]
     status: Library['approvalStatus']
@@ -108,44 +107,44 @@ export function createSeed(now: Date): DB {
     {
       id: 'lib_gyan', ownerId: 'u_anil', name: 'Gyan Deep Study Hub', cityId: 'city_lko', areaId: 'area_faz',
       address: '2nd Floor, Shanti Complex, Faizabad Road', pincode: '226016', landmark: 'Opposite Axis Bank',
-      phone: '9415000011', capacity: 39, fee: 1000, timings: '6:00 am to 11:00 pm',
+      phone: '9415000011', capacity: 39, timings: '8:30 am to 9:00 pm',
       amenities: ['AC', 'Wi-Fi', 'Power socket', 'Water purifier', 'Silent zone', 'CCTV'], status: 'approved',
     },
     {
       id: 'lib_nalanda', ownerId: 'u_sunita', name: 'Nalanda Reading Room', cityId: 'city_lko', areaId: 'area_ali',
       address: '14, Sector J, Aliganj', pincode: '226024', landmark: 'Near Aliganj Hanuman Mandir',
-      phone: '9415000012', capacity: 30, fee: 800, timings: '7:00 am to 10:00 pm',
+      phone: '9415000012', capacity: 30, timings: '8:30 am to 9:00 pm',
       amenities: ['Wi-Fi', 'Power socket', 'Locker', 'Silent zone'], status: 'approved',
     },
     {
       id: 'lib_quiet', ownerId: 'u_manoj', name: 'Quiet Hours Library', cityId: 'city_lko', areaId: 'area_ind',
       address: 'B-27, Sector 12, Indira Nagar', pincode: '226016', landmark: 'Behind Munshipulia Chauraha',
-      phone: '9415000013', capacity: 24, fee: 1200, timings: 'Open 24 hours',
+      phone: '9415000013', capacity: 24, timings: 'Open 24 hours',
       amenities: ['AC', 'Wi-Fi', 'Power socket', 'Open 24 hours', 'Tea & coffee'], status: 'approved',
     },
     {
       id: 'lib_scholars', ownerId: 'u_farah', name: "Scholars' Den", cityId: 'city_lko', areaId: 'area_kri',
       address: '41, Krishna Nagar Main Road', pincode: '226023', landmark: 'Next to Sai Medical Store',
-      phone: '9415000014', capacity: 20, fee: 900, timings: '6:30 am to 9:30 pm',
+      phone: '9415000014', capacity: 20, timings: '8:30 am to 12:30 pm',
       amenities: ['Wi-Fi', 'Power socket', 'Parking'], status: 'approved',
     },
     {
       id: 'lib_lakshya', ownerId: 'u_deepak', name: 'Lakshya Self Study', cityId: 'city_lko', areaId: 'area_gom',
       address: 'Vibhuti Khand, Gomti Nagar', pincode: '226010', landmark: 'Near Patrakarpuram crossing',
-      phone: '9415000015', capacity: 36, fee: 1500, timings: '6:00 am to 12:00 am',
+      phone: '9415000015', capacity: 36, timings: '8:30 am to 9:00 pm',
       amenities: ['AC', 'Wi-Fi', 'Power socket', 'Locker', 'CCTV', 'Parking'], status: 'pending',
     },
     {
       id: 'lib_nest', ownerId: 'u_rekha', name: 'Study Nest', cityId: 'city_knp', areaId: 'area_swa',
       address: '88, Swaroop Nagar', pincode: '208002', landmark: 'Near Kanpur Medical Store',
-      phone: '9415000016', capacity: 18, fee: 700, timings: '8:00 am to 8:00 pm',
+      phone: '9415000016', capacity: 18, timings: '8:30 am to 12:30 pm',
       amenities: ['Wi-Fi', 'Power socket'], status: 'rejected',
       reason: 'The phone number did not connect and the address has no landmark we could find. Please check both, then resubmit.',
     },
     {
       id: 'lib_khwai', ownerId: 'u_ibomcha', name: 'Khwairakpam Study Centre', cityId: 'city_imf', areaId: 'area_sin',
       address: 'Singjamei Chingamakha, Near Uripok Road', pincode: '795008', landmark: 'Above Keishampat Stationers',
-      phone: '9856000017', capacity: 28, fee: 600, timings: '6:00 am to 9:00 pm',
+      phone: '9856000017', capacity: 28, timings: '8:30 am to 9:00 pm',
       amenities: ['Wi-Fi', 'Power socket', 'Water purifier', 'Silent zone', 'Tea & coffee'], status: 'approved',
     },
   ]
@@ -153,9 +152,34 @@ export function createSeed(now: Date): DB {
   const libraries: Library[] = libs.map((l) => ({
     id: l.id, ownerId: l.ownerId, name: l.name, cityId: l.cityId, areaId: l.areaId, address: l.address,
     pincode: l.pincode, landmark: l.landmark, phone: l.phone, capacity: l.capacity,
-    monthlyFeePaise: l.fee * 100, timings: l.timings, amenities: l.amenities, photos: [],
+    timings: l.timings, amenities: l.amenities, photos: [],
     approvalStatus: l.status, rejectionReason: l.reason ?? null, createdAt: iso(-90),
   }))
+
+  // ---- shifts: each library sets its own times and fees (no overlaps, up to three) ----
+  const sh = (libraryId: string, n: number, name: string, startTime: string, endTime: string, rupees: number): Shift => ({
+    id: `${libraryId}_sh${n}`, libraryId, name, startTime, endTime, monthlyFeePaise: rupees * 100, isActive: true,
+  })
+  const shifts: Shift[] = [
+    sh('lib_gyan', 1, 'Morning', '08:30', '12:30', 1000),
+    sh('lib_gyan', 2, 'Afternoon', '13:00', '17:00', 800),
+    sh('lib_gyan', 3, 'Evening', '18:00', '21:00', 700),
+    sh('lib_nalanda', 1, 'Morning', '08:30', '12:30', 800),
+    sh('lib_nalanda', 2, 'Afternoon', '13:00', '17:00', 600),
+    sh('lib_nalanda', 3, 'Evening', '18:00', '21:00', 500),
+    sh('lib_quiet', 1, 'Day', '06:00', '18:00', 1200),
+    sh('lib_quiet', 2, 'Night', '18:00', '06:00', 1000),
+    sh('lib_scholars', 1, 'Morning', '08:30', '12:30', 900),
+    sh('lib_lakshya', 1, 'Morning', '08:30', '12:30', 1500),
+    sh('lib_lakshya', 2, 'Afternoon', '13:00', '17:00', 1200),
+    sh('lib_lakshya', 3, 'Evening', '18:00', '21:00', 1000),
+    sh('lib_nest', 1, 'Morning', '08:30', '12:30', 700),
+    sh('lib_khwai', 1, 'Morning', '08:30', '12:30', 600),
+    sh('lib_khwai', 2, 'Afternoon', '13:00', '17:00', 500),
+    sh('lib_khwai', 3, 'Evening', '18:00', '21:00', 400),
+  ]
+  // Khwairakpam's Evening shift is switched off: hidden from new students, but its students stay tagged to it.
+  shifts.find((s) => s.id === 'lib_khwai_sh3')!.isActive = false
 
   const subscriptions: Subscription[] = [
     { libraryId: 'lib_gyan', trialEndsAt: iso(9), activeUntil: iso(9) },
@@ -176,55 +200,101 @@ export function createSeed(now: Date): DB {
   const seats: Seat[] = []
   const members: Member[] = []
   const feePayments: FeePayment[] = []
+  let personIdx = 0
 
-  let nameIdx = 0
-  const nextName = () => NAMES[nameIdx++ % NAMES.length]
-
-  function build(libId: string, seatCount: number, expiryOffsets: number[], opts: { inactiveSeats?: number[]; studentLinks?: Record<number, string> } = {}) {
-    const lib = libraries.find((l) => l.id === libId)!
-    for (let n = 1; n <= seatCount; n++) {
-      seats.push({ id: `${libId}_s${n}`, libraryId: libId, seatNumber: n, isActive: !opts.inactiveSeats?.includes(n) })
-    }
-    const usable = seats.filter((s) => s.libraryId === libId && s.isActive)
-    expiryOffsets.forEach((off, i) => {
-      // Spread members across seats, leaving gaps so some stay free.
-      const seat = usable[i + Math.floor(i / 6)]
-      const studentId = opts.studentLinks?.[i] ?? null
-      const name = studentId ? profiles.find((p) => p.id === studentId)!.name : nextName()
-      const id = `${libId}_m${i + 1}`
-      const expiry = date(off)
-      members.push({
-        id, libraryId: libId, studentId, name, phone: studentId ? profiles.find((p) => p.id === studentId)!.phone : phone(nameIdx + i),
-        seatId: seat?.id ?? null, startDate: addDays(expiry, -30), expiryDate: expiry, status: 'active', removedAt: null,
-      })
-      feePayments.push({ id: `${id}_f1`, memberId: id, libraryId: libId, amountPaise: lib.monthlyFeePaise, paidOn: addDays(expiry, -30), mode: i % 3 === 0 ? 'upi' : 'cash', isVoid: false, voidReason: null })
-      if (i % 4 === 0) {
-        feePayments.push({ id: `${id}_f0`, memberId: id, libraryId: libId, amountPaise: lib.monthlyFeePaise, paidOn: addDays(expiry, -60), mode: 'cash', isVoid: false, voidReason: null })
-      }
-    })
-    // One removed member with history, to show "never hard-deleted".
-    const rid = `${libId}_mr`
-    members.push({ id: rid, libraryId: libId, studentId: null, name: nextName(), phone: phone(nameIdx + 99), seatId: null, startDate: date(-75), expiryDate: date(-45), status: 'removed', removedAt: iso(-44) })
-    feePayments.push({ id: `${rid}_f1`, memberId: rid, libraryId: libId, amountPaise: lib.monthlyFeePaise, paidOn: date(-75), mode: 'cash', isVoid: false, voidReason: null })
+  type ShiftPlan = {
+    shiftNo: number
+    /** Days until expiry for each student (negative = overdue). */
+    offsets: number[]
+    /** Leave gaps between seats so some stay free. Off = seats filled one after another (a full shift). */
+    spread?: boolean
+    /** Index in `offsets` -> linked student account. */
+    links?: Record<number, string>
   }
 
-  build('lib_gyan', 40, [-6, -2, 1, 2, 3, 4, 5, 6, 7, 9, 12, 15, 18, 20, 22, 25, 27, 28, 30, 30, 15, 12, 10, 26, 19], {
-    inactiveSeats: [13],
-    studentLinks: { 8: 'u_riya' },
-  })
-  build('lib_nalanda', 30, [-3, 2, 6, 11, 14, 18, 21, 24, 28, 30, 9, 16])
-  build('lib_quiet', 24, [1, 3, 8, 13, 17, 20, 25, 29, 22])
-  build('lib_scholars', 20, [-12, -9, -7, -5, -4, -3, -1, 0])
-  build('lib_khwai', 28, [2, 5, 10, 14, 19, 23, 26, 29, 12, 21])
+  function build(libId: string, seatCount: number, plans: ShiftPlan[], inactiveSeats: number[] = []) {
+    for (let n = 1; n <= seatCount; n++) {
+      seats.push({ id: `${libId}_s${n}`, libraryId: libId, seatNumber: n, isActive: !inactiveSeats.includes(n) })
+    }
+    const usable = seats.filter((s) => s.libraryId === libId && s.isActive)
 
-  // Make Riya's membership one the student view can show (id fixed for readability).
+    for (const plan of plans) {
+      const shift = shifts.find((s) => s.id === `${libId}_sh${plan.shiftNo}`)!
+      plan.offsets.forEach((off, i) => {
+        // Each shift fills seats from the start, so one seat can hold different students in different shifts.
+        const seat = usable[plan.spread ? i + Math.floor(i / 6) : i]
+        const studentId = plan.links?.[i] ?? null
+        const profile = studentId ? profiles.find((p) => p.id === studentId)! : null
+        personIdx++
+        const id = `${shift.id}_m${i + 1}`
+        const expiry = date(off)
+        members.push({
+          id, libraryId: libId, studentId, shiftId: shift.id,
+          name: profile ? profile.name : personName(personIdx),
+          phone: profile ? profile.phone : phone(personIdx),
+          seatId: seat?.id ?? null, startDate: addDays(expiry, -30), expiryDate: expiry, status: 'active', removedAt: null,
+        })
+        feePayments.push({ id: `${id}_f1`, memberId: id, libraryId: libId, amountPaise: shift.monthlyFeePaise, paidOn: addDays(expiry, -30), mode: i % 3 === 0 ? 'upi' : 'cash', isVoid: false, voidReason: null })
+        if (i % 4 === 0) {
+          feePayments.push({ id: `${id}_f0`, memberId: id, libraryId: libId, amountPaise: shift.monthlyFeePaise, paidOn: addDays(expiry, -60), mode: 'cash', isVoid: false, voidReason: null })
+        }
+      })
+    }
+
+    // One removed student with history, to show records are never hard-deleted.
+    const first = shifts.find((s) => s.id === `${libId}_sh1`)!
+    const rid = `${libId}_mr`
+    personIdx++
+    members.push({ id: rid, libraryId: libId, studentId: null, shiftId: first.id, name: personName(personIdx), phone: phone(personIdx + 99), seatId: null, startDate: date(-75), expiryDate: date(-45), status: 'removed', removedAt: iso(-44) })
+    feePayments.push({ id: `${rid}_f1`, memberId: rid, libraryId: libId, amountPaise: first.monthlyFeePaise, paidOn: date(-75), mode: 'cash', isVoid: false, voidReason: null })
+  }
+
+  // Gyan Deep: the Morning shift is completely FULL (all 39 seats), Afternoon and Evening have plenty free.
+  // Riya holds two memberships: Morning and Evening.
+  build(
+    'lib_gyan',
+    40,
+    [
+      {
+        shiftNo: 1,
+        offsets: [-6, -2, 1, 2, 3, 4, 5, 6, 7, 9, 12, 15, 18, 20, 22, 25, 27, 28, 30, 30, 15, 12, 10, 26, 19, 24, 21, 17, 14, 11, 8, 13, 16, 23, 29, 18, 22, 26, 9],
+        links: { 8: 'u_riya' },
+      },
+      { shiftNo: 2, offsets: [3, 9, 14, 20, 26, 5, -1, 17], spread: true },
+      { shiftNo: 3, offsets: [4, 10, 15, 21, 27, 2, 8, 13, 19, 25, 29, 6], spread: true, links: { 3: 'u_riya' } },
+    ],
+    [13],
+  )
+  build('lib_nalanda', 30, [
+    { shiftNo: 1, offsets: [-3, 2, 6, 11, 14, 18, 21, 24, 28, 30, 9, 16], spread: true },
+    { shiftNo: 2, offsets: [4, 12, 19, 25, 8, 22], spread: true },
+    { shiftNo: 3, offsets: [7, 17, 27], spread: true },
+  ])
+  build('lib_quiet', 24, [
+    { shiftNo: 1, offsets: [1, 3, 8, 13, 17, 20, 25, 29, 22], spread: true },
+    { shiftNo: 2, offsets: [5, 11, 18, 24, 28], spread: true },
+  ])
+  build('lib_scholars', 20, [{ shiftNo: 1, offsets: [-12, -9, -7, -5, -4, -3, -1, 0], spread: true }])
+  build('lib_khwai', 28, [
+    { shiftNo: 1, offsets: [2, 5, 10, 14, 19, 23, 26, 29, 12, 21], spread: true },
+    { shiftNo: 2, offsets: [6, 15, 24, 9], spread: true },
+    { shiftNo: 3, offsets: [3, 13, 20, 27, 16], spread: true },
+  ])
+
+  const sr = (id: string, studentId: string, libraryId: string, shiftNo: number, status: SeatRequest['status'], createdDays: number, decidedDays: number | null): SeatRequest => {
+    const p = profiles.find((x) => x.id === studentId)!
+    return {
+      id, studentId, studentName: p.name, studentPhone: p.phone, libraryId, shiftId: `${libraryId}_sh${shiftNo}`,
+      status, createdAt: iso(createdDays), decidedAt: decidedDays === null ? null : iso(decidedDays),
+    }
+  }
   const seatRequests: SeatRequest[] = [
-    { id: 'sr_1', studentId: 'u_aman', studentName: 'Aman Gupta', studentPhone: '9792000022', libraryId: 'lib_gyan', status: 'pending', createdAt: iso(-1.2), decidedAt: null },
-    { id: 'sr_2', studentId: 'u_sana', studentName: 'Sana Khan', studentPhone: '9792000023', libraryId: 'lib_gyan', status: 'pending', createdAt: iso(-0.6), decidedAt: null },
-    { id: 'sr_3', studentId: 'u_rahul', studentName: 'Rahul Yadav', studentPhone: '9792000024', libraryId: 'lib_gyan', status: 'pending', createdAt: iso(-0.2), decidedAt: null },
-    { id: 'sr_4', studentId: 'u_aman', studentName: 'Aman Gupta', studentPhone: '9792000022', libraryId: 'lib_nalanda', status: 'pending', createdAt: iso(-2), decidedAt: null },
-    { id: 'sr_5', studentId: 'u_sana', studentName: 'Sana Khan', studentPhone: '9792000023', libraryId: 'lib_khwai', status: 'cancelled', createdAt: iso(-5), decidedAt: iso(-4.8) },
-    { id: 'sr_6', studentId: 'u_rahul', studentName: 'Rahul Yadav', studentPhone: '9792000024', libraryId: 'lib_quiet', status: 'rejected', createdAt: iso(-9), decidedAt: iso(-8) },
+    sr('sr_1', 'u_aman', 'lib_gyan', 2, 'pending', -1.2, null),
+    sr('sr_2', 'u_sana', 'lib_gyan', 3, 'pending', -0.6, null),
+    sr('sr_3', 'u_rahul', 'lib_gyan', 3, 'pending', -0.2, null),
+    sr('sr_4', 'u_aman', 'lib_nalanda', 1, 'pending', -2, null),
+    sr('sr_5', 'u_sana', 'lib_khwai', 1, 'cancelled', -5, -4.8),
+    sr('sr_6', 'u_rahul', 'lib_quiet', 1, 'rejected', -9, -8),
   ]
 
   return {
@@ -234,6 +304,7 @@ export function createSeed(now: Date): DB {
     areas,
     profiles,
     libraries,
+    shifts,
     subscriptions,
     planPayments,
     seats,

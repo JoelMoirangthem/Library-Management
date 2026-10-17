@@ -27,7 +27,6 @@ export type Library = {
   landmark: string
   phone: string
   capacity: number
-  monthlyFeePaise: number
   timings: string
   amenities: string[]
   /** Image URLs or data URLs. May be empty. */
@@ -42,6 +41,21 @@ export type LibraryInput = Omit<
   Library,
   'id' | 'ownerId' | 'approvalStatus' | 'rejectionReason' | 'createdAt'
 >
+
+/** A time slot a seat can be rented for, e.g. Morning 08:30-12:30. Times are HH:MM (24h); end may be earlier than start for a shift that crosses midnight. */
+export type Shift = {
+  id: string
+  libraryId: string
+  name: string
+  startTime: string
+  endTime: string
+  /** Each shift sets its own monthly fee. */
+  monthlyFeePaise: number
+  /** Shifts are never deleted. Switching one off hides it from new students; existing students stay tagged to it. */
+  isActive: boolean
+}
+
+export type ShiftInput = Pick<Shift, 'name' | 'startTime' | 'endTime' | 'monthlyFeePaise'>
 
 export type Subscription = {
   libraryId: string
@@ -77,6 +91,8 @@ export type Member = {
   id: string
   libraryId: string
   studentId: string | null
+  /** Which shift this membership is for. A student in two shifts has two members. */
+  shiftId: string
   name: string
   phone: string
   seatId: string | null
@@ -108,15 +124,32 @@ export type SeatRequest = {
   studentName: string
   studentPhone: string
   libraryId: string
+  shiftId: string
   status: RequestStatus
   createdAt: string
   decidedAt: string | null
 }
 
 /** A request plus the library it points at, for the student's "My requests" list. */
-export type MySeatRequest = SeatRequest & { libraryName: string; areaName: string; cityName: string }
+export type MySeatRequest = SeatRequest & {
+  libraryName: string
+  areaName: string
+  cityName: string
+  shiftName: string
+}
 
-/** Public view of a library: no owner id, no rejection reason, plus live seat counts. */
+/** One shift as students see it, with live seats left for that shift. */
+export type PublicShift = {
+  id: string
+  name: string
+  startTime: string
+  endTime: string
+  monthlyFeePaise: number
+  totalSeats: number
+  seatsLeft: number
+}
+
+/** Public view of a library: no owner id, no rejection reason, plus live seat counts per shift. */
 export type PublicLibrary = {
   id: string
   name: string
@@ -128,17 +161,21 @@ export type PublicLibrary = {
   pincode: string
   landmark: string
   phone: string
-  monthlyFeePaise: number
+  /** Lowest monthly fee across active shifts (show as 'from'). */
+  fromFeePaise: number
   timings: string
   amenities: string[]
   photos: string[]
+  /** Physical seats in use (not per shift). */
   totalSeats: number
-  seatsLeft: number
+  /** Active shifts only. Seats left is per shift: a seat full in the morning can be free in the afternoon. */
+  shifts: PublicShift[]
 }
 
 export type PublicSearchFilter = {
   cityId?: string
   areaId?: string
+  /** Matches libraries with at least one active shift at or under this fee. */
   maxFeePaise?: number
   amenities?: string[]
 }
@@ -151,6 +188,7 @@ export type AdminLibraryRow = {
   cityName: string
   areaName: string
   subscription: Subscription | null
+  shifts: Shift[]
 }
 
 export type AdminPaymentRow = PlanPayment & { libraryName: string; ownerName: string }
@@ -158,6 +196,7 @@ export type AdminPaymentRow = PlanPayment & { libraryName: string; ownerName: st
 /** A student's own membership at a library. */
 export type MyMembership = {
   member: Member
+  shift: Shift | null
   library: PublicLibrary | null
   seatNumber: number | null
   payments: FeePayment[]

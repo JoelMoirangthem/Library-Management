@@ -15,13 +15,14 @@ type Props = {
   open: boolean
   onClose: () => void
   member: Member | null
-  monthlyFeePaise: number
+  /** The fee of the member's own shift, used as the default amount. */
+  shiftFeePaise: number
   /** Today in IST. */
   today: string
   onRenewed?: () => void
 }
 
-export function RenewModal({ open, onClose, member, monthlyFeePaise, today, onRenewed }: Props) {
+export function RenewModal({ open, onClose, member, shiftFeePaise, today, onRenewed }: Props) {
   const [newExpiry, setNewExpiry] = useState('')
   const [amount, setAmount] = useState('')
   const [mode, setMode] = useState<FeeMode>('cash')
@@ -30,10 +31,10 @@ export function RenewModal({ open, onClose, member, monthlyFeePaise, today, onRe
   useEffect(() => {
     if (!open || !member) return
     setNewExpiry(renewalExpiry(member, today))
-    setAmount((monthlyFeePaise / 100).toString())
+    setAmount(shiftFeePaise ? (shiftFeePaise / 100).toString() : '')
     setMode('cash')
     setError(undefined)
-  }, [open, member, today, monthlyFeePaise])
+  }, [open, member, today, shiftFeePaise])
 
   const renew = useMutation(services.renewMember, {
     success: newExpiry ? `Renewed until ${formatDate(newExpiry)}` : 'Renewed',
@@ -91,7 +92,7 @@ export function RenewModal({ open, onClose, member, monthlyFeePaise, today, onRe
             inputMode="decimal"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            hint={`Suggested: ${formatRupees(monthlyFeePaise)}`}
+            hint={`Suggested: ${formatRupees(shiftFeePaise)}`}
             error={error && newExpiry > member.expiryDate ? error : undefined}
           />
           <SelectField label="Payment mode" value={mode} onChange={(e) => setMode(e.target.value as FeeMode)}>
