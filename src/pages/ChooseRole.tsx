@@ -165,10 +165,9 @@ function RoleCard({
       </span>
       <span className="mt-4 text-lg font-semibold text-ink">{title}</span>
       <span className="mt-1 min-w-0 break-words text-sm text-ink-muted">{body}</span>
-      <span className="mt-4 text-sm font-medium text-primary group-hover:text-primary-hover">
+      <span className="mt-auto pt-4 text-sm font-medium text-primary group-hover:text-primary-hover">
         {selected ? 'Selected' : cta}
-      </span>
-    </button>
+      </span>    </button>
   )
 }
 

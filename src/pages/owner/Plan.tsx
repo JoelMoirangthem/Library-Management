@@ -120,51 +120,53 @@ export default function Plan() {
     <>
       <PageHeader title="Plan" description="Keep your library visible to students for ₹199 for 30 days." />
 
-      <div className="space-y-6">
-        {state === 'trial' && (
-          <StatusCard tone="primary" icon={<Hourglass />} title={`Free trial, ${dayWord(daysLeft)} left`}>
-            {activeUntilDate && <p>Your trial ends on {formatDate(activeUntilDate)}. Activate the plan to stay listed.</p>}
-          </StatusCard>
-        )}
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <div className="space-y-6">
+          {state === 'trial' && (
+            <StatusCard tone="primary" icon={<Hourglass />} title={`Free trial, ${dayWord(daysLeft)} left`}>
+              {activeUntilDate && <p>Your trial ends on {formatDate(activeUntilDate)}. Activate the plan to stay listed.</p>}
+            </StatusCard>
+          )}
 
-        {state === 'paid' && (
-          <StatusCard
-            tone="primary"
-            icon={<CircleCheck />}
-            title={`Plan active${activeUntilDate ? `, until ${formatDate(activeUntilDate)}` : ''}`}
-          >
-            <p>{dayWord(daysLeft)} left. Renew early and the days stack.</p>
-          </StatusCard>
-        )}
+          {state === 'paid' && (
+            <StatusCard
+              tone="primary"
+              icon={<CircleCheck />}
+              title={`Plan active${activeUntilDate ? `, until ${formatDate(activeUntilDate)}` : ''}`}
+            >
+              <p>{dayWord(daysLeft)} left. Renew early and the days stack.</p>
+            </StatusCard>
+          )}
 
-        {state === 'expired' && (
-          <StatusCard
-            tone="danger"
-            icon={<TriangleAlert />}
-            title={activeUntilDate ? `Expired on ${formatDate(activeUntilDate)}` : 'Your plan has expired'}
-          >
-            <p>Your library is hidden from students and this dashboard is read-only until you renew.</p>
-          </StatusCard>
-        )}
+          {state === 'expired' && (
+            <StatusCard
+              tone="danger"
+              icon={<TriangleAlert />}
+              title={activeUntilDate ? `Expired on ${formatDate(activeUntilDate)}` : 'Your plan has expired'}
+            >
+              <p>Your library is hidden from students and this dashboard is read-only until you renew.</p>
+            </StatusCard>
+          )}
 
-        {(state === 'pending' || state === 'rejected') && (
-          <StatusCard tone="warning" icon={<Hourglass />} title="You can pay once your library is approved">
-            <p>
-              {state === 'pending'
-                ? 'Your library is in review. Your 14-day free trial starts when we approve it.'
-                : 'Fix the points on your library listing and resubmit it for review first.'}
-            </p>
-          </StatusCard>
-        )}
+          {(state === 'pending' || state === 'rejected') && (
+            <StatusCard tone="warning" icon={<Hourglass />} title="You can pay once your library is approved">
+              <p>
+                {state === 'pending'
+                  ? 'Your library is in review. Your 14-day free trial starts when we approve it.'
+                  : 'Fix the points on your library listing and resubmit it for review first.'}
+              </p>
+            </StatusCard>
+          )}
 
-        {canPay &&
-          (payments.loading ? (
-            <LoadingState layout="list" count={1} label="Loading payment details" />
-          ) : payments.error ? (
-            <ErrorState onRetry={payments.reload} />
-          ) : (
-            <PaymentCard pending={pending} runsUntil={runsUntil} onSubmit={submit.run} submitting={submit.loading} />
-          ))}
+          {canPay &&
+            (payments.loading ? (
+              <LoadingState layout="list" count={1} label="Loading payment details" />
+            ) : payments.error ? (
+              <ErrorState onRetry={payments.reload} />
+            ) : (
+              <PaymentCard pending={pending} runsUntil={runsUntil} onSubmit={submit.run} submitting={submit.loading} />
+            ))}
+        </div>
 
         {canPay && !payments.loading && !payments.error && (
           <PaymentHistory payments={payments.data ?? []} onSubmitAgain={focusUtrForm} />

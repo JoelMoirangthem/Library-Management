@@ -2,13 +2,13 @@ import { useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ListFilter, Search, X } from 'lucide-react'
 import { buttonStyles } from '@/components/Button'
+import { CardGrid, GridItem } from '@/components/CardGrid'
 import { SelectField } from '@/components/Fields'
 import { PageHeader } from '@/components/PageParts'
 import { FilterSheet } from '@/components/student/FilterSheet'
-import { LibraryCard } from '@/components/student/LibraryCard'
+import { LibraryCard, LibraryCardSkeleton } from '@/components/student/LibraryCard'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
-import { LoadingState } from '@/components/states/LoadingState'
 import { FEE_OPTIONS, feeOptionLabel } from '@/components/student/discoverOptions'
 import type { PublicLibrary } from '@/domain/types'
 import { services } from '@/lib/container'
@@ -217,7 +217,13 @@ export default function Discover() {
 
       <section aria-label="Results" aria-busy={results.refreshing || undefined}>
         {results.loading ? (
-          <LoadingState layout="cards" label="Finding libraries" count={6} />
+          <CardGrid count={6} aria-busy="true" aria-label="Finding libraries">
+            {Array.from({ length: 6 }, (_, i) => (
+              <GridItem key={i}>
+                <LibraryCardSkeleton />
+              </GridItem>
+            ))}
+          </CardGrid>
         ) : results.error ? (
           <ErrorState onRetry={results.reload} retrying={results.refreshing} />
         ) : count === 0 ? (
@@ -254,13 +260,13 @@ export default function Discover() {
                 </select>
               </label>
             </div>
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <CardGrid count={count}>
               {searched.map((lib) => (
-                <li key={lib.id}>
+                <GridItem key={lib.id}>
                   <LibraryCard library={lib} />
-                </li>
+                </GridItem>
               ))}
-            </ul>
+            </CardGrid>
           </>
         )}
       </section>

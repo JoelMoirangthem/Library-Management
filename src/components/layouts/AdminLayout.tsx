@@ -53,7 +53,7 @@ export function AdminLayout() {
             <LogOut aria-hidden className="size-5" />
           </button>
         </header>
-        <main id="main" className="mx-auto max-w-5xl px-4 py-6 sm:px-6 md:py-8">
+        <main id="main" className="mx-auto max-w-6xl px-4 py-6 sm:px-6 md:py-8">
           <Suspense fallback={<PageFallback />}>
             <Outlet />
           </Suspense>

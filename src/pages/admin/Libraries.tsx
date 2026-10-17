@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
-import { Card } from '@/components/Card'
+import { CardBody, CardFooter, CardGrid, GridCard, GridItem } from '@/components/CardGrid'
 import { Modal } from '@/components/Modal'
 import { PageHeader, StatCard } from '@/components/PageParts'
 import { TextAreaField } from '@/components/Fields'
@@ -26,20 +26,30 @@ import { formatDate } from '@/domain/dates'
 import { formatRupees } from '@/domain/money'
 import { normalizePhone } from '@/domain/constants'
 import { extendedActiveUntil, planState, TRIAL_DAYS } from '@/domain/plan'
-import { formatShiftRange, sortShifts } from '@/domain/shifts'
+import { MAX_ACTIVE_SHIFTS, formatShiftRange, sortShifts } from '@/domain/shifts'
 import type { AdminLibraryRow, Shift } from '@/domain/types'
 
-/** Compact shift chips for the table and cards: 'Morning ₹800', switched-off ones muted with 'off'. */
-function ShiftChips({ shifts }: { shifts: Shift[] }) {
-  if (shifts.length === 0) return <span className="text-ink-muted">—</span>
+/**
+ * Shift chips for a card, always reserving MAX_ACTIVE_SHIFTS rows so every card in a row is
+ * the same height. Missing rows render as invisible placeholders that hold the same height.
+ */
+function ShiftRows({ shifts }: { shifts: Shift[] }) {
+  const sorted = sortShifts(shifts)
+  const rows = Array.from({ length: MAX_ACTIVE_SHIFTS }, (_, i) => sorted[i] ?? null)
   return (
-    <ul className="flex flex-wrap gap-1.5">
-      {sortShifts(shifts).map((s) => (
-        <li key={s.id}>
-          <Badge tone={s.isActive ? 'primary' : 'neutral'}>
+    <ul className="space-y-1.5">
+      {rows.map((s, i) => (
+        <li key={s?.id ?? `empty-${i}`} className={s ? undefined : 'invisible'} aria-hidden={s ? undefined : true}>
+          <Badge tone={s && s.isActive ? 'primary' : 'neutral'}>
             <span className="tabular-nums">
-              {s.name} {formatRupees(s.monthlyFeePaise)}
-              {!s.isActive && ' · off'}
+              {s ? (
+                <>
+                  {s.name} {formatRupees(s.monthlyFeePaise)}
+                  {!s.isActive && ' · off'}
+                </>
+              ) : (
+                'placeholder'
+              )}
             </span>
           </Badge>
         </li>
@@ -163,86 +173,21 @@ export default function Libraries() {
               <EmptyTab tab={activeTab} />
             )
           ) : (
-            <>
-              {/* Phone: cards */}
-              <div className="space-y-3 md:hidden">
-                {filtered.map(({ row, state }) => (
+            <CardGrid count={filtered.length}>
+              {filtered.map(({ row, state }) => (
+                <GridItem key={row.library.id}>
                   <LibraryCard
-                    key={row.library.id}
                     row={row}
                     now={now}
                     state={state}
+                    showRejection={activeTab === 'rejected'}
                     onDetail={() => setDetail(row)}
                     onApprove={() => setApproving(row)}
                     onReject={() => setRejecting(row)}
                   />
-                ))}
-              </div>
-
-              {/* md+: table */}
-              <Card className="hidden overflow-hidden md:block">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b border-border bg-canvas text-ink-muted">
-                    <tr>
-                      <th scope="col" className="px-4 py-3 font-medium">Library</th>
-                      <th scope="col" className="px-4 py-3 font-medium">Owner</th>
-                      <th scope="col" className="px-4 py-3 font-medium">Location</th>
-                      <th scope="col" className="px-4 py-3 font-medium">Shifts</th>
-                      <th scope="col" className="px-4 py-3 text-right font-medium">Status and actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {filtered.map(({ row, state }) => {
-                      const view = planStatusView(state, row.subscription, now)
-                      return (
-                        <tr key={row.library.id} className="align-top">
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-ink">{row.library.name}</div>
-                            <div className="text-xs text-ink-muted tabular-nums">
-                              {row.library.capacity} seats · submitted {formatDate(row.library.createdAt.slice(0, 10))}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div>{row.ownerName}</div>
-                            <TelLink phone={row.ownerPhone} className="text-ink-muted" />
-                          </td>
-                          <td className="px-4 py-3 text-ink-muted">
-                            {row.areaName}, {row.cityName}
-                          </td>
-                          <td className="px-4 py-3">
-                            <ShiftChips shifts={row.shifts} />
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col items-end gap-2">
-                              <Badge tone={view.tone}>{view.label}</Badge>
-                              {state === 'rejected' && row.library.rejectionReason && (
-                                <p className="max-w-48 text-right text-xs text-ink-muted">{row.library.rejectionReason}</p>
-                              )}
-                              <div className="flex flex-wrap justify-end gap-2">
-                                {state === 'pending' ? (
-                                  <>
-                                    <Button variant="primary" className="px-3" onClick={() => setApproving(row)}>
-                                      Approve
-                                    </Button>
-                                    <Button variant="secondary" className="px-3" onClick={() => setRejecting(row)}>
-                                      Reject
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <Button variant="secondary" className="px-3" onClick={() => setDetail(row)}>
-                                    Details
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </Card>
-            </>
+                </GridItem>
+              ))}
+            </CardGrid>
           )}
         </div>
       )}
@@ -269,6 +214,7 @@ function LibraryCard({
   row,
   now,
   state,
+  showRejection,
   onDetail,
   onApprove,
   onReject,
@@ -276,76 +222,67 @@ function LibraryCard({
   row: AdminLibraryRow
   now: Date
   state: ReturnType<typeof planState>
+  showRejection: boolean
   onDetail: () => void
   onApprove: () => void
   onReject: () => void
 }) {
   const view = planStatusView(state, row.subscription, now)
+  const pending = state === 'pending'
   return (
-    <Card className="p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="break-words font-semibold text-ink">{row.library.name}</h3>
-          <p className="text-sm text-ink-muted">
+    <GridCard>
+      <CardBody className="space-y-3">
+        {/* Header: name clamps to two reserved lines so badges below line up across cards. */}
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="line-clamp-2 min-h-[2.75rem] break-words font-semibold text-ink">
+            {row.library.name}
+          </h3>
+          <Badge tone={view.tone}>{view.label}</Badge>
+        </div>
+
+        <div className="space-y-1 text-sm">
+          <p className="text-ink">{row.ownerName}</p>
+          <TelLink phone={row.ownerPhone} className="text-ink-muted" />
+          <p className="text-ink-muted">
             {row.areaName}, {row.cityName}
           </p>
         </div>
-        <Badge tone={view.tone}>{view.label}</Badge>
-      </div>
 
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-        <div>
-          <dt className="text-ink-muted">Owner</dt>
-          <dd>{row.ownerName}</dd>
-        </div>
-        <div>
-          <dt className="text-ink-muted">Phone</dt>
-          <dd>
-            <TelLink phone={row.ownerPhone} />
-          </dd>
-        </div>
-        <div>
-          <dt className="text-ink-muted">Seats</dt>
-          <dd className="tabular-nums">{row.library.capacity}</dd>
-        </div>
-        <div className="col-span-2">
-          <dt className="text-ink-muted">Shifts</dt>
-          <dd className="mt-1">
-            <ShiftChips shifts={row.shifts} />
-          </dd>
-        </div>
-        <div className="col-span-2">
-          <dt className="text-ink-muted">Submitted</dt>
-          <dd className="tabular-nums">{formatDate(row.library.createdAt.slice(0, 10))}</dd>
-        </div>
-      </dl>
-
-      {state === 'rejected' && row.library.rejectionReason && (
-        <p className="mt-3 rounded-control bg-danger-soft px-3 py-2 text-sm text-danger-ink">
-          {row.library.rejectionReason}
+        <p className="text-xs text-ink-muted tabular-nums">
+          {row.library.capacity} seats · submitted {formatDate(row.library.createdAt.slice(0, 10))}
         </p>
-      )}
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        {state === 'pending' ? (
+        {/* Shift area reserves three chip rows so footers align across cards. */}
+        <ShiftRows shifts={row.shifts} />
+
+        {/* Rejection reason: a reserved region only on the Rejected tab, omitted everywhere else. */}
+        {showRejection && (
+          <p className="min-h-[2.5rem] rounded-control bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+            {row.library.rejectionReason || ''}
+          </p>
+        )}
+      </CardBody>
+
+      <CardFooter>
+        {pending ? (
           <>
-            <Button variant="primary" className="flex-1" onClick={onApprove}>
+            <Button variant="primary" className="flex-1 px-3" onClick={onApprove}>
               Approve
             </Button>
-            <Button variant="secondary" className="flex-1" onClick={onReject}>
+            <Button variant="secondary" className="flex-1 px-3" onClick={onReject}>
               Reject
             </Button>
-            <Button variant="ghost" className="w-full" onClick={onDetail}>
-              Details
-            </Button>
           </>
-        ) : (
-          <Button variant="secondary" className="flex-1" onClick={onDetail}>
-            Details
-          </Button>
-        )}
-      </div>
-    </Card>
+        ) : null}
+        <Button
+          variant={pending ? 'ghost' : 'secondary'}
+          className={pending ? 'w-full' : 'flex-1 px-3'}
+          onClick={onDetail}
+        >
+          Details
+        </Button>
+      </CardFooter>
+    </GridCard>
   )
 }
 

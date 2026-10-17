@@ -13,11 +13,12 @@ import {
 } from 'lucide-react'
 import { buttonStyles } from '@/components/Button'
 import { Card } from '@/components/Card'
+import { CardGrid, GridItem } from '@/components/CardGrid'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
-import { LoadingState } from '@/components/states/LoadingState'
 import { HeroSeatGrid } from '@/components/landing/HeroSeatGrid'
 import { LibraryTeaserCard } from '@/components/landing/LibraryTeaserCard'
+import { LibraryCardSkeleton } from '@/components/student/LibraryCard'
 import { OwnerProductPeek } from '@/components/landing/OwnerProductPeek'
 import { formatRupees } from '@/domain/money'
 import { PLAN_PRICE_PAISE } from '@/domain/plan'
@@ -104,8 +105,8 @@ function HowItWorks() {
         Two sides, one simple flow. Students find a seat; owners keep the library running.
       </p>
 
-      <div className="mt-8 grid gap-6 md:grid-cols-2">
-        <Card className="p-6">
+      <div className="mt-8 grid items-stretch gap-6 md:grid-cols-2">
+        <Card className="flex flex-col p-6">
           <h3 className="text-lg font-semibold">For students</h3>
           <ol className="mt-4 space-y-4">
             {studentSteps.map((step, i) => (
@@ -119,14 +120,14 @@ function HowItWorks() {
           </ol>
           <Link
             to="/discover"
-            className={buttonStyles('ghost', 'mt-6 -ml-4 w-fit text-sm')}
+            className={buttonStyles('ghost', 'mt-auto pt-6 -ml-4 w-fit text-sm')}
           >
             Find a library
             <ArrowRight aria-hidden className="size-4" />
           </Link>
         </Card>
 
-        <Card className="p-6">
+        <Card className="flex flex-col p-6">
           <h3 className="text-lg font-semibold">For owners</h3>
           <ol className="mt-4 space-y-4">
             {ownerSteps.map((step, i) => (
@@ -140,7 +141,7 @@ function HowItWorks() {
           </ol>
           <Link
             to="/login?as=owner"
-            className={buttonStyles('ghost', 'mt-6 -ml-4 w-fit text-sm')}
+            className={buttonStyles('ghost', 'mt-auto pt-6 -ml-4 w-fit text-sm')}
           >
             List your library
             <ArrowRight aria-hidden className="size-4" />
@@ -180,7 +181,13 @@ function SeatsFreeNow() {
 
         <div className="mt-8">
           {loading ? (
-            <LoadingState layout="cards" count={3} label="Loading libraries" />
+            <CardGrid count={3} aria-busy="true" aria-label="Loading libraries">
+              {Array.from({ length: 3 }, (_, i) => (
+                <GridItem key={i}>
+                  <LibraryCardSkeleton />
+                </GridItem>
+              ))}
+            </CardGrid>
           ) : error ? (
             <ErrorState onRetry={reload} />
           ) : top.length === 0 ? (
@@ -194,13 +201,13 @@ function SeatsFreeNow() {
               }
             />
           ) : (
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <CardGrid count={top.length}>
               {top.map((lib) => (
-                <li key={lib.id}>
+                <GridItem key={lib.id}>
                   <LibraryTeaserCard library={lib} />
-                </li>
+                </GridItem>
               ))}
-            </ul>
+            </CardGrid>
           )}
         </div>
       </div>
@@ -221,8 +228,9 @@ function OwnersSection() {
   return (
     <section id="owners" className="scroll-mt-20 bg-canvas">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
-        <div className="grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-14">
-          <div className="min-w-0 max-w-md">
+        <div className="grid items-stretch gap-10 lg:grid-cols-2 lg:gap-14">
+          {/* Left column: intro, the product peek and the pricing card pinned to the bottom. */}
+          <div className="flex min-w-0 flex-col">
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               Run your library without registers
             </h2>
@@ -231,7 +239,17 @@ function OwnersSection() {
               one price, every feature, no per-student charge.
             </p>
 
-            <Card className="mt-6 p-6">
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold">See it before you sign up</h3>
+              <p className="mt-1 text-sm text-ink-muted">
+                A peek at your Today screen: what is waiting, who is expiring, who is overdue.
+              </p>
+              <div className="mt-4">
+                <OwnerProductPeek />
+              </div>
+            </div>
+
+            <Card className="mt-8 p-6 lg:mt-auto">
               <p className="text-sm text-ink-muted">After your free trial</p>
               <p className="mt-1 text-3xl font-semibold tabular-nums">
                 {PLAN_PRICE_LABEL}
@@ -254,33 +272,22 @@ function OwnersSection() {
             </Card>
           </div>
 
-          <div className="min-w-0 space-y-8">
-            <div>
-              <h3 className="text-lg font-semibold">See it before you sign up</h3>
-              <p className="mt-1 text-sm text-ink-muted">
-                A peek at your Today screen: what is waiting, who is expiring, who is overdue.
-              </p>
-              <div className="mt-4">
-                <OwnerProductPeek />
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold">What owners get</h3>
-              <ul className="mt-4 divide-y divide-border rounded-card border border-border bg-surface">
-                {benefits.map((b) => (
-                  <li key={b.title} className="flex gap-4 p-5">
-                    <span aria-hidden className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-ink">
-                      {b.icon}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="font-medium text-ink">{b.title}</p>
-                      <p className="mt-1 text-sm text-ink-muted">{b.body}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {/* Right column: the benefits list stretches so its bottom aligns with the pricing card. */}
+          <div className="flex min-w-0 flex-col">
+            <h3 className="text-lg font-semibold">What owners get</h3>
+            <ul className="mt-4 flex-1 divide-y divide-border rounded-card border border-border bg-surface">
+              {benefits.map((b) => (
+                <li key={b.title} className="flex gap-4 p-5">
+                  <span aria-hidden className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-ink">
+                    {b.icon}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-medium text-ink">{b.title}</p>
+                    <p className="mt-1 text-sm text-ink-muted">{b.body}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </div>

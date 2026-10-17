@@ -3,6 +3,7 @@ import { Plus, Power, X } from 'lucide-react'
 import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
 import { Card } from '@/components/Card'
+import { CardBody, CardGrid, GridCard, GridItem } from '@/components/CardGrid'
 import { ChipCheckbox, SelectField, TextAreaField, TextField } from '@/components/Fields'
 import { useToast } from '@/components/Toast'
 import { PhotoPicker } from '@/components/owner/profile/PhotoPicker'
@@ -263,24 +264,26 @@ export function LibraryEditor({
 
   return (
     <form ref={formRef} noValidate onSubmit={handleSave} className="space-y-6 pb-24">
-      {/* About */}
-      <Card className="p-5 sm:p-6">
-        <h2 className="text-lg font-semibold">About</h2>
-        <div className="mt-5 space-y-5">
-          <div data-field="name">
-            <TextField
-              label="Library name"
-              value={draft.name}
-              onChange={(e) => set('name', e.target.value)}
-              error={errors.name}
-              autoComplete="organization"
-            />
+      {/* About + Where students find you: side by side on desktop, equal height. */}
+      <div className="grid items-stretch gap-6 lg:grid-cols-2">
+        {/* About */}
+        <Card className="flex min-h-full flex-1 flex-col p-5 sm:p-6 lg:col-start-1 lg:row-start-1">
+          <h2 className="text-lg font-semibold">About</h2>
+          <div className="mt-5 space-y-5">
+            <div data-field="name">
+              <TextField
+                label="Library name"
+                value={draft.name}
+                onChange={(e) => set('name', e.target.value)}
+                error={errors.name}
+                autoComplete="organization"
+              />
+            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
 
-      {/* Where students find you */}
-      <Card className="p-5 sm:p-6">
+        {/* Where students find you */}
+        <Card className="flex min-h-full flex-1 flex-col p-5 sm:p-6 lg:col-start-2 lg:row-start-1 lg:row-span-3">
         <h2 className="text-lg font-semibold">Where students find you</h2>
         <div className="mt-5 space-y-5">
           {catalogLoading ? (
@@ -370,36 +373,55 @@ export function LibraryEditor({
             />
           </div>
         </div>
-      </Card>
+        </Card>
 
-      {/* Seats and hours */}
-      <Card className="p-5 sm:p-6">
-        <h2 className="text-lg font-semibold">Seats and hours</h2>
-        <div className="mt-5 grid gap-5 sm:grid-cols-2">
-          <div data-field="capacity">
-            <TextField
-              label="Number of seats"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={500}
-              hint="Raising this adds new seats. Lowering it only removes free seats."
-              value={draft.capacity}
-              onChange={(e) => set('capacity', e.target.value)}
-              error={errors.capacity}
-            />
+        {/* Seats and hours */}
+        <Card className="flex min-h-full flex-1 flex-col p-5 sm:p-6 lg:col-start-1 lg:row-start-2">
+          <h2 className="text-lg font-semibold">Seats and hours</h2>
+          <div className="mt-5 grid gap-5 sm:grid-cols-2">
+            <div data-field="capacity">
+              <TextField
+                label="Number of seats"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={500}
+                hint="Raising this adds new seats. Lowering it only removes free seats."
+                value={draft.capacity}
+                onChange={(e) => set('capacity', e.target.value)}
+                error={errors.capacity}
+              />
+            </div>
+            <div data-field="timings">
+              <TextField
+                label="Timings"
+                hint="e.g. 6 am – 11 pm, all days"
+                value={draft.timings}
+                onChange={(e) => set('timings', e.target.value)}
+                error={errors.timings}
+              />
+            </div>
           </div>
-          <div data-field="timings">
-            <TextField
-              label="Timings"
-              hint="e.g. 6 am – 11 pm, all days"
-              value={draft.timings}
-              onChange={(e) => set('timings', e.target.value)}
-              error={errors.timings}
-            />
+        </Card>
+
+        {/* Amenities */}
+        <Card className="flex min-h-full flex-1 flex-col p-5 sm:p-6 lg:col-start-1 lg:row-start-3">
+          <h2 className="text-lg font-semibold">Amenities</h2>
+          <p className="mt-1 text-sm text-ink-muted">Pick everything your library offers.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {AMENITIES.map((a) => (
+              <ChipCheckbox
+                key={a}
+                label={a}
+                checked={amenitySet.has(a)}
+                onChange={(on) =>
+                  set('amenities', on ? [...draft.amenities, a] : draft.amenities.filter((x) => x !== a))
+                }
+              />
+            ))}
           </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
 
       {/* Shifts and fees */}
       <Card className="p-5 sm:p-6">
@@ -407,90 +429,92 @@ export function LibraryEditor({
         <p className="mt-1 text-sm text-ink-muted">
           Each shift has its own monthly fee. Shifts can't overlap; a night shift can run past midnight.
         </p>
-        <ul className="mt-5 space-y-4">
+        <CardGrid count={rows.length} max={3} className="mt-5">
           {rows.map((r) => (
-            <li
-              key={r.key}
-              className={cx(
-                'rounded-card border p-4',
-                r.isActive ? 'border-border bg-surface' : 'border-border bg-canvas/60 opacity-80',
-              )}
-            >
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <span className="flex items-center gap-2 font-medium">
-                  {r.name || 'New shift'}
-                  {!r.isActive && <Badge tone="neutral">Off</Badge>}
-                </span>
-                {r.id ? (
-                  <Button
-                    variant={r.isActive ? 'secondary' : 'primary'}
-                    disabled={r.isActive && activeCount <= 1}
-                    onClick={() => void handleToggle(r)}
-                    className="min-h-11"
-                  >
-                    <Power aria-hidden className="size-4" />
-                    {r.isActive ? 'Switch off' : 'Switch on'}
-                  </Button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => removeNewRow(r.key)}
-                    aria-label="Remove new shift"
-                    className="inline-flex min-h-11 items-center gap-1 rounded-control px-2 text-sm font-medium text-danger hover:bg-danger-soft"
-                  >
-                    <X aria-hidden className="size-4" /> Remove
-                  </button>
+            <GridItem key={r.key}>
+              <GridCard
+                className={cx(
+                  r.isActive ? 'bg-surface' : 'bg-canvas/60 opacity-80',
                 )}
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <TextField
-                  label="Shift name"
-                  value={r.name}
-                  disabled={!r.isActive}
-                  onChange={(e) => setRow(r.key, { name: e.target.value })}
-                />
-                <TextField
-                  label="Monthly fee (₹)"
-                  type="text"
-                  inputMode="decimal"
-                  value={r.fee}
-                  disabled={!r.isActive}
-                  hint={
-                    draftFeePaise(r.fee) > 0
-                      ? `Students will see ${formatRupees(draftFeePaise(r.fee))} / month.`
-                      : 'The monthly fee for this shift, e.g. 800.'
-                  }
-                  onChange={(e) => setRow(r.key, { fee: e.target.value })}
-                />
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">Start time</label>
-                  <input
-                    type="time"
-                    step={300}
-                    value={r.startTime}
-                    disabled={!r.isActive}
-                    onChange={(e) => setRow(r.key, { startTime: e.target.value })}
-                    className="block min-h-11 w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-base text-ink disabled:cursor-not-allowed disabled:bg-canvas disabled:text-ink-muted"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">End time</label>
-                  <input
-                    type="time"
-                    step={300}
-                    value={r.endTime}
-                    disabled={!r.isActive}
-                    onChange={(e) => setRow(r.key, { endTime: e.target.value })}
-                    className="block min-h-11 w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-base text-ink disabled:cursor-not-allowed disabled:bg-canvas disabled:text-ink-muted"
-                  />
-                </div>
-              </div>
-              <p className="mt-2 text-sm text-ink-muted">
-                Students already in a shift stay in it. Nothing is deleted.
-              </p>
-            </li>
+              >
+                <CardBody className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="flex items-center gap-2 font-medium">
+                      {r.name || 'New shift'}
+                      {!r.isActive && <Badge tone="neutral">Off</Badge>}
+                    </span>
+                    {r.id ? (
+                      <Button
+                        variant={r.isActive ? 'secondary' : 'primary'}
+                        disabled={r.isActive && activeCount <= 1}
+                        onClick={() => void handleToggle(r)}
+                        className="min-h-11"
+                      >
+                        <Power aria-hidden className="size-4" />
+                        {r.isActive ? 'Switch off' : 'Switch on'}
+                      </Button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => removeNewRow(r.key)}
+                        aria-label="Remove new shift"
+                        className="inline-flex min-h-11 items-center gap-1 rounded-control px-2 text-sm font-medium text-danger hover:bg-danger-soft"
+                      >
+                        <X aria-hidden className="size-4" /> Remove
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-4">
+                    <TextField
+                      label="Shift name"
+                      value={r.name}
+                      disabled={!r.isActive}
+                      onChange={(e) => setRow(r.key, { name: e.target.value })}
+                    />
+                    <TextField
+                      label="Monthly fee (₹)"
+                      type="text"
+                      inputMode="decimal"
+                      value={r.fee}
+                      disabled={!r.isActive}
+                      hint={
+                        draftFeePaise(r.fee) > 0
+                          ? `Students will see ${formatRupees(draftFeePaise(r.fee))} / month.`
+                          : 'The monthly fee for this shift, e.g. 800.'
+                      }
+                      onChange={(e) => setRow(r.key, { fee: e.target.value })}
+                    />
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium">Start time</label>
+                      <input
+                        type="time"
+                        step={300}
+                        value={r.startTime}
+                        disabled={!r.isActive}
+                        onChange={(e) => setRow(r.key, { startTime: e.target.value })}
+                        className="block min-h-11 w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-base text-ink disabled:cursor-not-allowed disabled:bg-canvas disabled:text-ink-muted"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium">End time</label>
+                      <input
+                        type="time"
+                        step={300}
+                        value={r.endTime}
+                        disabled={!r.isActive}
+                        onChange={(e) => setRow(r.key, { endTime: e.target.value })}
+                        className="block min-h-11 w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-base text-ink disabled:cursor-not-allowed disabled:bg-canvas disabled:text-ink-muted"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-sm text-ink-muted">
+                    Students already in a shift stay in it. Nothing is deleted.
+                  </p>
+                </CardBody>
+              </GridCard>
+            </GridItem>
           ))}
-        </ul>
+        </CardGrid>
         {activeCount < MAX_ACTIVE_SHIFTS && (
           <Button variant="secondary" onClick={addRow} className="mt-4">
             <Plus aria-hidden className="size-4" /> Add shift
@@ -501,24 +525,6 @@ export function LibraryEditor({
             {shiftError}
           </p>
         )}
-      </Card>
-
-      {/* Amenities */}
-      <Card className="p-5 sm:p-6">
-        <h2 className="text-lg font-semibold">Amenities</h2>
-        <p className="mt-1 text-sm text-ink-muted">Pick everything your library offers.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {AMENITIES.map((a) => (
-            <ChipCheckbox
-              key={a}
-              label={a}
-              checked={amenitySet.has(a)}
-              onChange={(on) =>
-                set('amenities', on ? [...draft.amenities, a] : draft.amenities.filter((x) => x !== a))
-              }
-            />
-          ))}
-        </div>
       </Card>
 
       {/* Photos */}

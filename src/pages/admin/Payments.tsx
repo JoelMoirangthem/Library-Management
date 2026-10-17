@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
+import { CardBody, CardFooter, CardGrid, GridCard, GridItem } from '@/components/CardGrid'
 import { Modal } from '@/components/Modal'
 import { PageHeader } from '@/components/PageParts'
 import { TextAreaField } from '@/components/Fields'
@@ -107,18 +108,19 @@ export default function Payments() {
                   description="New ones appear here when owners submit a UTR."
                 />
               ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
+                <CardGrid count={pending.length}>
                   {pending.map((p) => (
-                    <PendingCard
-                      key={p.id}
-                      payment={p}
-                      now={now}
-                      ownerPhone={phoneByLibrary.get(p.libraryId) ?? null}
-                      onVerify={() => setVerifying(p)}
-                      onFail={() => setFailing(p)}
-                    />
+                    <GridItem key={p.id}>
+                      <PendingCard
+                        payment={p}
+                        now={now}
+                        ownerPhone={phoneByLibrary.get(p.libraryId) ?? null}
+                        onVerify={() => setVerifying(p)}
+                        onFail={() => setFailing(p)}
+                      />
+                    </GridItem>
                   ))}
-                </div>
+                </CardGrid>
               )}
             </section>
           )}
@@ -208,51 +210,53 @@ function PendingCard({
   onFail: () => void
 }) {
   return (
-    <Card className="flex flex-col gap-4 p-4">
-      {/* UTR is the thing to match against the bank app: make it the hero. */}
-      <div className="rounded-control bg-accent-soft px-3 py-3 text-accent-ink">
-        <p className="text-xs">Check your bank app for this UTR</p>
-        <div className="mt-1.5 flex items-center gap-2">
-          <span className="min-w-0 flex-1 break-all font-mono text-xl font-semibold tabular-nums">
-            {payment.utr}
-          </span>
-          <CopyButton value={payment.utr} toastText="UTR copied" />
+    <GridCard>
+      <CardBody className="space-y-4">
+        {/* UTR is the thing to match against the bank app: make it the hero. */}
+        <div className="rounded-control bg-accent-soft px-3 py-3 text-accent-ink">
+          <p className="text-xs">Check your bank app for this UTR</p>
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className="min-w-0 flex-1 break-all font-mono text-xl font-semibold tabular-nums">
+              {payment.utr}
+            </span>
+            <CopyButton value={payment.utr} toastText="UTR copied" />
+          </div>
         </div>
-      </div>
 
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-        <div>
-          <dt className="text-ink-muted">Amount</dt>
-          <dd className="text-lg font-semibold tabular-nums">{formatRupees(payment.amountPaise)}</dd>
-        </div>
-        <div className="text-right">
-          <dt className="text-ink-muted">Submitted</dt>
-          <dd className="text-ink">
-            <RelativeTime iso={payment.submittedAt} now={now} />
-          </dd>
-        </div>
-        <div className="col-span-2">
-          <dt className="text-ink-muted">Library</dt>
-          <dd className="break-words font-medium text-ink">{payment.libraryName}</dd>
-        </div>
-        <div className="col-span-2">
-          <dt className="text-ink-muted">Owner</dt>
-          <dd className="flex flex-wrap items-center gap-x-2 text-ink">
-            {payment.ownerName}
-            {ownerPhone && <TelLink phone={ownerPhone} />}
-          </dd>
-        </div>
-      </dl>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+          <div>
+            <dt className="text-ink-muted">Amount</dt>
+            <dd className="text-lg font-semibold tabular-nums">{formatRupees(payment.amountPaise)}</dd>
+          </div>
+          <div className="text-right">
+            <dt className="text-ink-muted">Submitted</dt>
+            <dd className="text-ink">
+              <RelativeTime iso={payment.submittedAt} now={now} />
+            </dd>
+          </div>
+          <div className="col-span-2">
+            <dt className="text-ink-muted">Library</dt>
+            <dd className="break-words font-medium text-ink">{payment.libraryName}</dd>
+          </div>
+          <div className="col-span-2">
+            <dt className="text-ink-muted">Owner</dt>
+            <dd className="flex flex-wrap items-center gap-x-2 text-ink">
+              {payment.ownerName}
+              {ownerPhone && <TelLink phone={ownerPhone} />}
+            </dd>
+          </div>
+        </dl>
+      </CardBody>
 
-      <div className="mt-auto flex flex-wrap gap-2">
-        <Button variant="primary" className="flex-1" onClick={onVerify}>
+      <CardFooter>
+        <Button variant="primary" className="flex-1 px-3" onClick={onVerify}>
           Verify
         </Button>
-        <Button variant="secondary" className="flex-1" onClick={onFail}>
-          Mark as failed
+        <Button variant="secondary" className="flex-1 px-3" onClick={onFail}>
+          Mark failed
         </Button>
-      </div>
-    </Card>
+      </CardFooter>
+    </GridCard>
   )
 }
 

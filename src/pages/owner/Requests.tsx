@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { CircleCheck, MessageCircle, Phone } from 'lucide-react'
 import { Badge, type BadgeTone } from '@/components/Badge'
 import { Button, buttonStyles } from '@/components/Button'
-import { Card } from '@/components/Card'
+import { CardBody, CardFooter, CardGrid, GridCard, GridItem } from '@/components/CardGrid'
 import { SelectField, TextField } from '@/components/Fields'
 import { Modal } from '@/components/Modal'
 import { PageHeader } from '@/components/PageParts'
@@ -114,35 +114,27 @@ export default function Requests() {
       ) : (
         <div className="space-y-8">
           {pending.length > 0 ? (
-            <ul className="space-y-3">
+            <CardGrid count={pending.length} max={2}>
               {pending.map((r) => {
                 const shift = shiftById.get(r.shiftId) ?? null
                 const left = shift ? seatsLeftInShift(shift.id) : 0
                 const off = shift ? !shift.isActive : false
                 return (
-                  <li key={r.id}>
-                    <Card className="p-4 sm:p-5">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
+                  <GridItem key={r.id}>
+                    <GridCard>
+                      <CardBody className="space-y-3">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0">
                             <p className="break-words font-medium">{r.studentName}</p>
-                            <ShiftBadge shift={shift} />
+                            <a
+                              href={`tel:${r.studentPhone}`}
+                              className="mt-0.5 inline-flex min-h-11 items-center gap-1.5 text-sm text-primary underline underline-offset-2"
+                            >
+                              <Phone aria-hidden className="size-4" />
+                              <span className="tabular-nums">{formatPhone(r.studentPhone)}</span>
+                            </a>
                           </div>
-                          <a
-                            href={`tel:${r.studentPhone}`}
-                            className="mt-0.5 inline-flex min-h-11 items-center gap-1.5 text-sm text-primary underline underline-offset-2"
-                          >
-                            <Phone aria-hidden className="size-4" />
-                            <span className="tabular-nums">{formatPhone(r.studentPhone)}</span>
-                          </a>
-                          {shift && (
-                            <p className="mt-1 text-sm text-ink-muted tabular-nums">
-                              {shift.name} · {formatShiftRange(shift)} · {formatRupees(shift.monthlyFeePaise)} / month
-                            </p>
-                          )}
-                          <p className="mt-1 text-sm text-ink-muted tabular-nums">
-                            Requested {formatDateTime(r.createdAt)}
-                          </p>
+                          <ShiftBadge shift={shift} />
                         </div>
                         <Badge tone={off ? 'neutral' : left > 0 ? 'primary' : 'warning'}>
                           {shift
@@ -151,20 +143,30 @@ export default function Requests() {
                               : `${left} seat${left === 1 ? '' : 's'} free in ${shift.name}`
                             : 'Shift unavailable'}
                         </Badge>
-                      </div>
+                        {shift && (
+                          <p className="text-sm text-ink-muted tabular-nums">
+                            {shift.name} · {formatShiftRange(shift)} · {formatRupees(shift.monthlyFeePaise)} / month
+                          </p>
+                        )}
+                        <p className="text-sm text-ink-muted tabular-nums">
+                          Requested {formatDateTime(r.createdAt)}
+                        </p>
+                      </CardBody>
                       {canWrite && (
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <Button onClick={() => setApproveReq(r)}>Approve</Button>
-                          <Button variant="secondary" onClick={() => setDeclineReq(r)}>
+                        <CardFooter>
+                          <Button className="flex-1" onClick={() => setApproveReq(r)}>
+                            Approve
+                          </Button>
+                          <Button variant="secondary" className="flex-1" onClick={() => setDeclineReq(r)}>
                             Decline
                           </Button>
-                        </div>
+                        </CardFooter>
                       )}
-                    </Card>
-                  </li>
+                    </GridCard>
+                  </GridItem>
                 )
               })}
-            </ul>
+            </CardGrid>
           ) : (
             <p className="text-ink-muted">No pending requests right now.</p>
           )}

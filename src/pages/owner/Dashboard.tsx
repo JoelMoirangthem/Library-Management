@@ -3,13 +3,16 @@ import { Link } from 'react-router-dom'
 import {
   Armchair,
   CalendarClock,
+  ClipboardList,
   Hourglass,
   ShieldAlert,
   UserCheck,
+  UserPlus,
   Users,
 } from 'lucide-react'
 import { buttonStyles } from '@/components/Button'
 import { Card } from '@/components/Card'
+import { CardBody, CardGrid, GridCard, GridItem } from '@/components/CardGrid'
 import { PageHeader, StatCard } from '@/components/PageParts'
 import { SeatStrip } from '@/components/SeatGrid'
 import { ShiftTabs } from '@/components/ShiftTabs'
@@ -282,7 +285,7 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Pick a shift; the stat cards below are for this shift only. */}
+      {/* The numbers. Pick a shift; the stat tiles below are for this shift only. */}
       {shifts.length > 0 && selectedShiftId && (
         <div className="mt-8">
           <ShiftTabs
@@ -294,7 +297,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 items-stretch gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard label="Total seats" value={selectedCounts.total} icon={<Armchair />} />
         <StatCard
           label={selectedShift ? `Occupied in ${selectedShift.name}` : 'Occupied'}
@@ -315,70 +318,72 @@ export default function Dashboard() {
         />
       </div>
 
-      {selectedCounts.total > 0 && selectedShift && (
-        <Card className="mt-4 p-4 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-medium tabular-nums">
-              {selectedShift.name}: {selectedCounts.free} free · {selectedCounts.occupied} occupied
-            </p>
-            <Link to="/owner/seats" className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline">
-              Open seat grid
-            </Link>
-          </div>
-          <SeatStrip total={selectedCounts.total} free={selectedCounts.free} className="mt-3" />
-        </Card>
-      )}
-
-      {/* All shifts at a glance. */}
+      {/* All shifts at a glance: one equal card per shift. */}
       {shifts.length > 0 && (
-        <Card className="mt-6 overflow-hidden">
-          <div className="border-b border-border p-4 sm:px-5">
-            <h2 className="text-lg font-semibold">All shifts</h2>
-          </div>
-          <ul className="divide-y divide-border">
+        <section className="mt-6">
+          <h2 className="mb-3 text-lg font-semibold">All shifts</h2>
+          <CardGrid count={shifts.length}>
             {shifts.map((s) => {
               const counts = seatCounts(buildSeatCells(allSeats, allMembers, today, s.id))
               const studentCount = activeMembers.filter((m) => m.shiftId === s.id).length
               const taken = counts.total - counts.free
               return (
-                <li
-                  key={s.id}
-                  className={`p-4 sm:px-5 ${s.isActive ? '' : 'bg-canvas/60 text-ink-muted'}`}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="flex flex-wrap items-center gap-2 font-medium">
-                        {s.name}
-                        {!s.isActive && (
-                          <span className="rounded-full bg-border px-2 py-0.5 text-xs font-medium text-ink-muted">
-                            Off
-                          </span>
-                        )}
-                      </p>
-                      <p className="mt-0.5 text-sm text-ink-muted tabular-nums">
+                <GridItem key={s.id}>
+                  <GridCard className={s.isActive ? '' : 'bg-canvas/60 text-ink-muted'}>
+                    <CardBody className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="flex min-w-0 flex-wrap items-center gap-2 font-medium">
+                          <span className="truncate">{s.name}</span>
+                          {!s.isActive && (
+                            <span className="rounded-full bg-border px-2 py-0.5 text-xs font-medium text-ink-muted">
+                              Off
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <p className="text-sm text-ink-muted tabular-nums">
                         {formatShiftRange(s)} · {formatRupees(s.monthlyFeePaise)} / month
                       </p>
-                    </div>
-                    <p className="shrink-0 text-right text-sm tabular-nums">
-                      <span className="font-medium">{taken} of {counts.total} seats taken</span>
-                      <br />
-                      <span className="text-ink-muted">
-                        {studentCount} student{studentCount === 1 ? '' : 's'}
-                        {!s.isActive && studentCount > 0 ? ' still tagged' : ''}
-                      </span>
-                    </p>
-                  </div>
-                  {counts.total > 0 && (
-                    <SeatStrip total={counts.total} free={counts.free} className="mt-3" />
-                  )}
-                </li>
+                      <p className="text-sm tabular-nums">
+                        <span className="font-medium">
+                          {taken} of {counts.total} seats taken
+                        </span>
+                        <br />
+                        <span className="text-ink-muted">
+                          {studentCount} student{studentCount === 1 ? '' : 's'}
+                          {!s.isActive && studentCount > 0 ? ' still tagged' : ''}
+                        </span>
+                      </p>
+                      {counts.total > 0 && (
+                        <SeatStrip total={counts.total} free={counts.free} />
+                      )}
+                    </CardBody>
+                  </GridCard>
+                </GridItem>
               )
             })}
-          </ul>
-        </Card>
+          </CardGrid>
+        </section>
       )}
 
-      <div className="mt-6">
+      {/* Quick actions + recent joins, equal height side by side. */}
+      <div className="mt-6 grid items-stretch gap-4 lg:grid-cols-2">
+        <Card className="flex flex-col overflow-hidden">
+          <div className="border-b border-border p-4 sm:px-5">
+            <h2 className="text-lg font-semibold">Quick actions</h2>
+          </div>
+          <div className="flex flex-1 flex-col gap-3 p-4 sm:p-5">
+            <Link to="/owner/students" className={buttonStyles('secondary', 'w-full justify-start')}>
+              <UserPlus aria-hidden className="size-4" /> Add or find a student
+            </Link>
+            <Link to="/owner/seats" className={buttonStyles('secondary', 'w-full justify-start')}>
+              <Armchair aria-hidden className="size-4" /> Open the seat grid
+            </Link>
+            <Link to="/owner/requests" className={buttonStyles('secondary', 'w-full justify-start')}>
+              <ClipboardList aria-hidden className="size-4" /> See seat requests
+            </Link>
+          </div>
+        </Card>
         <RecentJoins members={recent} />
       </div>
 

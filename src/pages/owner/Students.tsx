@@ -427,7 +427,7 @@ export default function Students() {
                   const fee = latestFeeByMember.get(m.id)
                   return (
                     <li key={m.id}>
-                      <Card className="p-4">
+                      <Card className="flex min-h-full flex-col p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">

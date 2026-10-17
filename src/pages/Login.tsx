@@ -18,7 +18,7 @@ import { demoLogin } from '@/lib/container'
 
 /** One-line scenario hints keyed by the seeded demo account id (from the build brief). */
 const HINTS: Record<string, string> = {
-  u_anil: 'Free trial, 9 days left · 25 students',
+  u_anil: 'Free trial, Morning shift full (39 of 39 seats)',
   u_sunita: 'Paid plan, running normally',
   u_manoj: 'Trial ending in 2 days · payment pending check',
   u_farah: 'Plan expired · library hidden',
@@ -203,34 +203,37 @@ function DemoChooser({
             })}
           </div>
 
-          <Card className="mt-3 divide-y divide-border overflow-hidden">
+          <ul data-card-grid role="list" className="mt-3 grid items-stretch gap-3 md:grid-cols-2">
             {current.accounts.map((acc) => (
-              <button
-                key={acc.id}
-                type="button"
-                onClick={() => void handleSignIn(acc.id)}
-                disabled={pendingId !== null}
-                className="flex w-full min-h-11 items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-canvas disabled:cursor-progress disabled:opacity-70"
-              >
-                <span
-                  aria-hidden
-                  className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary-ink"
+              <li key={acc.id} className="flex min-w-0">
+                <button
+                  type="button"
+                  onClick={() => void handleSignIn(acc.id)}
+                  disabled={pendingId !== null}
+                  className="flex min-h-11 w-full min-w-0 flex-1 items-start gap-3 rounded-card border border-border bg-surface p-4 text-left transition-colors hover:bg-canvas disabled:cursor-progress disabled:opacity-70"
                 >
-                  {initials(acc.name)}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-ink">{acc.name}</span>
-                  {HINTS[acc.id] && (
-                    <span className="block truncate text-xs text-ink-muted">{HINTS[acc.id]}</span>
-                  )}
-                </span>
-                <LogIn
-                  aria-hidden
-                  className={cx('size-4 shrink-0 text-ink-muted', pendingId === acc.id && 'motion-safe:animate-pulse')}
-                />
-              </button>
+                  <span
+                    aria-hidden
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary-ink"
+                  >
+                    {initials(acc.name)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-ink">{acc.name}</span>
+                    <span className="block truncate text-xs text-ink-muted">{acc.email}</span>
+                    {/* Reserve two lines for the scenario hint so every card is the same height. */}
+                    <span className="mt-1 block min-h-[2rem] text-xs text-ink-muted">
+                      {HINTS[acc.id] ?? ''}
+                    </span>
+                  </span>
+                  <LogIn
+                    aria-hidden
+                    className={cx('mt-0.5 size-4 shrink-0 text-ink-muted', pendingId === acc.id && 'motion-safe:animate-pulse')}
+                  />
+                </button>
+              </li>
             ))}
-          </Card>
+          </ul>
         </section>
       ) : null}
 

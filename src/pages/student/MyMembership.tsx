@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { Clock, MapPin, MessageCircle, Phone } from 'lucide-react'
 import { Badge, type BadgeTone } from '@/components/Badge'
 import { buttonStyles } from '@/components/Button'
-import { Card } from '@/components/Card'
+import { CardGrid, GridCard, GridItem } from '@/components/CardGrid'
 import { PageHeader } from '@/components/PageParts'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
@@ -98,9 +98,9 @@ function MembershipCard({
   const waMessage = `Hi, I'd like to renew my ${m.shift.name} seat. — ${studentName}`
 
   return (
-    <Card className="overflow-hidden">
-      {/* Ticket head: the seat number is the one bold beat. */}
-      <div className="flex items-stretch gap-4 border-b border-dashed border-border bg-primary-soft p-5">
+    <GridCard className="overflow-hidden">
+      {/* Ticket head: fixed height so every ticket's header aligns. Seat number is the one bold beat. */}
+      <div className="flex min-h-[7rem] items-stretch gap-4 border-b border-dashed border-border bg-primary-soft p-5">
         <div className="flex flex-col items-center justify-center">
           <span className="text-xs font-medium text-primary-ink">Seat</span>
           <span className="text-5xl font-semibold leading-none tabular-nums text-primary-ink">
@@ -129,7 +129,7 @@ function MembershipCard({
         </div>
       </div>
 
-      <div className="space-y-5 p-5">
+      <div className="flex flex-1 flex-col gap-5 p-5">
         <div>
           <div className="mb-1.5 flex items-center justify-between gap-2 text-sm">
             <span className="font-medium tabular-nums">{daysLeftText(daysLeft)}</span>
@@ -154,7 +154,8 @@ function MembershipCard({
           </div>
         </div>
 
-        {showReminder && libPhone && (
+        {/* Reminder region: reserves the same height whether or not a reminder is shown. */}
+        {showReminder && libPhone ? (
           <div className="space-y-3 rounded-card bg-warning-soft px-4 py-4 text-warning-ink">
             <p className="text-sm font-medium">
               {phase === 'expired'
@@ -177,11 +178,16 @@ function MembershipCard({
               </a>
             </div>
           </div>
+        ) : (
+          <p className="text-sm text-ink-muted">Your seat is active. No action needed right now.</p>
         )}
 
-        <Payments m={m} />
+        {/* Payments disclosure pinned to the bottom so it lines up across tickets. */}
+        <div className="mt-auto">
+          <Payments m={m} />
+        </div>
       </div>
-    </Card>
+    </GridCard>
   )
 }
 
@@ -208,7 +214,7 @@ export default function MyMembership() {
   })()
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <PageHeader title="My membership" description="Your seat, dates and payments." />
 
       {memberships.loading ? (
@@ -229,6 +235,7 @@ export default function MyMembership() {
         <div className="space-y-8">
           {groups.map((group, i) => {
             const libId = group.items[0].library?.id
+            const tickets = group.items.filter((m) => m.shift)
             return (
               <section key={libId ?? i} aria-label={group.name} className="space-y-4">
                 <h2 className="text-lg font-semibold leading-tight">
@@ -243,9 +250,13 @@ export default function MyMembership() {
                     group.name
                   )}
                 </h2>
-                {group.items.map((m) => (
-                  <MembershipCard key={m.member.id} m={m} today={today} studentName={studentName} />
-                ))}
+                <CardGrid count={tickets.length} max={2}>
+                  {tickets.map((m) => (
+                    <GridItem key={m.member.id}>
+                      <MembershipCard m={m} today={today} studentName={studentName} />
+                    </GridItem>
+                  ))}
+                </CardGrid>
               </section>
             )
           })}

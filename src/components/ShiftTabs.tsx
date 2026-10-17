@@ -28,7 +28,11 @@ export function ShiftTabs({
   className?: string
 }) {
   return (
-    <div role="group" aria-label={label} className={cx('flex flex-wrap gap-2', className)}>
+    <div
+      role="group"
+      aria-label={label}
+      className={cx('grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(10.5rem,1fr))]', className)}
+    >
       {shifts.map((s) => {
         const selected = s.id === value
         return (
@@ -38,7 +42,7 @@ export function ShiftTabs({
             aria-pressed={selected}
             onClick={() => onChange(s.id)}
             className={cx(
-              'flex min-h-14 cursor-pointer flex-col items-start rounded-control border px-4 py-2 text-left transition-colors',
+              'flex min-h-14 min-w-0 cursor-pointer flex-col items-start rounded-control border px-4 py-2 text-left transition-colors',
               selected
                 ? 'border-primary bg-primary-soft text-primary-ink'
                 : 'border-border-strong bg-surface text-ink hover:bg-canvas',

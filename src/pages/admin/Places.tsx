@@ -47,54 +47,71 @@ export default function Places() {
       ) : error ? (
         <ErrorState onRetry={() => { cities.reload(); areas.reload() }} />
       ) : (
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid items-stretch gap-6 lg:grid-cols-2">
           {/* Cities pane */}
-          <section aria-labelledby="cities-heading" className="min-w-0 space-y-3">
-            <h2 id="cities-heading" className="text-lg font-semibold">
-              Cities
-            </h2>
-            <AddCityForm />
-            {cityList.length === 0 ? (
-              <EmptyState title="No cities yet" description="Add your first city above." />
-            ) : (
-              <Card className="divide-y divide-border">
-                {cityList.map((city) => (
-                  <CityRow
-                    key={city.id}
-                    city={city}
-                    areaCount={areaCountByCity.get(city.id) ?? 0}
-                    selected={city.id === selectedCityId}
-                    onSelect={() => setSelectedCityId(city.id)}
-                  />
-                ))}
-              </Card>
-            )}
+          <section aria-labelledby="cities-heading" className="flex min-w-0 flex-col">
+            <Card className="flex min-h-full flex-1 flex-col p-4 sm:p-5">
+              <h2 id="cities-heading" className="text-lg font-semibold">
+                Cities
+              </h2>
+              <div className="mt-3">
+                <AddCityForm />
+              </div>
+              <div className="mt-3 max-h-[28rem] flex-1 overflow-y-auto">
+                {cityList.length === 0 ? (
+                  <EmptyState title="No cities yet" description="Add your first city above." />
+                ) : (
+                  <ul className="divide-y divide-border rounded-card border border-border">
+                    {cityList.map((city) => (
+                      <li key={city.id}>
+                        <CityRow
+                          city={city}
+                          areaCount={areaCountByCity.get(city.id) ?? 0}
+                          selected={city.id === selectedCityId}
+                          onSelect={() => setSelectedCityId(city.id)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </Card>
           </section>
 
           {/* Areas pane: on phones this appears below after a city is picked */}
           <section
             aria-labelledby="areas-heading"
-            className={cx('min-w-0 space-y-3', !selectedCity && 'hidden md:block')}
+            className={cx('flex min-w-0 flex-col', !selectedCity && 'hidden lg:flex')}
           >
-            <h2 id="areas-heading" className="text-lg font-semibold">
-              {selectedCity ? `Areas in ${selectedCity.name}` : 'Areas'}
-            </h2>
-            {!selectedCity ? (
-              <EmptyState title="Pick a city" description="Select a city to see and add its areas." />
-            ) : (
-              <>
-                <AddAreaForm cityId={selectedCity.id} />
-                {cityAreas.length === 0 ? (
-                  <EmptyState title="No areas yet" description={`Add the first area in ${selectedCity.name}.`} />
-                ) : (
-                  <Card className="divide-y divide-border">
-                    {cityAreas.map((area) => (
-                      <AreaRow key={area.id} area={area} />
-                    ))}
-                  </Card>
-                )}
-              </>
-            )}
+            <Card className="flex min-h-full flex-1 flex-col p-4 sm:p-5">
+              <h2 id="areas-heading" className="text-lg font-semibold">
+                {selectedCity ? `Areas in ${selectedCity.name}` : 'Areas'}
+              </h2>
+              {!selectedCity ? (
+                <div className="mt-3 flex-1">
+                  <EmptyState title="Pick a city" description="Select a city to see and add its areas." />
+                </div>
+              ) : (
+                <>
+                  <div className="mt-3">
+                    <AddAreaForm cityId={selectedCity.id} />
+                  </div>
+                  <div className="mt-3 max-h-[28rem] flex-1 overflow-y-auto">
+                    {cityAreas.length === 0 ? (
+                      <EmptyState title="No areas yet" description={`Add the first area in ${selectedCity.name}.`} />
+                    ) : (
+                      <ul className="divide-y divide-border rounded-card border border-border">
+                        {cityAreas.map((area) => (
+                          <li key={area.id}>
+                            <AreaRow area={area} />
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </>
+              )}
+            </Card>
           </section>
         </div>
       )}

@@ -4,6 +4,7 @@ import { CheckCircle2, Clock, MapPin, Phone } from 'lucide-react'
 import { Badge } from '@/components/Badge'
 import { Button, buttonStyles } from '@/components/Button'
 import { Card } from '@/components/Card'
+import { CardGrid, GridItem } from '@/components/CardGrid'
 import { LibraryArt } from '@/components/LibraryArt'
 import { PageHeader } from '@/components/PageParts'
 import { SeatStrip } from '@/components/SeatGrid'
@@ -206,7 +207,7 @@ function RequestAction({
   )
 }
 
-/** Selectable radio-styled card for one shift. */
+/** Selectable radio-styled card for one shift. Fills its grid cell; rows align across cards. */
 function ShiftOption({
   shift,
   selected,
@@ -224,7 +225,7 @@ function ShiftOption({
       aria-checked={selected}
       onClick={onSelect}
       className={cx(
-        'flex w-full flex-col gap-2 rounded-card border p-4 text-left transition-colors',
+        'flex h-full w-full flex-col gap-3 rounded-card border p-4 text-left transition-colors',
         selected
           ? 'border-primary bg-primary-soft'
           : 'border-border-strong bg-surface hover:bg-canvas',
@@ -246,7 +247,10 @@ function ShiftOption({
       <p className="text-sm font-medium tabular-nums">
         {full ? 'Full' : `${shift.seatsLeft} of ${shift.totalSeats} seats free`}
       </p>
-      <SeatStrip total={shift.totalSeats} free={shift.seatsLeft} />
+      {/* Pin the seat strip to the bottom so it sits at the same y in every card. */}
+      <div className="mt-auto">
+        <SeatStrip total={shift.totalSeats} free={shift.seatsLeft} />
+      </div>
     </button>
   )
 }
@@ -379,7 +383,7 @@ export default function LibraryDetail() {
         </Link>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
+      <div className="grid items-start gap-8 lg:grid-cols-[1fr_20rem]">
         <div className="space-y-6">
           <Cover library={lib} />
 
@@ -397,20 +401,22 @@ export default function LibraryDetail() {
               Pick a shift to request a seat. Each shift has its own fee and seats.
             </p>
             {shifts.length > 0 ? (
-              <div
+              <CardGrid
+                count={shifts.length}
                 role="radiogroup"
                 aria-label="Choose a shift"
-                className="grid gap-3 sm:grid-cols-2"
+                className="gap-3"
               >
                 {shifts.map((s) => (
-                  <ShiftOption
-                    key={s.id}
-                    shift={s}
-                    selected={selectedShift?.id === s.id}
-                    onSelect={() => selectShift(s.id)}
-                  />
+                  <GridItem key={s.id}>
+                    <ShiftOption
+                      shift={s}
+                      selected={selectedShift?.id === s.id}
+                      onSelect={() => selectShift(s.id)}
+                    />
+                  </GridItem>
                 ))}
-              </div>
+              </CardGrid>
             ) : (
               <p className="text-sm text-ink-muted">No shifts are open right now.</p>
             )}

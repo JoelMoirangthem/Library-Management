@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronDown, Phone, Search } from 'lucide-react'
+import { ChevronDown, Clock, Phone, Search } from 'lucide-react'
+import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
 import { Card } from '@/components/Card'
 import { TextField } from '@/components/Fields'
 import { Modal } from '@/components/Modal'
 import { PageHeader } from '@/components/PageParts'
 import { SeatGrid } from '@/components/SeatGrid'
-import { ShiftBadge, ShiftTabs } from '@/components/ShiftTabs'
+import { ShiftBadge } from '@/components/ShiftTabs'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
@@ -21,7 +23,7 @@ import { useToast } from '@/components/Toast'
 import { buildSeatCells, seatCounts } from '@/domain/seatCells'
 import { todayIST, formatDate } from '@/domain/dates'
 import { formatPhone } from '@/domain/constants'
-import { sortShifts } from '@/domain/shifts'
+import { formatShiftRange, sortShifts } from '@/domain/shifts'
 import type { Member, Shift } from '@/domain/types'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
@@ -38,6 +40,60 @@ function ReadOnlyNotice() {
       <Link to="/owner/plan" className="font-medium text-primary underline underline-offset-2">
         Go to plan
       </Link>
+    </div>
+  )
+}
+
+/**
+ * Shift picker as equal-width tiles in a count-based grid (1 to 3 columns matching the
+ * number of shifts). Tiles are identical height so they line up with the grid card below.
+ */
+function ShiftTabGrid({
+  shifts,
+  value,
+  onChange,
+  detail,
+}: {
+  shifts: Shift[]
+  value: string
+  onChange: (shiftId: string) => void
+  detail?: (shift: Shift) => ReactNode
+}) {
+  const cols =
+    shifts.length >= 3
+      ? 'sm:grid-cols-3'
+      : shifts.length === 2
+        ? 'sm:grid-cols-2'
+        : 'sm:grid-cols-1'
+  return (
+    <div role="group" aria-label="Shift" className={cx('grid grid-cols-1 items-stretch gap-2', cols)}>
+      {shifts.map((s) => {
+        const selected = s.id === value
+        return (
+          <button
+            key={s.id}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => onChange(s.id)}
+            className={cx(
+              'flex min-h-14 cursor-pointer flex-col items-start rounded-control border px-4 py-2 text-left transition-colors',
+              selected
+                ? 'border-primary bg-primary-soft text-primary-ink'
+                : 'border-border-strong bg-surface text-ink hover:bg-canvas',
+            )}
+          >
+            <span className="flex items-center gap-2 font-medium">
+              {s.name}
+              {!s.isActive && <Badge tone="neutral">Off</Badge>}
+            </span>
+            <span className="flex items-center gap-1 text-xs tabular-nums text-ink-muted">
+              <Clock aria-hidden className="size-3" />
+              {formatShiftRange(s)}
+            </span>
+            {detail && <span className="mt-0.5 text-sm font-medium tabular-nums">{detail(s)}</span>}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -184,7 +240,7 @@ export default function Seats() {
       ) : (
         <div className="space-y-4">
           {shifts.length > 0 && (
-            <ShiftTabs
+            <ShiftTabGrid
               shifts={shifts}
               value={selectedShiftId}
               onChange={(id) => {
