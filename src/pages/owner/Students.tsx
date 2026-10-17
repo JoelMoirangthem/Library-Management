@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { CreditCard, Pencil, Phone, RefreshCw, Trash2, UserPlus } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { MoreHorizontal, Phone, RefreshCw, UserPlus } from 'lucide-react'
 import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
 import { Card } from '@/components/Card'
 import { PageHeader } from '@/components/PageParts'
 import { ShiftBadge } from '@/components/ShiftTabs'
+import { ShowMore } from '@/components/ShowMore'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
@@ -14,22 +15,33 @@ import {
   ConfirmModal,
   EditStudentModal,
   ExpiryBadge,
+  MemberActionsSheet,
   PaymentsModal,
   RenewModal,
 } from '@/components/owner/members'
+import { reminderMessage } from '@/components/owner/home/reminder'
 import { formatDate, formatDateTime, todayIST } from '@/domain/dates'
 import { memberPhase } from '@/domain/members'
+import { formatPhone } from '@/domain/constants'
 import { formatRupees } from '@/domain/money'
 import { sortShifts } from '@/domain/shifts'
 import type { FeePayment, Member, Shift } from '@/domain/types'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
 import { useOwnerLibrary } from '@/hooks/useOwnerLibrary'
+import { usePaged } from '@/hooks/usePaged'
+import { useTitle } from '@/hooks/useTitle'
 import { services } from '@/lib/container'
 import { useNow } from '@/lib/devState'
 import { cx } from '@/lib/cx'
 
-type StatusFilter = 'active' | 'expiring' | 'overdue' | 'noSeat'
+type StatusFilter = 'attention' | 'all' | 'expiring' | 'overdue' | 'noSeat'
+
+const FILTERS: StatusFilter[] = ['attention', 'all', 'expiring', 'overdue', 'noSeat']
+
+function isFilter(v: string | null): v is StatusFilter {
+  return !!v && (FILTERS as string[]).includes(v)
+}
 
 function ReadOnlyNotice({ className }: { className?: string }) {
   return (
@@ -43,6 +55,7 @@ function ReadOnlyNotice({ className }: { className?: string }) {
 }
 
 export default function Students() {
+  useTitle('Students')
   const now = useNow()
   const today = todayIST(now)
   const { library, canWrite } = useOwnerLibrary()
@@ -70,7 +83,6 @@ export default function Students() {
     return m
   }, [seats])
 
-  // Latest non-void payment per member.
   const latestFeeByMember = useMemo(() => {
     const map = new Map<string, FeePayment>()
     for (const f of fees) {
@@ -84,21 +96,51 @@ export default function Students() {
   const activeMembers = useMemo(() => members.filter((m) => m.status === 'active'), [members])
   const removedMembers = useMemo(() => members.filter((m) => m.status === 'removed'), [members])
 
+  // How many need attention right now (expiring + overdue), to decide the default chip.
+  const attentionCount = useMemo(
+    () => activeMembers.filter((m) => memberPhase(m, today) !== 'active').length,
+    [activeMembers, today],
+  )
+
+  // Filter lives in the URL so dashboard "Show all" links land on the right chip.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlFilter = searchParams.get('filter')
+  const [status, setStatus] = useState<StatusFilter>(() =>
+    isFilter(urlFilter) ? urlFilter : attentionCount > 0 ? 'attention' : 'all',
+  )
+
+  // Keep state in sync when the URL changes (e.g. navigating from the dashboard).
+  useEffect(() => {
+    if (isFilter(urlFilter) && urlFilter !== status) setStatus(urlFilter)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlFilter])
+
+  const setFilter = (next: StatusFilter) => {
+    setStatus(next)
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev)
+        if (next === 'all') p.delete('filter')
+        else p.set('filter', next)
+        return p
+      },
+      { replace: true },
+    )
+  }
+
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState<StatusFilter>('active')
   const [shiftFilter, setShiftFilter] = useState<string>('all')
   const [showRemoved, setShowRemoved] = useState(false)
 
   const matchesStatus = (m: Member) => {
     const phase = memberPhase(m, today)
-    if (status === 'active') return phase !== 'expired'
+    if (status === 'attention') return phase !== 'active'
     if (status === 'expiring') return phase === 'expiring'
     if (status === 'overdue') return phase === 'expired'
     if (status === 'noSeat') return !m.seatId
     return true
   }
 
-  // Status chip counts respect the current shift filter.
   const byShift = useMemo(
     () =>
       shiftFilter === 'all'
@@ -108,21 +150,22 @@ export default function Students() {
   )
 
   const counts = useMemo(() => {
-    let active = 0
+    let all = 0
+    let attention = 0
     let expiring = 0
     let overdue = 0
     let noSeat = 0
     for (const m of byShift) {
+      all++
       const phase = memberPhase(m, today)
-      if (phase !== 'expired') active++
+      if (phase !== 'active') attention++
       if (phase === 'expiring') expiring++
       if (phase === 'expired') overdue++
       if (!m.seatId) noSeat++
     }
-    return { active, expiring, overdue, noSeat }
+    return { all, attention, expiring, overdue, noSeat }
   }, [byShift, today])
 
-  // Shift chip counts respect the current status filter + search.
   const shiftCounts = useMemo(() => {
     const q = query.trim().toLowerCase()
     const matchesQuery = (m: Member) =>
@@ -153,16 +196,27 @@ export default function Students() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMembers, query, status, shiftFilter, today])
 
+  const paged = usePaged(visible, 25, `${status}|${query}|${shiftFilter}`)
+
   // Modal state
   const [addOpen, setAddOpen] = useState(false)
   const [renewMember, setRenewMember] = useState<Member | null>(null)
   const [editMember, setEditMember] = useState<Member | null>(null)
   const [paymentsMember, setPaymentsMember] = useState<Member | null>(null)
   const [removeMember, setRemoveMember] = useState<Member | null>(null)
+  const [moreMember, setMoreMember] = useState<Member | null>(null)
 
   const remove = useMutation(services.removeMember, { success: 'Student removed' })
   const feeFor = (m: Member | null) =>
     (m && shiftById.get(m.shiftId)?.monthlyFeePaise) || 0
+
+  const makeReminder = (m: Member) =>
+    reminderMessage({
+      name: m.name,
+      shift: shiftById.get(m.shiftId)?.name ?? 'study',
+      library: library!.name,
+      expiry: m.expiryDate,
+    })
 
   const loading = seatsQ.loading || membersQ.loading || feesQ.loading || shiftsQ.loading
   const error = seatsQ.error ?? membersQ.error ?? feesQ.error ?? shiftsQ.error
@@ -174,8 +228,9 @@ export default function Students() {
   }
 
   const statusChips: { key: StatusFilter; label: string; count: number }[] = [
-    { key: 'active', label: 'All active', count: counts.active },
-    { key: 'expiring', label: 'Expiring in 7 days', count: counts.expiring },
+    { key: 'attention', label: 'Needs attention', count: counts.attention },
+    { key: 'all', label: 'All', count: counts.all },
+    { key: 'expiring', label: 'Expiring', count: counts.expiring },
     { key: 'overdue', label: 'Overdue', count: counts.overdue },
     { key: 'noSeat', label: 'No seat', count: counts.noSeat },
   ]
@@ -184,7 +239,7 @@ export default function Students() {
     <>
       <PageHeader
         title="Students"
-        description="Everyone at your library. Status comes from each student’s expiry date."
+        description="Everyone at your library. Status comes from each student's expiry date."
         actions={
           canWrite ? (
             <Button onClick={() => setAddOpen(true)}>
@@ -230,7 +285,7 @@ export default function Students() {
                   key={c.key}
                   type="button"
                   aria-pressed={status === c.key}
-                  onClick={() => setStatus(c.key)}
+                  onClick={() => setFilter(c.key)}
                   className={cx(
                     'inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
                     status === c.key
@@ -285,6 +340,10 @@ export default function Students() {
             <Card className="p-8 text-center text-ink-muted">No students match this filter.</Card>
           ) : (
             <>
+              <p className="text-sm text-ink-muted tabular-nums" aria-live="polite">
+                {visible.length} student{visible.length === 1 ? '' : 's'}
+              </p>
+
               {/* Desktop table */}
               <Card className="hidden overflow-hidden md:block">
                 <table className="w-full text-left text-sm">
@@ -297,12 +356,12 @@ export default function Students() {
                       <th scope="col" className="px-4 py-3 font-medium">Shift</th>
                       <th scope="col" className="px-4 py-3 font-medium">Seat</th>
                       <th scope="col" className="px-4 py-3 font-medium">Expires</th>
-                      <th scope="col" className="px-4 py-3 font-medium">Fees</th>
+                      <th scope="col" className="px-4 py-3 font-medium">Last payment</th>
                       <th scope="col" className="px-4 py-3 text-right font-medium">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {visible.map((m) => {
+                    {paged.visible.map((m) => {
                       const seatNo = m.seatId ? seatNumberById.get(m.seatId) : undefined
                       const fee = latestFeeByMember.get(m.id)
                       return (
@@ -311,10 +370,10 @@ export default function Students() {
                             <p className="font-medium">{m.name}</p>
                             <a
                               href={`tel:${m.phone}`}
-                              className="inline-flex items-center gap-1 text-ink-muted hover:text-primary"
+                              className="inline-flex min-h-11 items-center gap-1 text-ink-muted hover:text-primary"
                             >
                               <Phone aria-hidden className="size-3.5" />
-                              <span className="tabular-nums">{m.phone}</span>
+                              <span className="tabular-nums">{formatPhone(m.phone)}</span>
                             </a>
                           </td>
                           <td className="px-4 py-3">
@@ -337,14 +396,22 @@ export default function Students() {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <RowActions
-                              iconOnly
-                              canWrite={canWrite}
-                              onRenew={() => setRenewMember(m)}
-                              onEdit={() => setEditMember(m)}
-                              onPayments={() => setPaymentsMember(m)}
-                              onRemove={() => setRemoveMember(m)}
-                            />
+                            <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+                              {canWrite && (
+                                <Button variant="ghost" className="min-h-11 px-3" onClick={() => setRenewMember(m)}>
+                                  <RefreshCw aria-hidden className="size-4" /> Renew
+                                </Button>
+                              )}
+                              <Button
+                                variant="secondary"
+                                className="min-h-11 px-3"
+                                aria-haspopup="dialog"
+                                aria-label={`More actions for ${m.name}`}
+                                onClick={() => setMoreMember(m)}
+                              >
+                                <MoreHorizontal aria-hidden className="size-4" /> More
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       )
@@ -355,24 +422,24 @@ export default function Students() {
 
               {/* Phone cards */}
               <ul className="space-y-3 md:hidden">
-                {visible.map((m) => {
+                {paged.visible.map((m) => {
                   const seatNo = m.seatId ? seatNumberById.get(m.seatId) : undefined
                   const fee = latestFeeByMember.get(m.id)
                   return (
                     <li key={m.id}>
                       <Card className="p-4">
                         <div className="flex items-start justify-between gap-3">
-                          <div>
+                          <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-medium">{m.name}</p>
+                              <p className="break-words font-medium">{m.name}</p>
                               <ShiftBadge shift={shiftById.get(m.shiftId)} />
                             </div>
                             <a
                               href={`tel:${m.phone}`}
-                              className="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-primary"
+                              className="inline-flex min-h-11 items-center gap-1 text-sm text-ink-muted hover:text-primary"
                             >
                               <Phone aria-hidden className="size-3.5" />
-                              <span className="tabular-nums">{m.phone}</span>
+                              <span className="tabular-nums">{formatPhone(m.phone)}</span>
                             </a>
                           </div>
                           <ExpiryBadge member={m} today={today} />
@@ -387,33 +454,47 @@ export default function Students() {
                             <dd className="tabular-nums">{formatDate(m.expiryDate)}</dd>
                           </div>
                           <div className="col-span-2">
-                            <dt className="text-ink-muted">Latest fee</dt>
+                            <dt className="text-ink-muted">Last payment</dt>
                             <dd className="tabular-nums">
                               {fee ? `${formatRupees(fee.amountPaise)} · ${formatDate(fee.paidOn)}` : 'No payment'}
                             </dd>
                           </div>
                         </dl>
-                        <div className="mt-3 border-t border-border pt-3">
-                          <RowActions
-                            canWrite={canWrite}
-                            onRenew={() => setRenewMember(m)}
-                            onEdit={() => setEditMember(m)}
-                            onPayments={() => setPaymentsMember(m)}
-                            onRemove={() => setRemoveMember(m)}
-                          />
+                        <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
+                          {canWrite && (
+                            <Button className="flex-1" onClick={() => setRenewMember(m)}>
+                              <RefreshCw aria-hidden className="size-4" /> Renew
+                            </Button>
+                          )}
+                          <Button
+                            variant="secondary"
+                            className={canWrite ? 'px-4' : 'flex-1'}
+                            aria-haspopup="dialog"
+                            aria-label={`More actions for ${m.name}`}
+                            onClick={() => setMoreMember(m)}
+                          >
+                            <MoreHorizontal aria-hidden className="size-4" /> More
+                          </Button>
                         </div>
                       </Card>
                     </li>
                   )
                 })}
               </ul>
+
+              <ShowMore
+                shown={paged.shown}
+                total={paged.total}
+                onClick={paged.showMore}
+                noun="students"
+              />
             </>
           )}
 
           {/* Removed students */}
           {removedMembers.length > 0 && (
             <div className="pt-2">
-              <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium">
+              <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium">
                 <input
                   type="checkbox"
                   className="size-4 accent-primary"
@@ -426,12 +507,12 @@ export default function Students() {
                 <ul className="mt-3 divide-y divide-border rounded-card border border-border bg-surface">
                   {removedMembers.map((m) => (
                     <li key={m.id} className="flex items-center justify-between gap-3 p-4 text-ink-muted">
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{m.name}</p>
+                          <p className="break-words font-medium">{m.name}</p>
                           <ShiftBadge shift={shiftById.get(m.shiftId)} />
                         </div>
-                        <span className="tabular-nums text-sm">{m.phone}</span>
+                        <span className="tabular-nums text-sm">{formatPhone(m.phone)}</span>
                       </div>
                       <Badge tone="neutral">
                         Removed{m.removedAt ? ` ${formatDateTime(m.removedAt)}` : ''}
@@ -454,6 +535,11 @@ export default function Students() {
         seats={seats}
         members={members}
         today={today}
+        onAdded={(name) => {
+          // Show the new student straight away instead of hiding them behind the default filter.
+          setFilter('all')
+          setQuery(name)
+        }}
       />
       <RenewModal
         open={!!renewMember}
@@ -471,6 +557,28 @@ export default function Students() {
         today={today}
         canWrite={canWrite}
       />
+      <MemberActionsSheet
+        member={moreMember}
+        shift={moreMember ? shiftById.get(moreMember.shiftId) : undefined}
+        reminderMessage={makeReminder}
+        canWrite={canWrite}
+        onClose={() => setMoreMember(null)}
+        onEdit={() => {
+          const m = moreMember
+          setMoreMember(null)
+          setEditMember(m)
+        }}
+        onPayments={() => {
+          const m = moreMember
+          setMoreMember(null)
+          setPaymentsMember(m)
+        }}
+        onRemove={() => {
+          const m = moreMember
+          setMoreMember(null)
+          setRemoveMember(m)
+        }}
+      />
       <ConfirmModal
         open={!!removeMember}
         onClose={() => setRemoveMember(null)}
@@ -485,55 +593,5 @@ export default function Students() {
         }}
       />
     </>
-  )
-}
-
-function RowActions({
-  canWrite,
-  onRenew,
-  onEdit,
-  onPayments,
-  onRemove,
-  iconOnly = false,
-}: {
-  canWrite: boolean
-  onRenew: () => void
-  onEdit: () => void
-  onPayments: () => void
-  onRemove: () => void
-  /** Table rows: Renew keeps its label, the rest become icon buttons so the row never wraps. */
-  iconOnly?: boolean
-}) {
-  const small = iconOnly ? 'min-w-11 px-0' : 'px-3'
-  const label = (text: string) => (iconOnly ? <span className="sr-only">{text}</span> : text)
-  if (!canWrite) {
-    return (
-      <div className="flex justify-end">
-        <Button variant="ghost" className={`min-h-11 ${small}`} onClick={onPayments} title="Payments">
-          <CreditCard aria-hidden className="size-4" /> {label('Payments')}
-        </Button>
-      </div>
-    )
-  }
-  return (
-    <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-      <Button variant="ghost" className="min-h-11 px-3" onClick={onRenew}>
-        <RefreshCw aria-hidden className="size-4" /> Renew
-      </Button>
-      <Button variant="ghost" className={`min-h-11 ${small}`} onClick={onEdit} title="Edit">
-        <Pencil aria-hidden className="size-4" /> {label('Edit')}
-      </Button>
-      <Button variant="ghost" className={`min-h-11 ${small}`} onClick={onPayments} title="Payments">
-        <CreditCard aria-hidden className="size-4" /> {label('Payments')}
-      </Button>
-      <Button
-        variant="ghost"
-        className={`min-h-11 text-danger hover:bg-danger-soft ${small}`}
-        onClick={onRemove}
-        title="Remove"
-      >
-        <Trash2 aria-hidden className="size-4" /> {label('Remove')}
-      </Button>
-    </div>
   )
 }

@@ -80,7 +80,7 @@ Library owners manage their study library (seats, students, fees, expiry). Stude
 
 ### Discovery (DISC)
 - **DISC-1** City and area dropdowns; fee and amenity filters.
-- **DISC-2** Library cards with "from ?X" and seats left per shift (from `public_libraries`).
+- **DISC-2** Library cards with "from ₹X" and seats left per shift (from `public_libraries`).
 - **DISC-3** Detail page: photos, fees, timings, Call button, "Open in Google Maps" link from text address.
 
 ### Seat requests (REQ)

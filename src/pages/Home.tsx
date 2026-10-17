@@ -18,11 +18,16 @@ import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
 import { HeroSeatGrid } from '@/components/landing/HeroSeatGrid'
 import { LibraryTeaserCard } from '@/components/landing/LibraryTeaserCard'
+import { OwnerProductPeek } from '@/components/landing/OwnerProductPeek'
 import { formatRupees } from '@/domain/money'
 import { PLAN_PRICE_PAISE } from '@/domain/plan'
 import type { PublicLibrary } from '@/domain/types'
 import { useAsync } from '@/hooks/useAsync'
+import { useTitle } from '@/hooks/useTitle'
 import { services } from '@/lib/container'
+
+/** '₹199 for 30 days' — the owner plan price, worded consistently everywhere. */
+const PLAN_PRICE_LABEL = `${formatRupees(PLAN_PRICE_PAISE)} for 30 days`
 
 /** Total seats free across a library's active shifts — used to rank the teaser list. */
 function totalSeatsLeft(library: PublicLibrary): number {
@@ -30,6 +35,7 @@ function totalSeatsLeft(library: PublicLibrary): number {
 }
 
 export default function Home() {
+  useTitle('Find a study library seat')
   return (
     <div>
       <Hero />
@@ -46,14 +52,13 @@ function Hero() {
   return (
     <section className="border-b border-border">
       <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-2 lg:gap-12 lg:py-20">
-        <div className="max-w-xl">
+        <div className="min-w-0 max-w-xl">
           <h1 className="text-3xl font-semibold leading-tight tracking-tight text-ink sm:text-4xl lg:text-5xl">
-            Find a study library with a free seat, or run yours without paper registers.
+            Find a seat. Or run your library.
           </h1>
           <p className="mt-5 max-w-prose text-lg text-ink-muted">
-            Students search by city and area and request a seat in a few taps. Owners rent
-            each seat by shift — morning, afternoon and evening — and track students, fees
-            and expiry dates in one place, on the phone, between students.
+            Students find a study library by city and area and request a seat in a few taps —
+            owners rent every seat by shift and track fees and expiry in one place.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link to="/discover" className={buttonStyles('primary', 'text-base')}>
@@ -65,12 +70,12 @@ function Hero() {
             </Link>
           </div>
           <p className="mt-4 text-sm text-ink-muted">
-            14 days free for owners. No card needed to start.
+            Free for students. 14 days free for owners, no card needed.
           </p>
         </div>
 
-        <div className="relative">
-          <Card className="bg-canvas p-5 sm:p-7">
+        <div className="relative min-w-0">
+          <Card className="bg-canvas p-4 sm:p-7">
             <HeroSeatGrid />
           </Card>
         </div>
@@ -108,13 +113,13 @@ function HowItWorks() {
                 <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary-ink tabular-nums">
                   {i + 1}
                 </span>
-                <span className="pt-0.5 text-ink">{step}</span>
+                <span className="min-w-0 break-words pt-0.5 text-ink">{step}</span>
               </li>
             ))}
           </ol>
           <Link
             to="/discover"
-            className="mt-6 inline-flex items-center gap-1.5 rounded-control text-sm font-medium text-primary hover:text-primary-hover"
+            className={buttonStyles('ghost', 'mt-6 -ml-4 w-fit text-sm')}
           >
             Find a library
             <ArrowRight aria-hidden className="size-4" />
@@ -129,13 +134,13 @@ function HowItWorks() {
                 <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary-ink tabular-nums">
                   {i + 1}
                 </span>
-                <span className="pt-0.5 text-ink">{step}</span>
+                <span className="min-w-0 break-words pt-0.5 text-ink">{step}</span>
               </li>
             ))}
           </ol>
           <Link
             to="/login?as=owner"
-            className="mt-6 inline-flex items-center gap-1.5 rounded-control text-sm font-medium text-primary hover:text-primary-hover"
+            className={buttonStyles('ghost', 'mt-6 -ml-4 w-fit text-sm')}
           >
             List your library
             <ArrowRight aria-hidden className="size-4" />
@@ -158,7 +163,7 @@ function SeatsFreeNow() {
     <section className="border-y border-border bg-surface">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <h2 className="text-2xl font-semibold tracking-tight">Libraries with seats free now</h2>
             <p className="mt-2 max-w-prose text-ink-muted">
               A few open spots near our pilot cities. Tap one to see fees, timings and the seat map.
@@ -166,7 +171,7 @@ function SeatsFreeNow() {
           </div>
           <Link
             to="/discover"
-            className="inline-flex items-center gap-1.5 rounded-control text-sm font-medium text-primary hover:text-primary-hover"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-control text-sm font-medium text-primary hover:text-primary-hover"
           >
             See all libraries
             <ArrowRight aria-hidden className="size-4" />
@@ -217,29 +222,28 @@ function OwnersSection() {
     <section id="owners" className="scroll-mt-20 bg-canvas">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
         <div className="grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-14">
-          <div className="max-w-md">
+          <div className="min-w-0 max-w-md">
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               Run your library without registers
             </h2>
             <p className="mt-4 text-ink-muted">
-              Start free for 14 days. Keep going for a flat {formatRupees(PLAN_PRICE_PAISE)} a month —
+              Start free for 14 days. Keep going for a flat {PLAN_PRICE_LABEL} —
               one price, every feature, no per-student charge.
             </p>
 
             <Card className="mt-6 p-6">
               <p className="text-sm text-ink-muted">After your free trial</p>
-              <p className="mt-1 flex items-baseline gap-1">
-                <span className="text-4xl font-semibold tabular-nums">{formatRupees(PLAN_PRICE_PAISE)}</span>
-                <span className="text-ink-muted">/ month</span>
+              <p className="mt-1 text-3xl font-semibold tabular-nums">
+                {PLAN_PRICE_LABEL}
               </p>
               <ul className="mt-4 space-y-2 text-sm text-ink">
                 <li className="flex items-center gap-2">
-                  <IndianRupee aria-hidden className="size-4 text-primary" />
-                  Pay by UPI, verified by our team — usually the same day.
+                  <IndianRupee aria-hidden className="size-4 shrink-0 text-primary" />
+                  <span className="min-w-0 break-words">Pay by UPI, verified by our team — usually the same day.</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <ListChecks aria-hidden className="size-4 text-primary" />
-                  Renew early and the days stack; you never lose time.
+                  <ListChecks aria-hidden className="size-4 shrink-0 text-primary" />
+                  <span className="min-w-0 break-words">Renew early and the days stack; you never lose time.</span>
                 </li>
               </ul>
               <Link to="/login?as=owner" className={buttonStyles('primary', 'mt-6 w-full')}>
@@ -250,21 +254,33 @@ function OwnersSection() {
             </Card>
           </div>
 
-          <div>
-            <h3 className="text-lg font-semibold">What owners get</h3>
-            <ul className="mt-4 divide-y divide-border rounded-card border border-border bg-surface">
-              {benefits.map((b) => (
-                <li key={b.title} className="flex gap-4 p-5">
-                  <span aria-hidden className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-ink">
-                    {b.icon}
-                  </span>
-                  <div>
-                    <p className="font-medium text-ink">{b.title}</p>
-                    <p className="mt-1 text-sm text-ink-muted">{b.body}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+          <div className="min-w-0 space-y-8">
+            <div>
+              <h3 className="text-lg font-semibold">See it before you sign up</h3>
+              <p className="mt-1 text-sm text-ink-muted">
+                A peek at your Today screen: what is waiting, who is expiring, who is overdue.
+              </p>
+              <div className="mt-4">
+                <OwnerProductPeek />
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold">What owners get</h3>
+              <ul className="mt-4 divide-y divide-border rounded-card border border-border bg-surface">
+                {benefits.map((b) => (
+                  <li key={b.title} className="flex gap-4 p-5">
+                    <span aria-hidden className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-ink">
+                      {b.icon}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="font-medium text-ink">{b.title}</p>
+                      <p className="mt-1 text-sm text-ink-muted">{b.body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
       </div>
@@ -275,7 +291,7 @@ function OwnersSection() {
 const FAQS: { q: string; a: ReactNode }[] = [
   {
     q: 'How does the free trial work?',
-    a: 'When your library is approved, you get 14 days free with every feature unlocked. Nothing is charged automatically — when the trial ends you choose whether to pay for a month.',
+    a: 'When your library is approved, you get 14 days free with every feature unlocked. Nothing is charged automatically — when the trial ends you choose whether to pay for 30 more days.',
   },
   {
     q: 'How do shifts work?',
@@ -283,7 +299,7 @@ const FAQS: { q: string; a: ReactNode }[] = [
   },
   {
     q: 'How do I pay?',
-    a: 'You pay ₹199 by UPI and enter the payment reference (UTR). An admin checks it by hand, usually the same day, and your month starts once it is verified.',
+    a: 'You pay ₹199 for 30 days by UPI and enter the payment reference (UTR). An admin checks it by hand, usually the same day, and your days start once it is verified.',
   },
   {
     q: 'What happens if my plan ends?',
@@ -291,7 +307,7 @@ const FAQS: { q: string; a: ReactNode }[] = [
   },
   {
     q: 'Is it free for students?',
-    a: 'Yes. Searching libraries and requesting a seat is completely free for students. Students pay their monthly fee directly to the library, not to StudySeat.',
+    a: 'Yes. Searching libraries and requesting a seat is completely free for students. Students pay their own fee directly to the library, not to StudySeat.',
   },
   {
     q: 'Can I use it on my phone?',
@@ -311,8 +327,8 @@ function Faq() {
         <div className="mt-8 divide-y divide-border rounded-card border border-border">
           {FAQS.map((item) => (
             <details key={item.q} className="group px-5">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-left font-medium text-ink marker:content-none [&::-webkit-details-marker]:hidden">
-                {item.q}
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 py-4 text-left font-medium text-ink marker:content-none [&::-webkit-details-marker]:hidden">
+                <span className="min-w-0 break-words">{item.q}</span>
                 <ArrowRight
                   aria-hidden
                   className="size-4 shrink-0 text-ink-muted transition-transform group-open:rotate-90"

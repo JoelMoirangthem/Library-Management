@@ -17,13 +17,15 @@ type Props = {
   tone?: Tone
   /** 'alert' announces immediately (errors); 'status' is polite. */
   role?: 'alert' | 'status'
+  /** Use 'h1' when this is the main content of the page (e.g. a 404). */
+  heading?: 'h1' | 'h2'
 }
 
 /**
  * The single layout behind every non-happy-path screen, so empty, error, not-found
  * and setup all look like one family and can be restyled in one place.
  */
-export function StateShell({ icon, title, description, action, tone = 'neutral', role }: Props) {
+export function StateShell({ icon, title, description, action, tone = 'neutral', role, heading: Heading = 'h2' }: Props) {
   return (
     <div
       role={role}
@@ -35,7 +37,7 @@ export function StateShell({ icon, title, description, action, tone = 'neutral',
       >
         {icon}
       </div>
-      <h2 className="text-xl font-semibold">{title}</h2>
+      <Heading className="text-xl font-semibold">{title}</Heading>
       {description && <p className="mt-2 text-ink-muted">{description}</p>}
       {action && <div className="mt-6 flex flex-wrap justify-center gap-3">{action}</div>}
     </div>

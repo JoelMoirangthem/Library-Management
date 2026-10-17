@@ -116,7 +116,7 @@ export function RecentJoins({ members }: { members: DashMember[] }) {
         </ul>
       )}
       <div className="border-t border-border p-4 sm:px-5">
-        <Link to="/owner/students" className="text-sm font-medium text-primary hover:underline">
+        <Link to="/owner/students" className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline">
           View all students
         </Link>
       </div>

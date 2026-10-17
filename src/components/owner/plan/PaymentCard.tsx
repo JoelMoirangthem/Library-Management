@@ -1,17 +1,20 @@
-import { useState } from 'react'
-import { Clock, Copy, ExternalLink } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Check, ChevronDown, Copy, ExternalLink } from 'lucide-react'
+import { renderSVG } from 'uqr'
 import { Button, buttonStyles } from '@/components/Button'
 import { Card } from '@/components/Card'
 import { TextField } from '@/components/Fields'
+import { Steps, type StepState } from '@/components/Steps'
 import { useToast } from '@/components/Toast'
-import { formatDate } from '@/domain/dates'
+import { formatDate, formatDateTime } from '@/domain/dates'
 import { formatRupees } from '@/domain/money'
 import { ADMIN_UPI_ID, PLAN_DAYS, PLAN_PRICE_PAISE } from '@/domain/plan'
 import { isValidUtr } from '@/domain/constants'
 import type { PlanPayment } from '@/domain/types'
+import { cx } from '@/lib/cx'
 
-const RUPEES = PLAN_PRICE_PAISE / 100
-const upiLink = `upi://pay?pa=${encodeURIComponent(ADMIN_UPI_ID)}&pn=StudySeat&am=${RUPEES}&cu=INR&tn=${encodeURIComponent('StudySeat plan')}`
+const RUPEES = (PLAN_PRICE_PAISE / 100).toFixed(2)
+const UPI_LINK = `upi://pay?pa=${encodeURIComponent(ADMIN_UPI_ID)}&pn=StudySeat&am=${RUPEES}&cu=INR&tn=${encodeURIComponent('StudySeat plan')}`
 
 type Props = {
   /** The payment that is currently awaiting admin review, if any. */
@@ -22,10 +25,35 @@ type Props = {
   submitting: boolean
 }
 
+/** The id students' "Submit again" link focuses. */
+export const UTR_INPUT_ID = 'plan-utr-input'
+
 export function PaymentCard({ pending, runsUntil, onSubmit, submitting }: Props) {
+  // A pending payment: show the progress timeline instead of the form.
+  if (pending) {
+    return <PendingTimeline pending={pending} />
+  }
+  return <PayFlow runsUntil={runsUntil} onSubmit={onSubmit} submitting={submitting} />
+}
+
+function PayFlow({
+  runsUntil,
+  onSubmit,
+  submitting,
+}: Omit<Props, 'pending'>) {
   const toast = useToast()
   const [utr, setUtr] = useState('')
   const [fieldError, setFieldError] = useState<string | undefined>()
+  const [showQrOnMobile, setShowQrOnMobile] = useState(false)
+
+  const digits = utr.replace(/\D/g, '')
+  const stepStates: StepState[] = [
+    'current',
+    digits.length === 12 ? 'current' : 'todo',
+    'todo',
+  ]
+
+  const qrSvg = useMemo(() => renderSVG(UPI_LINK, { border: 1 }), [])
 
   async function copyUpi() {
     try {
@@ -52,80 +80,145 @@ export function PaymentCard({ pending, runsUntil, onSubmit, submitting }: Props)
   return (
     <Card className="p-5 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-semibold">Pay for 30 more days</h2>
+        <h2 className="text-lg font-semibold">Pay for 30 days</h2>
         <p className="text-xl font-semibold tabular-nums">
           {formatRupees(PLAN_PRICE_PAISE)}
-          <span className="ml-1 text-sm font-normal text-ink-muted">/ {PLAN_DAYS} days</span>
+          <span className="ml-1 text-sm font-normal text-ink-muted">for {PLAN_DAYS} days</span>
         </p>
       </div>
 
-      <p className="mt-2 max-w-prose text-sm text-ink-muted">
-        Renew early and the days stack: you never lose days you've already paid for. After we
-        verify this payment, your plan will run until{' '}
-        <span className="font-medium text-ink tabular-nums">{formatDate(runsUntil)}</span>.
-      </p>
+      <Steps
+        className="mt-5"
+        steps={[
+          { label: 'Pay ₹199', state: stepStates[0] },
+          { label: 'Enter the UTR', state: stepStates[1] },
+          { label: 'We verify', state: stepStates[2] },
+        ]}
+      />
 
-      {pending ? (
-        <div
-          role="status"
-          className="mt-5 flex items-start gap-3 rounded-card border border-warning/30 bg-warning-soft p-4 text-warning-ink"
-        >
-          <span aria-hidden className="mt-0.5 [&>svg]:size-5">
-            <Clock />
-          </span>
-          <div>
-            <p className="text-sm font-semibold">We're checking your payment</p>
-            <p className="mt-1 text-sm">
-              Usually within a few hours. UTR{' '}
-              <span className="font-medium tabular-nums">{pending.utr}</span>.
-            </p>
+      {/* Step 1: Pay */}
+      <section className="mt-6">
+        <h3 className="text-sm font-semibold">1. Pay ₹199</h3>
+
+        {/* Mobile: big UPI button first. */}
+        <a href={UPI_LINK} className={buttonStyles('primary', 'mt-3 w-full sm:hidden')}>
+          <ExternalLink aria-hidden className="size-4" />
+          Pay ₹199 with a UPI app
+        </a>
+
+        <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 rounded-card border border-border-strong bg-canvas p-3">
+            <div className="min-w-0">
+              <p className="text-xs text-ink-muted">UPI ID</p>
+              <p className="truncate font-medium tabular-nums">{ADMIN_UPI_ID}</p>
+            </div>
+            <Button variant="secondary" onClick={copyUpi} className="ml-auto min-h-11 px-3">
+              <Copy aria-hidden className="size-4" />
+              Copy
+            </Button>
+          </div>
+
+          {/* Desktop: QR beside the UPI ID. */}
+          <div className="hidden sm:block">
+            <QrImage svg={qrSvg} />
           </div>
         </div>
-      ) : (
-        <>
-          <ol className="mt-5 space-y-5">
-            <li>
-              <p className="text-sm font-medium">1. Pay {formatRupees(PLAN_PRICE_PAISE)} to this UPI ID</p>
-              <div className="mt-2 flex flex-wrap items-center gap-3 rounded-card border border-border-strong bg-canvas p-3">
-                <span className="font-medium tabular-nums">{ADMIN_UPI_ID}</span>
-                <div className="ml-auto flex gap-2">
-                  <Button variant="secondary" onClick={copyUpi} className="px-3">
-                    <Copy aria-hidden className="size-4" />
-                    Copy
-                  </Button>
-                  <a href={upiLink} className={buttonStyles('secondary', 'px-3 sm:hidden')}>
-                    <ExternalLink aria-hidden className="size-4" />
-                    Pay with a UPI app
-                  </a>
-                </div>
-              </div>
-              <a
-                href={upiLink}
-                className="mt-2 hidden text-sm font-medium text-primary hover:underline sm:inline-flex sm:items-center sm:gap-1"
-              >
-                <ExternalLink aria-hidden className="size-4" />
-                Pay with a UPI app
-              </a>
-            </li>
-            <li>
-              <form onSubmit={handleSubmit}>
-                <TextField
-                  label="2. Enter the UTR (reference number from your UPI app)"
-                  inputMode="numeric"
-                  maxLength={12}
-                  hint="A 12-digit number shown in your UPI app after the payment."
-                  value={utr}
-                  error={fieldError}
-                  onChange={(e) => setUtr(e.target.value)}
-                />
-                <Button type="submit" loading={submitting} className="mt-3">
-                  Submit payment
-                </Button>
-              </form>
-            </li>
-          </ol>
-        </>
-      )}
+
+        {/* Mobile: reveal QR to pay from another phone. */}
+        <div className="sm:hidden">
+          <button
+            type="button"
+            onClick={() => setShowQrOnMobile((v) => !v)}
+            aria-expanded={showQrOnMobile}
+            className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary"
+          >
+            <ChevronDown aria-hidden className={cx('size-4 transition-transform', showQrOnMobile && 'rotate-180')} />
+            Pay from another phone
+          </button>
+          {showQrOnMobile && (
+            <div className="mt-3">
+              <QrImage svg={qrSvg} />
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Step 2: UTR */}
+      <section className="mt-6" id={UTR_INPUT_ID}>
+        <form onSubmit={handleSubmit}>
+          <TextField
+            label="2. Enter the UTR"
+            type="text"
+            inputMode="numeric"
+            maxLength={12}
+            hint={`${digits.length} of 12 digits. The reference number shown in your UPI app after paying.`}
+            value={utr}
+            error={fieldError}
+            onChange={(e) => setUtr(e.target.value)}
+            className="[&_input]:tabular-nums"
+          />
+          <Button type="submit" loading={submitting} className="mt-3">
+            Submit payment
+          </Button>
+        </form>
+      </section>
+
+      <p className="mt-5 text-sm text-ink-muted">
+        Renew early and the days stack: you never lose days you've already paid for. After we verify
+        this payment, your plan will run until{' '}
+        <span className="font-medium text-ink tabular-nums">{formatDate(runsUntil)}</span>.
+      </p>
+    </Card>
+  )
+}
+
+function QrImage({ svg }: { svg: string }) {
+  return (
+    <div
+      role="img"
+      aria-label="QR code to pay ₹199 to StudySeat over UPI"
+      className="size-36 shrink-0 rounded-card border border-border bg-white p-3 [&>svg]:size-full"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  )
+}
+
+function PendingTimeline({ pending }: { pending: PlanPayment }) {
+  const steps: { label: string; detail?: string; done: boolean; current: boolean }[] = [
+    { label: 'Submitted', detail: formatDateTime(pending.submittedAt), done: true, current: false },
+    { label: "We're checking", done: false, current: true },
+    { label: 'Verified', done: false, current: false },
+  ]
+  return (
+    <Card className="p-5 sm:p-6">
+      <h2 className="text-lg font-semibold">We're checking your payment</h2>
+      <p className="mt-1 text-sm text-ink-muted">
+        Usually the same day. We'll show a message here as soon as it's checked.
+      </p>
+      <ol className="mt-5 space-y-4">
+        {steps.map((s, i) => (
+          <li key={s.label} className="flex gap-3">
+            <span
+              aria-hidden
+              className={cx(
+                'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums',
+                s.done && 'bg-primary text-white',
+                s.current && 'border-2 border-primary text-primary',
+                !s.done && !s.current && 'border border-border-strong text-ink-muted',
+              )}
+            >
+              {s.done ? <Check className="size-3.5" /> : i + 1}
+            </span>
+            <div className="min-w-0">
+              <p className={cx('font-medium', !s.done && !s.current && 'text-ink-muted')}>{s.label}</p>
+              {s.detail && <p className="text-sm text-ink-muted tabular-nums">{s.detail}</p>}
+            </div>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-5 text-sm text-ink-muted">
+        UTR <span className="font-medium tabular-nums">{pending.utr}</span>.
+      </p>
     </Card>
   )
 }

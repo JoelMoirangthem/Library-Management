@@ -3,13 +3,11 @@ import { Link } from 'react-router-dom'
 import {
   Armchair,
   CalendarClock,
-  CircleCheck,
   Hourglass,
   ShieldAlert,
   UserCheck,
   Users,
 } from 'lucide-react'
-import type { ReactNode } from 'react'
 import { buttonStyles } from '@/components/Button'
 import { Card } from '@/components/Card'
 import { PageHeader, StatCard } from '@/components/PageParts'
@@ -18,8 +16,10 @@ import { ShiftTabs } from '@/components/ShiftTabs'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
 import { SetupState } from '@/components/states/SetupState'
-import { ExpiringList, RecentJoins, type DashMember } from '@/components/owner/DashboardLists'
-import { todayIST } from '@/domain/dates'
+import { RecentJoins, type DashMember } from '@/components/owner/DashboardLists'
+import { NeedsAttention, type AttentionRow } from '@/components/owner/home/AttentionList'
+import { RenewModal } from '@/components/owner/members'
+import { formatDate, todayIST } from '@/domain/dates'
 import { memberDaysLeft, memberPhase } from '@/domain/members'
 import { formatRupees } from '@/domain/money'
 import { buildSeatCells, seatCounts } from '@/domain/seatCells'
@@ -27,12 +27,11 @@ import { formatShiftRange, sortShifts } from '@/domain/shifts'
 import type { Member, Seat, Shift } from '@/domain/types'
 import { useAsync } from '@/hooks/useAsync'
 import { useOwnerLibrary } from '@/hooks/useOwnerLibrary'
+import { useTitle } from '@/hooks/useTitle'
 import { services } from '@/lib/container'
 import { useNow } from '@/lib/devState'
 
-function dayWord(n: number) {
-  return `${n} day${n === 1 ? '' : 's'}`
-}
+const ATTENTION_PER_BLOCK = 5
 
 function toDash(m: Member, seatNumber: number | null, today: string, shift?: Shift): DashMember {
   return {
@@ -47,9 +46,10 @@ function toDash(m: Member, seatNumber: number | null, today: string, shift?: Shi
 }
 
 export default function Dashboard() {
+  useTitle('Today')
   const now = useNow()
   const today = todayIST(now)
-  const { library, state, daysLeft, loading, error, reload } = useOwnerLibrary()
+  const { library, state, loading, error, reload } = useOwnerLibrary()
 
   const seats = useAsync(
     () => (library ? services.listSeats(library.id) : Promise.resolve([] as Seat[])),
@@ -74,10 +74,12 @@ export default function Dashboard() {
   const selectedShiftId = selectedId ?? firstActive?.id ?? null
   const selectedShift = shifts.find((s) => s.id === selectedShiftId) ?? null
 
+  const [renewMember, setRenewMember] = useState<Member | null>(null)
+
   if (loading) {
     return (
       <>
-        <PageHeader title="Dashboard" />
+        <PageHeader title="Today" />
         <LoadingState layout="cards" count={4} label="Loading your dashboard" />
       </>
     )
@@ -86,7 +88,7 @@ export default function Dashboard() {
   if (error) {
     return (
       <>
-        <PageHeader title="Dashboard" />
+        <PageHeader title="Today" />
         <ErrorState onRetry={reload} />
       </>
     )
@@ -96,7 +98,7 @@ export default function Dashboard() {
   if (state === 'none' || !library) {
     return (
       <>
-        <PageHeader title="Dashboard" />
+        <PageHeader title="Today" />
         <SetupState
           action={
             <Link to="/owner/library" className={buttonStyles('primary')}>
@@ -112,7 +114,7 @@ export default function Dashboard() {
   if (state === 'pending') {
     return (
       <>
-        <PageHeader title="Dashboard" />
+        <PageHeader title="Today" />
         <Card className="mx-auto max-w-xl p-6 text-center sm:p-8">
           <span
             aria-hidden
@@ -138,7 +140,7 @@ export default function Dashboard() {
   if (state === 'rejected') {
     return (
       <>
-        <PageHeader title="Dashboard" />
+        <PageHeader title="Today" />
         <Card className="mx-auto max-w-xl p-6 sm:p-8">
           <span
             aria-hidden
@@ -169,39 +171,32 @@ export default function Dashboard() {
   const dataLoading = seats.loading || members.loading || shiftsQ.loading
   const dataError = seats.error ?? members.error ?? shiftsQ.error
 
-  const planCard: ReactNode = (
-    <Card className="flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5">
-      <div className="flex items-center gap-3">
-        <span
-          aria-hidden
-          className={`flex size-10 items-center justify-center rounded-full [&>svg]:size-5 ${
-            state === 'expired' ? 'bg-danger-soft text-danger-ink' : 'bg-primary-soft text-primary-ink'
-          }`}
-        >
-          {state === 'expired' ? <CalendarClock /> : <CircleCheck />}
-        </span>
-        <div>
-          <p className="font-medium">
-            {state === 'trial' && 'Free trial'}
-            {state === 'paid' && 'Plan active'}
-            {state === 'expired' && 'Plan expired'}
-          </p>
-          <p className="text-sm text-ink-muted tabular-nums">
-            {state === 'expired' ? 'Renew to go live again' : `${dayWord(daysLeft)} left`}
-          </p>
+  const greeting = `Here's ${library.name} on ${formatDate(today)}.`
+
+  // The plan banner is shown in the layout; show only the expired call-out here.
+  const expiredCard =
+    state === 'expired' ? (
+      <Card className="flex flex-wrap items-center justify-between gap-4 border-danger/30 bg-danger-soft p-4 text-danger-ink sm:p-5">
+        <div className="flex items-center gap-3">
+          <span aria-hidden className="flex size-10 items-center justify-center rounded-full bg-danger-soft [&>svg]:size-5">
+            <CalendarClock />
+          </span>
+          <div>
+            <p className="font-medium">Plan expired</p>
+            <p className="text-sm tabular-nums">Renew to go live again</p>
+          </div>
         </div>
-      </div>
-      <Link to="/owner/plan" className={buttonStyles(state === 'expired' ? 'accent' : 'ghost')}>
-        {state === 'expired' ? 'Renew plan' : 'View plan'}
-      </Link>
-    </Card>
-  )
+        <Link to="/owner/plan" className={buttonStyles('accent')}>
+          Renew plan
+        </Link>
+      </Card>
+    ) : null
 
   if (dataLoading) {
     return (
       <>
-        <PageHeader title="Dashboard" />
-        {planCard}
+        <PageHeader title="Today" description={greeting} />
+        {expiredCard}
         <div className="mt-6">
           <LoadingState layout="cards" count={4} label="Loading your numbers" />
         </div>
@@ -212,8 +207,8 @@ export default function Dashboard() {
   if (dataError) {
     return (
       <>
-        <PageHeader title="Dashboard" />
-        {planCard}
+        <PageHeader title="Today" description={greeting} />
+        {expiredCard}
         <div className="mt-6">
           <ErrorState onRetry={() => { seats.reload(); members.reload(); shiftsQ.reload() }} />
         </div>
@@ -228,6 +223,7 @@ export default function Dashboard() {
   const shiftById = new Map(shifts.map((s) => [s.id, s]))
   const seatNumberById = new Map(allSeats.map((s) => [s.id, s.seatNumber]))
   const seatOf = (m: Member) => (m.seatId ? seatNumberById.get(m.seatId) ?? null : null)
+  const feeOf = (m: Member | null) => (m && shiftById.get(m.shiftId)?.monthlyFeePaise) || 0
 
   // Selected-shift stat cards: counts match the Seats page (same buildSeatCells + seatCounts).
   const selectedCells = selectedShiftId
@@ -238,56 +234,57 @@ export default function Dashboard() {
     ? activeMembers.filter((m) => m.shiftId === selectedShiftId).length
     : 0
 
-  // "12 free" line on each tab.
   const freeByShift = new Map(
     shifts.map((s) => [s.id, seatCounts(buildSeatCells(allSeats, allMembers, today, s.id)).free]),
   )
 
-  // Expiring / overdue / recent cover ALL shifts; a two-shift student appears once per membership.
-  const expiring = activeMembers
-    .filter((m) => memberPhase(m, today) === 'expiring')
-    .map((m) => toDash(m, seatOf(m), today, shiftById.get(m.shiftId)))
+  // Needs-attention lists cover ALL shifts; a two-shift student appears once per membership.
+  const toRow = (m: Member): AttentionRow => ({
+    member: m,
+    seatNumber: seatOf(m),
+    daysLeft: memberDaysLeft(m, today),
+    shift: shiftById.get(m.shiftId),
+  })
+
+  const overdueAll = activeMembers
+    .filter((m) => m.seatId && memberPhase(m, today) === 'expired')
+    .map(toRow)
     .sort((a, b) => a.daysLeft - b.daysLeft)
 
-  const overdue = activeMembers
-    .filter((m) => m.seatId && memberPhase(m, today) === 'expired')
-    .map((m) => toDash(m, seatOf(m), today, shiftById.get(m.shiftId)))
+  const expiringAll = activeMembers
+    .filter((m) => memberPhase(m, today) === 'expiring')
+    .map(toRow)
     .sort((a, b) => a.daysLeft - b.daysLeft)
 
   const recent = activeMembers
     .slice()
     .sort((a, b) => b.startDate.localeCompare(a.startDate))
-    .slice(0, 5)
+    .slice(0, 3)
     .map((m) => toDash(m, seatOf(m), today, shiftById.get(m.shiftId)))
 
   const pendingRequests = (requests.data ?? []).filter((r) => r.status === 'pending')
 
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        description={`Here's how ${library.name} is doing today.`}
-      />
+      <PageHeader title="Today" description={greeting} />
 
-      {planCard}
+      {expiredCard}
 
-      {pendingRequests.length > 0 && (
-        <Card className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3 border-accent/30 bg-accent-soft p-4 text-accent-ink">
-          <span aria-hidden className="[&>svg]:size-5">
-            <Users />
-          </span>
-          <p className="min-w-0 flex-1 text-sm font-medium tabular-nums">
-            {pendingRequests.length} student{pendingRequests.length === 1 ? ' is' : 's are'} waiting for a seat.
-          </p>
-          <Link to="/owner/requests" className={buttonStyles('accent')}>
-            Review requests
-          </Link>
-        </Card>
-      )}
+      <div className="mt-6">
+        <NeedsAttention
+          pendingCount={pendingRequests.length}
+          overdue={overdueAll.slice(0, ATTENTION_PER_BLOCK)}
+          overdueTotal={overdueAll.length}
+          expiring={expiringAll.slice(0, ATTENTION_PER_BLOCK)}
+          expiringTotal={expiringAll.length}
+          libraryName={library.name}
+          onRenew={setRenewMember}
+        />
+      </div>
 
       {/* Pick a shift; the stat cards below are for this shift only. */}
       {shifts.length > 0 && selectedShiftId && (
-        <div className="mt-6">
+        <div className="mt-8">
           <ShiftTabs
             shifts={shifts}
             value={selectedShiftId}
@@ -324,7 +321,7 @@ export default function Dashboard() {
             <p className="text-sm font-medium tabular-nums">
               {selectedShift.name}: {selectedCounts.free} free · {selectedCounts.occupied} occupied
             </p>
-            <Link to="/owner/seats" className="text-sm font-medium text-primary hover:underline">
+            <Link to="/owner/seats" className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline">
               Open seat grid
             </Link>
           </div>
@@ -381,36 +378,21 @@ export default function Dashboard() {
         </Card>
       )}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <ExpiringList
-          title="Expiring in the next 7 days"
-          description="Students whose fees are due soon. Call to remind them."
-          members={expiring}
-          tone="warning"
-          footer={
-            <Link to="/owner/students" className="text-sm font-medium text-primary hover:underline">
-              View all students
-            </Link>
-          }
-        />
+      <div className="mt-6">
         <RecentJoins members={recent} />
       </div>
 
-      {overdue.length > 0 && (
-        <div className="mt-6">
-          <ExpiringList
-            title="Overdue"
-            description="Seated students whose fees have lapsed. Renew or free their seat."
-            members={overdue}
-            tone="danger"
-            footer={
-              <Link to="/owner/students" className="text-sm font-medium text-primary hover:underline">
-                Manage students
-              </Link>
-            }
-          />
-        </div>
-      )}
+      <RenewModal
+        open={!!renewMember}
+        onClose={() => setRenewMember(null)}
+        member={renewMember}
+        shiftFeePaise={feeOf(renewMember)}
+        today={today}
+        onRenewed={() => {
+          members.reload()
+          seats.reload()
+        }}
+      />
     </>
   )
 }

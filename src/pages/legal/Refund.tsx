@@ -1,6 +1,8 @@
 import { LegalPage } from '@/components/landing/LegalPage'
+import { useTitle } from '@/hooks/useTitle'
 
 export default function Refund() {
+  useTitle('Refund policy')
   return (
     <LegalPage
       title="Refund policy"

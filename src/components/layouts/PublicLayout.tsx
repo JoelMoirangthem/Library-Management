@@ -1,8 +1,10 @@
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { ClipboardList, IdCard, Search } from 'lucide-react'
 import { buttonStyles } from '@/components/Button'
 import { Logo } from '@/components/Logo'
+import { PageFallback } from '@/components/PageFallback'
+import { UpdatesBanner } from '@/components/UpdatesBanner'
 import { BottomTabs, type NavItemDef } from '@/components/layouts/Nav'
 import { homePathFor, useAuth } from '@/hooks/useAuth'
 import { cx } from '@/lib/cx'
@@ -28,7 +30,7 @@ function ScrollManager() {
 
 const topLink = ({ isActive }: { isActive: boolean }) =>
   cx(
-    'rounded-control px-3 py-2 text-base font-medium transition-colors',
+    'inline-flex min-h-11 items-center rounded-control px-3 py-2 text-base font-medium transition-colors',
     isActive ? 'text-primary' : 'text-ink-muted hover:text-ink',
   )
 
@@ -48,7 +50,7 @@ export function PublicLayout() {
       </a>
 
       <header className="sticky top-0 z-30 border-b border-border bg-canvas/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
+        <div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 sm:px-6">
           <Logo />
           <nav aria-label="Main" className="ml-4 hidden items-center gap-1 md:flex">
             <NavLink to="/discover" className={topLink}>
@@ -71,7 +73,7 @@ export function PublicLayout() {
             )}
           </nav>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             {user ? (
               <>
                 {!isStudent && (
@@ -94,7 +96,7 @@ export function PublicLayout() {
               </>
             ) : (
               <>
-                <Link to="/login" className={buttonStyles('ghost', 'whitespace-nowrap px-3')}>
+                <Link to="/login" className={buttonStyles('ghost', 'whitespace-nowrap px-3 max-[359px]:hidden')}>
                   Log in
                 </Link>
                 <Link to="/login?as=owner" className={buttonStyles('primary', 'whitespace-nowrap px-3 sm:px-4')}>
@@ -108,7 +110,10 @@ export function PublicLayout() {
       </header>
 
       <main id="main" className="flex-1">
-        <Outlet />
+        {isStudent && <UpdatesBanner className="mx-auto max-w-6xl px-4 pt-6 sm:px-6" />}
+        <Suspense fallback={<div className="mx-auto max-w-6xl px-4 py-8 sm:px-6"><PageFallback /></div>}>
+          <Outlet />
+        </Suspense>
       </main>
 
       <footer className={cx('border-t border-border bg-surface', isStudent && 'pb-20 md:pb-0')}>
@@ -120,11 +125,11 @@ export function PublicLayout() {
             </p>
           </div>
           <nav aria-label="Footer" className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
-            <Link to="/discover" className="text-ink-muted hover:text-ink">Find a library</Link>
-            <Link to="/login?as=owner" className="text-ink-muted hover:text-ink">List your library</Link>
-            <Link to="/privacy" className="text-ink-muted hover:text-ink">Privacy</Link>
-            <Link to="/terms" className="text-ink-muted hover:text-ink">Terms</Link>
-            <Link to="/refund" className="text-ink-muted hover:text-ink">Refunds</Link>
+            <Link to="/discover" className="inline-flex min-h-11 items-center text-ink-muted hover:text-ink">Find a library</Link>
+            <Link to="/login?as=owner" className="inline-flex min-h-11 items-center text-ink-muted hover:text-ink">List your library</Link>
+            <Link to="/privacy" className="inline-flex min-h-11 items-center text-ink-muted hover:text-ink">Privacy</Link>
+            <Link to="/terms" className="inline-flex min-h-11 items-center text-ink-muted hover:text-ink">Terms</Link>
+            <Link to="/refund" className="inline-flex min-h-11 items-center text-ink-muted hover:text-ink">Refunds</Link>
           </nav>
         </div>
         <p className="border-t border-border px-4 py-4 text-center text-sm text-ink-muted">

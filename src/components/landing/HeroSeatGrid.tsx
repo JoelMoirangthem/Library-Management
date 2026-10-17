@@ -128,7 +128,7 @@ export function HeroSeatGrid({ className }: { className?: string }) {
       <div
         role="group"
         aria-label="See seats free by shift"
-        className="mt-4 flex justify-center gap-2"
+        className="mt-4 flex flex-wrap justify-center gap-2"
       >
         {SHIFTS.map((s) => {
           const selected = s.key === shift
@@ -139,7 +139,7 @@ export function HeroSeatGrid({ className }: { className?: string }) {
               aria-pressed={selected}
               onClick={() => setShift(s.key)}
               className={cx(
-                'min-h-11 cursor-pointer rounded-control border px-4 text-sm font-medium transition-colors',
+                'min-h-11 min-w-0 flex-1 cursor-pointer rounded-control border px-2 text-sm font-medium transition-colors sm:flex-none sm:px-4',
                 selected
                   ? 'border-primary bg-primary-soft text-primary-ink'
                   : 'border-border-strong bg-surface text-ink hover:bg-canvas',

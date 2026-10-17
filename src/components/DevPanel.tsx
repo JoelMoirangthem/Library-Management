@@ -38,11 +38,28 @@ export function DevPanel() {
   }
 
   return (
-    <div className="fixed bottom-20 right-3 z-40 md:bottom-4">
-      {open ? (
+    <>
+      {/* A slim bar in the normal page flow, so it never covers content. */}
+      <div className="flex min-h-9 items-center gap-3 bg-ink px-4 py-1 text-sm text-white">
+        <FlaskConical aria-hidden className="size-4 shrink-0" />
+        <p className="min-w-0 flex-1 truncate">
+          <span className="font-medium">Demo mode</span>
+          <span className="hidden text-white/70 sm:inline"> · sample data saved in this browser</span>
+          {offsetDays !== 0 && <span className="text-white/70"> · date moved {offsetDays > 0 ? '+' : ''}{offsetDays} days</span>}
+        </p>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-expanded={open}
+          className="-my-1 min-h-11 shrink-0 cursor-pointer rounded-control px-3 font-semibold underline underline-offset-2 hover:bg-white/10"
+        >
+          Demo controls
+        </button>
+      </div>
+      {open && (
         <section
           aria-label="Demo controls"
-          className="w-[min(22rem,calc(100vw-1.5rem))] rounded-card border border-border-strong bg-surface p-4 text-sm shadow-xl"
+          className="fixed right-3 top-12 z-50 max-h-[calc(100dvh-4rem)] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto rounded-card border border-border-strong bg-surface p-4 text-sm text-ink shadow-xl"
         >
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-semibold">Demo controls</h2>
@@ -152,16 +169,7 @@ export function DevPanel() {
             {formatDate(todayIST(getNow()))}.
           </p>
         </section>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-border-strong bg-surface px-4 text-sm font-medium shadow-lg hover:bg-canvas"
-        >
-          <FlaskConical aria-hidden className="size-4" />
-          Demo
-        </button>
       )}
-    </div>
+    </>
   )
 }

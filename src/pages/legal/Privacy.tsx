@@ -1,6 +1,8 @@
 import { LegalPage } from '@/components/landing/LegalPage'
+import { useTitle } from '@/hooks/useTitle'
 
 export default function Privacy() {
+  useTitle('Privacy policy')
   return (
     <LegalPage
       title="Privacy policy"

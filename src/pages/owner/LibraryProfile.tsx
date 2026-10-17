@@ -1,23 +1,27 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckCircle2, Hourglass, Lock } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { CircleCheck, Hourglass, Lock, TriangleAlert } from 'lucide-react'
 import { Badge, type BadgeTone } from '@/components/Badge'
 import { buttonStyles } from '@/components/Button'
 import { Card } from '@/components/Card'
 import { PageHeader } from '@/components/PageParts'
+import { SuccessMoment } from '@/components/Steps'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
-import { LibraryForm } from '@/components/owner/profile/LibraryForm'
+import { LibraryEditor } from '@/components/owner/profile/LibraryEditor'
+import { OnboardingWizard } from '@/components/owner/profile/OnboardingWizard'
 import type { ApprovalStatus, LibraryInput, ShiftInput } from '@/domain/types'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
 import { useOwnerLibrary } from '@/hooks/useOwnerLibrary'
+import { useTitle } from '@/hooks/useTitle'
 import { services } from '@/lib/container'
 
-const STATUS_META: Record<ApprovalStatus, { tone: BadgeTone; label: string }> = {
-  pending: { tone: 'warning', label: 'In review' },
-  approved: { tone: 'success', label: 'Live' },
-  rejected: { tone: 'danger', label: 'Needs changes' },
+const STATUS_META: Record<ApprovalStatus, { tone: BadgeTone; label: string; icon: ReactNode }> = {
+  pending: { tone: 'warning', label: 'In review', icon: <Hourglass /> },
+  approved: { tone: 'success', label: 'Live', icon: <CircleCheck /> },
+  rejected: { tone: 'danger', label: 'Needs changes', icon: <TriangleAlert /> },
 }
 
 export default function LibraryProfile() {
@@ -26,30 +30,39 @@ export default function LibraryProfile() {
   const [created, setCreated] = useState(false)
 
   const cities = useAsync(() => services.listCities(), [])
-  // Area list depends on the chosen city (default to the saved one on first load).
   const effectiveCityId = cityId ?? library?.cityId ?? null
   const areas = useAsync(
     () => (effectiveCityId ? services.listAreas({ cityId: effectiveCityId }) : Promise.resolve([])),
     [effectiveCityId],
   )
+  const shiftsQ = useAsync(
+    () => (library ? services.listShifts(library.id) : Promise.resolve([])),
+    [library?.id],
+  )
+
+  const isNone = state === 'none'
+  const isRejected = state === 'rejected'
+  useTitle(isNone ? 'List your library' : 'Your library')
 
   const createLib = useMutation(
     (input: LibraryInput, shifts: ShiftInput[]) => services.createLibrary(input, shifts),
-    {
-      silent: true,
-      onSuccess: () => setCreated(true),
-    },
+    { silent: true, onSuccess: () => setCreated(true) },
   )
-  const updateLib = useMutation(
-    (input: LibraryInput) => services.updateLibrary(library!.id, input),
-    { success: 'Changes saved' },
-  )
-  const saveAndResubmit = useMutation(
-    async (input: LibraryInput) => {
+
+  const save = useMutation(
+    async (input: LibraryInput, changed: { id: string; input: ShiftInput }[], added: ShiftInput[]) => {
       await services.updateLibrary(library!.id, input)
-      await services.resubmitLibrary(library!.id)
+      for (const c of changed) await services.updateShift(c.id, c.input)
+      for (const a of added) await services.addShift(library!.id, a)
+      if (isRejected) await services.resubmitLibrary(library!.id)
+      shiftsQ.reload()
     },
-    { success: 'Sent for review' },
+    { success: isRejected ? 'Sent for review' : 'Changes saved' },
+  )
+
+  const toggle = useMutation(
+    (shiftId: string, on: boolean) => services.setShiftActive(shiftId, on),
+    { silent: true, onSuccess: () => shiftsQ.reload() },
   )
 
   if (loading) {
@@ -70,67 +83,70 @@ export default function LibraryProfile() {
     )
   }
 
-  const isNone = state === 'none'
-  const isRejected = state === 'rejected'
-
   // Success view after a first-time create.
   if (created) {
     return (
       <>
-        <PageHeader title="Your library" />
-        <Card className="mx-auto max-w-md p-6 text-center sm:p-8">
-          <span
-            aria-hidden
-            className="mx-auto mb-5 flex size-14 items-center justify-center rounded-full bg-success-soft text-success-ink"
+        <PageHeader title="List your library" />
+        <Card className="mx-auto max-w-lg p-2 sm:p-4">
+          <SuccessMoment
+            title="Submitted for review"
+            actions={
+              <Link to="/owner" className={buttonStyles('primary')}>
+                Go to dashboard
+              </Link>
+            }
           >
-            <CheckCircle2 className="size-7" />
-          </span>
-          <h2 className="text-xl font-semibold">Submitted for review</h2>
-          <p className="mx-auto mt-2 max-w-prose text-ink-muted">
-            In review, usually within 24 hours. Your 14-day free trial starts the moment we
-            approve your library.
-          </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link to="/owner" className={buttonStyles('primary')}>
-              Go to dashboard
-            </Link>
-          </div>
+            <ul className="mx-auto mt-2 max-w-sm space-y-2 text-left text-ink">
+              <li className="flex gap-2">
+                <span aria-hidden className="text-primary">1.</span>
+                We review it, usually within 24 hours.
+              </li>
+              <li className="flex gap-2">
+                <span aria-hidden className="text-primary">2.</span>
+                Your 14-day free trial starts when we approve.
+              </li>
+              <li className="flex gap-2">
+                <span aria-hidden className="text-primary">3.</span>
+                Students can then find you.
+              </li>
+            </ul>
+          </SuccessMoment>
         </Card>
       </>
     )
   }
 
-  const title = isNone ? 'List your library' : 'Your library'
-  const submitLabel = isNone
-    ? 'Submit for review'
-    : isRejected
-      ? 'Save and resubmit'
-      : 'Save changes'
-
-  function handleSubmit(input: LibraryInput, shifts?: ShiftInput[]) {
-    if (isNone) void createLib.run(input, shifts ?? [])
-    else if (isRejected) void saveAndResubmit.run(input)
-    else void updateLib.run(input)
+  // First-time onboarding wizard.
+  if (isNone) {
+    return (
+      <>
+        <PageHeader
+          title="List your library"
+          description="Tell students about your library. We review every listing, usually within 24 hours."
+        />
+        <div className="mx-auto max-w-2xl">
+          <OnboardingWizard
+            cities={cities.data ?? []}
+            areas={areas.data ?? []}
+            onCityChange={setCityId}
+            onSubmit={(input, shifts) => void createLib.run(input, shifts)}
+            submitting={createLib.loading}
+            error={createLib.error?.message}
+          />
+        </div>
+      </>
+    )
   }
 
-  const submitting = createLib.loading || updateLib.loading || saveAndResubmit.loading
+  // Edit mode.
+  const meta = library ? STATUS_META[library.approvalStatus] : null
 
   return (
     <>
       <PageHeader
-        title={title}
-        description={
-          isNone
-            ? 'Tell students about your library. We review every listing, usually within 24 hours.'
-            : undefined
-        }
-        actions={
-          library ? (
-            <Badge tone={STATUS_META[library.approvalStatus].tone} icon={<Hourglass />}>
-              {STATUS_META[library.approvalStatus].label}
-            </Badge>
-          ) : undefined
-        }
+        title="Your library"
+        actions={meta ? <Badge tone={meta.tone} icon={meta.icon}>{meta.label}</Badge> : undefined}
       />
 
       {isRejected && library?.rejectionReason && (
@@ -155,25 +171,36 @@ export default function LibraryProfile() {
         </Card>
       )}
 
-      {createLib.error && (
-        <Card className="mb-6 border-danger/30 bg-danger-soft p-4 text-sm font-medium text-danger-ink" role="alert">
-          {createLib.error.message}
-        </Card>
+      {canEditProfile && library ? (
+        shiftsQ.loading ? (
+          <LoadingState layout="list" count={4} label="Loading your library" />
+        ) : shiftsQ.error ? (
+          <ErrorState onRetry={shiftsQ.reload} />
+        ) : (
+          <LibraryEditor
+            library={library}
+            shifts={shiftsQ.data ?? []}
+            cities={cities.data ?? []}
+            areas={areas.data ?? []}
+            catalogLoading={cities.loading}
+            onCityChange={setCityId}
+            onSave={async (input, changed, added) => (await save.run(input, changed, added)) !== undefined}
+            onToggleShift={async (id, on) => (await toggle.run(id, on)) !== undefined}
+            saving={save.loading}
+            isRejected={isRejected}
+          />
+        )
+      ) : (
+        library && <ReadOnlyLibrary />
       )}
-
-      <Card className="p-5 sm:p-6">
-        <LibraryForm
-          library={library}
-          cities={cities.data ?? []}
-          areas={areas.data ?? []}
-          onCityChange={setCityId}
-          onSubmit={handleSubmit}
-          submitting={submitting}
-          submitLabel={submitLabel}
-          disabled={!canEditProfile}
-          isExisting={!isNone}
-        />
-      </Card>
     </>
+  )
+}
+
+function ReadOnlyLibrary() {
+  return (
+    <Card className="p-5 text-sm text-ink-muted sm:p-6">
+      Renew your plan to edit your library details again.
+    </Card>
   )
 }

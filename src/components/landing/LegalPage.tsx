@@ -22,7 +22,7 @@ export function LegalPage({
     <div className="mx-auto max-w-prose px-4 py-10 sm:px-6">
       <Link
         to="/"
-        className="inline-flex items-center gap-1.5 rounded-control text-sm font-medium text-ink-muted hover:text-ink"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-control text-sm font-medium text-ink-muted hover:text-ink"
       >
         <ArrowLeft aria-hidden className="size-4" />
         Back to home
@@ -47,7 +47,7 @@ export function LegalPage({
             Questions about this page? Write to{' '}
             <a
               href="mailto:support@studyseat.app"
-              className="font-medium text-primary hover:text-primary-hover"
+              className="inline-flex min-h-11 items-center font-medium text-primary hover:text-primary-hover"
             >
               support@studyseat.app
             </a>

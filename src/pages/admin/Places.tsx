@@ -11,11 +11,13 @@ import { LoadingState } from '@/components/states/LoadingState'
 import { Switch } from '@/components/admin/AdminBits'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
+import { useTitle } from '@/hooks/useTitle'
 import { services } from '@/lib/container'
 import { cx } from '@/lib/cx'
 import type { Area, City } from '@/domain/types'
 
 export default function Places() {
+  useTitle('Cities and areas')
   const cities = useAsync(() => services.listCities({ includeInactive: true }), [])
   const areas = useAsync(() => services.listAreas({ includeInactive: true }), [])
 
@@ -47,7 +49,7 @@ export default function Places() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2">
           {/* Cities pane */}
-          <section aria-labelledby="cities-heading" className="space-y-3">
+          <section aria-labelledby="cities-heading" className="min-w-0 space-y-3">
             <h2 id="cities-heading" className="text-lg font-semibold">
               Cities
             </h2>
@@ -72,7 +74,7 @@ export default function Places() {
           {/* Areas pane: on phones this appears below after a city is picked */}
           <section
             aria-labelledby="areas-heading"
-            className={cx('space-y-3', !selectedCity && 'hidden md:block')}
+            className={cx('min-w-0 space-y-3', !selectedCity && 'hidden md:block')}
           >
             <h2 id="areas-heading" className="text-lg font-semibold">
               {selectedCity ? `Areas in ${selectedCity.name}` : 'Areas'}
@@ -113,20 +115,27 @@ function CityRow({
 }) {
   const { run } = useMutation(services.setCityActive)
   return (
-    <div className={cx('flex items-center gap-3 p-3', selected && 'bg-primary-soft/40')}>
-      <button type="button" onClick={onSelect} className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left">
-        <span className={cx('truncate font-medium', !city.isActive && 'text-ink-muted')}>{city.name}</span>
+    <div
+      className={cx(
+        'flex min-h-11 flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-3',
+        selected && 'bg-primary-soft/40',
+      )}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+      >
+        <span className={cx('min-w-0 break-words font-medium', !city.isActive && 'text-ink-muted')}>{city.name}</span>
         {!city.isActive && <Badge tone="neutral">Inactive</Badge>}
         <span className="ml-auto whitespace-nowrap text-sm tabular-nums text-ink-muted">
           {areaCount} {areaCount === 1 ? 'area' : 'areas'}
         </span>
         <ChevronRight aria-hidden className="size-4 shrink-0 text-ink-muted" />
       </button>
-      <Switch
-        label="Active"
-        checked={city.isActive}
-        onChange={(on) => void run(city.id, on)}
-      />
+      <div className="shrink-0">
+        <Switch label="Active" checked={city.isActive} onChange={(on) => void run(city.id, on)} />
+      </div>
     </div>
   )
 }
@@ -134,12 +143,14 @@ function CityRow({
 function AreaRow({ area }: { area: Area }) {
   const { run } = useMutation(services.setAreaActive)
   return (
-    <div className="flex items-center justify-between gap-3 p-3">
+    <div className="flex min-h-11 flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
       <span className="flex min-w-0 items-center gap-2">
-        <span className={cx('truncate', !area.isActive && 'text-ink-muted')}>{area.name}</span>
+        <span className={cx('min-w-0 break-words', !area.isActive && 'text-ink-muted')}>{area.name}</span>
         {!area.isActive && <Badge tone="neutral">Inactive</Badge>}
       </span>
-      <Switch label="Active" checked={area.isActive} onChange={(on) => void run(area.id, on)} />
+      <div className="shrink-0">
+        <Switch label="Active" checked={area.isActive} onChange={(on) => void run(area.id, on)} />
+      </div>
     </div>
   )
 }
@@ -160,7 +171,7 @@ function AddCityForm() {
   }
 
   return (
-    <form onSubmit={submit} className="flex items-start gap-2">
+    <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row sm:items-start">
       <TextField
         label="Add city"
         className="flex-1"
@@ -172,7 +183,13 @@ function AddCityForm() {
           if (error) clearError()
         }}
       />
-      <Button type="submit" variant="secondary" loading={loading} className="mt-7 px-3" aria-label="Add city">
+      <Button
+        type="submit"
+        variant="secondary"
+        loading={loading}
+        className="px-3 sm:mt-7"
+        aria-label="Add city"
+      >
         <Plus aria-hidden className="size-4" />
         Add
       </Button>
@@ -196,7 +213,7 @@ function AddAreaForm({ cityId }: { cityId: string }) {
   }
 
   return (
-    <form onSubmit={submit} className="flex items-start gap-2">
+    <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row sm:items-start">
       <TextField
         label="Add area"
         className="flex-1"
@@ -208,7 +225,13 @@ function AddAreaForm({ cityId }: { cityId: string }) {
           if (error) clearError()
         }}
       />
-      <Button type="submit" variant="secondary" loading={loading} className="mt-7 px-3" aria-label="Add area">
+      <Button
+        type="submit"
+        variant="secondary"
+        loading={loading}
+        className="px-3 sm:mt-7"
+        aria-label="Add area"
+      >
         <Plus aria-hidden className="size-4" />
         Add
       </Button>

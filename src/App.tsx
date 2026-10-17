@@ -22,6 +22,7 @@ const Refund = lazy(() => import('@/pages/legal/Refund'))
 const MyRequests = lazy(() => import('@/pages/student/MyRequests'))
 const MyMembership = lazy(() => import('@/pages/student/MyMembership'))
 const NotFound = lazy(() => import('@/pages/NotFound'))
+const Profile = lazy(() => import('@/pages/Profile'))
 
 const OwnerDashboard = lazy(() => import('@/pages/owner/Dashboard'))
 const OwnerSeats = lazy(() => import('@/pages/owner/Seats'))
@@ -61,6 +62,7 @@ export default function App() {
 
                 <Route element={<RequireSignedIn />}>
                   <Route path="choose-role" element={<ChooseRole />} />
+                  <Route path="profile" element={<Profile />} />
                 </Route>
 
                 <Route element={<RequireRole roles={['student']} />}>

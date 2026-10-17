@@ -63,3 +63,4 @@ describe('validateShiftSet', () => {
     expect(validateShiftSet([s('A', '09:00', '10:00', 0)])).toMatch(/fee/)
   })
 })
+

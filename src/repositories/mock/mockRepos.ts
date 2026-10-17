@@ -2,7 +2,7 @@ import { AppError } from '@/domain/errors'
 import { todayIST } from '@/domain/dates'
 import { PLAN_PRICE_PAISE, canEditProfile, extendedActiveUntil, newTrial } from '@/domain/plan'
 import { MAX_ACTIVE_SHIFTS, sortShifts, validateShiftFields, validateShiftSet } from '@/domain/shifts'
-import { isValidUtr } from '@/domain/constants'
+import { isValidPhone, isValidUtr, normalizePhone } from '@/domain/constants'
 import type {
   AdminLibraryRow,
   AdminPaymentRow,
@@ -170,7 +170,7 @@ function requireActiveShift(libraryId: string, shiftId: string): Shift {
 }
 function assertMemberFields(name: string, phone: string) {
   if (!name.trim()) throw new AppError('invalid', 'Enter the student’s name.')
-  if (!/^[6-9]\d{9}$/.test(phone.trim())) throw new AppError('invalid', 'Enter a 10-digit mobile number.')
+  if (!isValidPhone(phone)) throw new AppError('invalid', 'Enter a 10-digit mobile number.')
 }
 
 function shiftOrThrow(id: string): Shift {
@@ -217,8 +217,9 @@ export class MockAuthRepository implements AuthRepository {
     return run(() => {
       const user = requireUser()
       if (!patch.name.trim()) throw new AppError('invalid', 'Enter your name.')
+      if (!isValidPhone(patch.phone)) throw new AppError('invalid', 'Enter a 10-digit mobile number.')
       user.name = patch.name.trim()
-      user.phone = patch.phone.trim()
+      user.phone = normalizePhone(patch.phone)
       commit()
       return user
     })
@@ -656,7 +657,7 @@ export class MockMemberRepository implements MemberRepository {
       if (input.firstFee && input.firstFee.amountPaise <= 0) throw new AppError('invalid', 'Fee must be more than zero.')
       const db = getDb()
       // The same person can join several shifts, but only once per shift.
-      if (db.members.some((m) => m.libraryId === lib.id && m.shiftId === shift.id && m.status === 'active' && m.phone === input.phone.trim())) {
+      if (db.members.some((m) => m.libraryId === lib.id && m.shiftId === shift.id && m.status === 'active' && m.phone === normalizePhone(input.phone))) {
         throw new AppError('conflict', `This student is already in ${shift.name}. Add them to a different shift, or renew them.`)
       }
       const member: Member = {
@@ -665,7 +666,7 @@ export class MockMemberRepository implements MemberRepository {
         studentId: null,
         shiftId: shift.id,
         name: input.name.trim(),
-        phone: input.phone.trim(),
+        phone: normalizePhone(input.phone),
         seatId: input.seatId,
         startDate: input.startDate,
         expiryDate: input.expiryDate,
@@ -689,7 +690,7 @@ export class MockMemberRepository implements MemberRepository {
       requireActiveOwner(m.libraryId)
       assertMemberFields(patch.name, patch.phone)
       m.name = patch.name.trim()
-      m.phone = patch.phone.trim()
+      m.phone = normalizePhone(patch.phone)
       commit()
       return m
     })
@@ -811,6 +812,9 @@ export class MockSeatRequestRepository implements SeatRequestRepository {
       const db = getDb()
       const lib = db.libraries.find((l) => l.id === libraryId)
       if (!lib || !isLibraryActive(lib)) throw new AppError('not_found', 'This library is not accepting requests.')
+      if (!isValidPhone(user.phone)) {
+        throw new AppError('invalid', 'Add your mobile number first, so the library can call you.')
+      }
       const shift = requireActiveShift(libraryId, shiftId)
       // One request per shift: a student can ask for Morning and Evening separately.
       if (db.seatRequests.some((r) => r.studentId === user.id && r.shiftId === shiftId && r.status === 'pending')) {

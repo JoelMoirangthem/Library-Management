@@ -24,8 +24,14 @@ const variants: Record<ButtonVariant, string> = {
  * 44px minimum height: these are used one-handed on phones.
  */
 export function buttonStyles(variant: ButtonVariant = 'primary', extra?: string) {
+  // Tailwind can't tell which of two conflicting utilities you meant, so the defaults step aside
+  // when the caller supplies their own horizontal padding or hides the button.
+  const customPadding = /(^|\s)px-/.test(extra ?? '')
+  const hidden = /(^|\s)hidden(\s|$)/.test(extra ?? '')
   return cx(
-    'inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-control px-4',
+    !hidden && 'inline-flex',
+    'min-h-11 cursor-pointer items-center justify-center gap-2 rounded-control',
+    !customPadding && 'px-4',
     'text-base font-medium transition-colors duration-150',
     variants[variant],
     extra,

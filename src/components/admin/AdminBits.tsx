@@ -1,8 +1,65 @@
 import { useId, useState, type ReactNode } from 'react'
-import { Check, Copy } from 'lucide-react'
+import { Check, Copy, Phone } from 'lucide-react'
 import { Badge, type BadgeTone } from '@/components/Badge'
 import { useToast } from '@/components/Toast'
 import { cx } from '@/lib/cx'
+import { formatPhone } from '@/domain/constants'
+import { formatDateTime } from '@/domain/dates'
+
+/** A 44px tel link that shows the number with formatPhone and a leading phone icon. */
+export function TelLink({
+  phone,
+  className,
+}: {
+  phone: string
+  className?: string
+}) {
+  return (
+    <a
+      href={`tel:${phone}`}
+      className={cx(
+        'inline-flex min-h-11 items-center gap-1.5 tabular-nums text-primary hover:underline',
+        className,
+      )}
+    >
+      <Phone aria-hidden className="size-4 shrink-0" />
+      {formatPhone(phone)}
+    </a>
+  )
+}
+
+/**
+ * Relative time like '3 hours ago' for the display text; the exact time goes in the title.
+ * `now` is passed in so the fake clock works.
+ */
+function relativeTime(iso: string, now: Date): string {
+  const ms = now.getTime() - new Date(iso).getTime()
+  const sec = Math.round(ms / 1000)
+  const abs = Math.abs(sec)
+  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+  const units: [Intl.RelativeTimeFormatUnit, number][] = [
+    ['year', 31_536_000],
+    ['month', 2_592_000],
+    ['week', 604_800],
+    ['day', 86_400],
+    ['hour', 3600],
+    ['minute', 60],
+  ]
+  for (const [unit, secs] of units) {
+    if (abs >= secs) return rtf.format(-Math.round(sec / secs), unit)
+  }
+  return rtf.format(-sec, 'second')
+}
+
+/** Relative time as text with the exact time on hover/title. */
+export function RelativeTime({ iso, now, prefix }: { iso: string; now: Date; prefix?: string }) {
+  return (
+    <span title={formatDateTime(iso)} className="tabular-nums">
+      {prefix}
+      {relativeTime(iso, now)}
+    </span>
+  )
+}
 
 /** A row of segmented filter buttons with counts. Real buttons with aria-pressed. */
 export type SegOption<T extends string> = { value: T; label: string; count?: number }
@@ -120,7 +177,7 @@ export function CopyButton({ value, toastText }: { value: string; toastText: str
           toast.show("Couldn't copy. Select and copy it by hand.", 'error')
         }
       }}
-      className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-control border border-border-strong text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
+      className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-control border border-border-strong text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
     >
       {copied ? <Check aria-hidden className="size-4 text-success-ink" /> : <Copy aria-hidden className="size-4" />}
     </button>

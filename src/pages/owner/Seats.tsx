@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Phone } from 'lucide-react'
+import { ChevronDown, Phone, Search } from 'lucide-react'
 import { Button } from '@/components/Button'
 import { Card } from '@/components/Card'
 import { TextField } from '@/components/Fields'
@@ -17,15 +17,19 @@ import {
   ExpiryBadge,
   RenewModal,
 } from '@/components/owner/members'
+import { useToast } from '@/components/Toast'
 import { buildSeatCells, seatCounts } from '@/domain/seatCells'
 import { todayIST, formatDate } from '@/domain/dates'
+import { formatPhone } from '@/domain/constants'
 import { sortShifts } from '@/domain/shifts'
 import type { Member, Shift } from '@/domain/types'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
 import { useOwnerLibrary } from '@/hooks/useOwnerLibrary'
+import { useTitle } from '@/hooks/useTitle'
 import { services } from '@/lib/container'
 import { useNow } from '@/lib/devState'
+import { cx } from '@/lib/cx'
 
 function ReadOnlyNotice() {
   return (
@@ -39,10 +43,12 @@ function ReadOnlyNotice() {
 }
 
 export default function Seats() {
+  useTitle('Seats')
   const now = useNow()
   const today = todayIST(now)
   const { library, canWrite } = useOwnerLibrary()
   const libraryId = library!.id
+  const toast = useToast()
 
   const seatsQ = useAsync(() => services.listSeats(libraryId), [libraryId])
   const membersQ = useAsync(() => services.listMembers(libraryId), [libraryId])
@@ -68,24 +74,36 @@ export default function Seats() {
 
   const activeMembers = useMemo(() => members.filter((m) => m.status === 'active'), [members])
 
-  // Active member holding each seat, in the selected shift.
   const memberBySeat = useMemo(() => {
     const map = new Map<string, Member>()
     for (const m of activeMembers) if (m.seatId && m.shiftId === selectedShiftId) map.set(m.seatId, m)
     return map
   }, [activeMembers, selectedShiftId])
 
-  // Active students of THIS shift with no seat, for the "assign" select.
   const studentsWithoutSeat = useMemo(
     () => activeMembers.filter((m) => m.shiftId === selectedShiftId && !m.seatId),
     [activeMembers, selectedShiftId],
   )
 
+  // Students in THIS shift, for the "find a student" box.
+  const shiftStudents = useMemo(
+    () => activeMembers.filter((m) => m.shiftId === selectedShiftId),
+    [activeMembers, selectedShiftId],
+  )
+
+  const [find, setFind] = useState('')
+  const findResults = useMemo(() => {
+    const q = find.trim().toLowerCase()
+    if (!q) return []
+    return shiftStudents
+      .filter((m) => m.name.toLowerCase().includes(q) || m.phone.includes(q))
+      .slice(0, 6)
+  }, [find, shiftStudents])
+
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selectedCell = cells.find((c) => c.id === selectedId) ?? null
   const selectedMember = selectedId ? memberBySeat.get(selectedId) ?? null : null
 
-  // Who holds the same physical seat in OTHER shifts, for context.
   const sameSeatOtherShifts = useMemo(() => {
     if (!selectedId) return []
     const out: { shift: Shift; name: string }[] = []
@@ -101,9 +119,10 @@ export default function Seats() {
   const [addPresetSeatId, setAddPresetSeatId] = useState<string | null>(null)
   const [renewMember, setRenewMember] = useState<Member | null>(null)
   const [removeMember, setRemoveMember] = useState<Member | null>(null)
+  const [moreOpen, setMoreOpen] = useState(false)
 
   const assign = useMutation(services.assignSeat, { success: 'Seat assigned' })
-  const free = useMutation(services.assignSeat, { success: 'Seat freed' })
+  const free = useMutation(services.assignSeat, { silent: true })
   const remove = useMutation(services.removeMember, { success: 'Student removed' })
 
   const [assignTo, setAssignTo] = useState('')
@@ -111,6 +130,24 @@ export default function Seats() {
   const closeModal = () => {
     setSelectedId(null)
     setAssignTo('')
+    setMoreOpen(false)
+  }
+
+  // "Find a student": select their seat and open the sheet, or say they have none in this shift.
+  const seatByMember = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const [seatId, m] of memberBySeat) map.set(m.id, seatId)
+    return map
+  }, [memberBySeat])
+
+  const pickStudent = (m: Member) => {
+    setFind('')
+    const seatId = seatByMember.get(m.id)
+    if (seatId) {
+      setSelectedId(seatId)
+    } else {
+      toast.show(`${m.name} has no seat in ${selectedShift?.name ?? 'this shift'} yet.`, 'info')
+    }
   }
 
   const shiftOff = selectedShift ? !selectedShift.isActive : false
@@ -153,6 +190,7 @@ export default function Seats() {
               onChange={(id) => {
                 setSelectedShiftId(id)
                 closeModal()
+                setFind('')
               }}
               detail={(s) => {
                 const c = seatCounts(buildSeatCells(seats, members, today, s.id))
@@ -171,6 +209,52 @@ export default function Seats() {
               students can't be assigned to it.
             </p>
           )}
+
+          {/* Find a student in this shift */}
+          <div className="relative">
+            <label htmlFor="find-student" className="mb-1.5 block text-sm font-medium">
+              Find a student
+            </label>
+            <div className="relative">
+              <Search
+                aria-hidden
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
+              />
+              <input
+                id="find-student"
+                type="search"
+                value={find}
+                onChange={(e) => setFind(e.target.value)}
+                placeholder={`Search ${selectedShift?.name ?? 'this shift'} by name or phone`}
+                className="block min-h-11 w-full rounded-control border border-border-strong bg-surface py-2 pl-9 pr-3 text-base text-ink placeholder:text-ink-muted/70"
+              />
+            </div>
+            {find.trim() && (
+              <ul className="mt-2 divide-y divide-border rounded-card border border-border bg-surface">
+                {findResults.length === 0 ? (
+                  <li className="p-3 text-sm text-ink-muted">No students match in this shift.</li>
+                ) : (
+                  findResults.map((m) => {
+                    const hasSeat = seatByMember.has(m.id)
+                    return (
+                      <li key={m.id}>
+                        <button
+                          type="button"
+                          onClick={() => pickStudent(m)}
+                          className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-canvas"
+                        >
+                          <span className="min-w-0 break-words font-medium">{m.name}</span>
+                          <span className="shrink-0 text-sm tabular-nums text-ink-muted">
+                            {hasSeat ? `Seat ${seatByMember.get(m.id)}` : 'No seat'}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })
+                )}
+              </ul>
+            )}
+          </div>
 
           <Card className="p-4 sm:p-6">
             <SeatGrid
@@ -194,7 +278,7 @@ export default function Seats() {
       >
         {selectedCell && selectedCell.state === 'disabled' && (
           <p className="text-sm text-ink-muted">
-            This seat is not in use. Raise your capacity in the seats settings to bring it back.
+            This seat is not in use. Raise your capacity in the seat settings to bring it back.
           </p>
         )}
 
@@ -274,33 +358,44 @@ export default function Seats() {
 
         {selectedCell && selectedMember && selectedCell.state !== 'free' && selectedCell.state !== 'disabled' && (
           <div className="space-y-4">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-lg font-semibold">{selectedMember.name}</p>
+            {/* Big seat number + shift */}
+            <div className="flex items-center gap-3 rounded-card bg-canvas p-3">
+              <span className="flex size-14 shrink-0 items-center justify-center rounded-card bg-primary text-2xl font-bold tabular-nums text-white">
+                {selectedCell.number}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm text-ink-muted">Seat {selectedCell.number}</p>
                 <ShiftBadge shift={selectedShift} />
               </div>
+            </div>
+
+            {/* Student card */}
+            <div className="rounded-card border border-border p-3">
+              <p className="break-words text-lg font-semibold">{selectedMember.name}</p>
               <a
                 href={`tel:${selectedMember.phone}`}
-                className="mt-1 inline-flex items-center gap-1.5 text-sm text-primary underline underline-offset-2"
+                className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-sm text-primary underline underline-offset-2"
               >
                 <Phone aria-hidden className="size-4" />
-                {selectedMember.phone}
+                <span className="tabular-nums">{formatPhone(selectedMember.phone)}</span>
               </a>
+              <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <dt className="text-ink-muted">Started</dt>
+                  <dd className="tabular-nums">{formatDate(selectedMember.startDate)}</dd>
+                </div>
+                <div>
+                  <dt className="text-ink-muted">Expires</dt>
+                  <dd className="tabular-nums">{formatDate(selectedMember.expiryDate)}</dd>
+                </div>
+              </dl>
+              <div className="mt-3">
+                <ExpiryBadge member={selectedMember} today={today} />
+              </div>
             </div>
-            <dl className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <dt className="text-ink-muted">Started</dt>
-                <dd className="tabular-nums">{formatDate(selectedMember.startDate)}</dd>
-              </div>
-              <div>
-                <dt className="text-ink-muted">Expires</dt>
-                <dd className="tabular-nums">{formatDate(selectedMember.expiryDate)}</dd>
-              </div>
-            </dl>
-            <ExpiryBadge member={selectedMember} today={today} />
 
             {sameSeatOtherShifts.length > 0 && (
-              <div className="border-t border-border pt-4 text-sm text-ink-muted">
+              <div className="text-sm text-ink-muted">
                 {sameSeatOtherShifts.map((o) => (
                   <p key={o.shift.id}>
                     Seat {selectedCell.number} in {o.shift.name}: {o.name}
@@ -312,34 +407,66 @@ export default function Seats() {
             {!canWrite ? (
               <ReadOnlyNotice />
             ) : (
-              <div className="flex flex-wrap gap-2 border-t border-border pt-4">
-                <Button
-                  onClick={() => {
-                    setRenewMember(selectedMember)
-                    setSelectedId(null)
-                  }}
-                >
-                  Renew
-                </Button>
-                <Button
-                  variant="secondary"
-                  loading={free.loading}
-                  onClick={async () => {
-                    const ok = await free.run(selectedMember.id, null)
-                    if (ok !== undefined) closeModal()
-                  }}
-                >
-                  Free this seat
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={() => {
-                    setRemoveMember(selectedMember)
-                    setSelectedId(null)
-                  }}
-                >
-                  Remove student
-                </Button>
+              <div className="space-y-3 border-t border-border pt-4">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    className="flex-1"
+                    onClick={() => {
+                      setRenewMember(selectedMember)
+                      setSelectedId(null)
+                    }}
+                  >
+                    Renew
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="flex-1"
+                    loading={free.loading}
+                    onClick={async () => {
+                      const m = selectedMember
+                      const prevSeatId = selectedCell.id
+                      const seatNo = selectedCell.number
+                      const ok = await free.run(m.id, null)
+                      if (ok !== undefined) {
+                        closeModal()
+                        toast.show(`Seat ${seatNo} freed`, 'success', {
+                          action: {
+                            label: 'Undo',
+                            onClick: () => {
+                              void free.run(m.id, prevSeatId).then(() => membersQ.reload())
+                            },
+                          },
+                        })
+                        membersQ.reload()
+                      }
+                    }}
+                  >
+                    Free this seat
+                  </Button>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    aria-expanded={moreOpen}
+                    onClick={() => setMoreOpen((v) => !v)}
+                    className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ink-muted hover:text-ink"
+                  >
+                    More
+                    <ChevronDown aria-hidden className={cx('size-4 transition-transform', moreOpen && 'rotate-180')} />
+                  </button>
+                  {moreOpen && (
+                    <Button
+                      variant="danger"
+                      className="mt-2 w-full"
+                      onClick={() => {
+                        setRemoveMember(selectedMember)
+                        setSelectedId(null)
+                      }}
+                    >
+                      Remove student
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -398,13 +525,14 @@ function SeatSettings({
   seatCount: number
   canWrite: boolean
 }) {
+  const [open, setOpen] = useState(false)
+  const panelRef = useRef<HTMLDivElement>(null)
   const [value, setValue] = useState(String(seatCount))
   const update = useMutation((n: number) => services.setCapacity(libraryId, n), {
     success: 'Seats updated',
     silent: true,
   })
 
-  // Keep the input in sync when the seat count changes after a write.
   const [lastCount, setLastCount] = useState(seatCount)
   if (lastCount !== seatCount) {
     setLastCount(seatCount)
@@ -415,35 +543,50 @@ function SeatSettings({
   const invalid = !Number.isInteger(n) || n < 1 || n > 500
 
   return (
-    <Card className="mt-6 p-4 sm:p-6">
-      <h2 className="text-lg font-semibold">Seats</h2>
-      <p className="mt-1 text-sm text-ink-muted">
-        Raising the number adds seats. Lowering it removes free seats only.
-      </p>
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-        <TextField
-          label="Capacity"
-          type="number"
-          min={1}
-          max={500}
-          inputMode="numeric"
-          value={value}
-          disabled={!canWrite}
-          onChange={(e) => setValue(e.target.value)}
-          className="sm:w-40"
-        />
-        <Button
-          disabled={!canWrite || invalid || n === seatCount}
-          loading={update.loading}
-          onClick={() => void update.run(n)}
+    <Card className="mt-6 overflow-hidden">
+      <h2>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls="seat-settings-panel"
+          onClick={() => setOpen((v) => !v)}
+          className="flex min-h-14 w-full items-center justify-between gap-3 p-4 text-left sm:px-6"
         >
-          Update seats
-        </Button>
-      </div>
-      {update.error && <p className="mt-2 text-sm font-medium text-danger">{update.error.message}</p>}
-      {!canWrite && (
-        <div className="mt-2">
-          <ReadOnlyNotice />
+          <span className="text-lg font-semibold">Seat settings</span>
+          <ChevronDown aria-hidden className={cx('size-5 shrink-0 text-ink-muted transition-transform', open && 'rotate-180')} />
+        </button>
+      </h2>
+      {open && (
+        <div id="seat-settings-panel" ref={panelRef} className="border-t border-border p-4 sm:p-6">
+          <p className="text-sm text-ink-muted">
+            Raising the number adds seats. Lowering it removes free seats only.
+          </p>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <TextField
+              label="Capacity"
+              type="number"
+              min={1}
+              max={500}
+              inputMode="numeric"
+              value={value}
+              disabled={!canWrite}
+              onChange={(e) => setValue(e.target.value)}
+              className="sm:w-40"
+            />
+            <Button
+              disabled={!canWrite || invalid || n === seatCount}
+              loading={update.loading}
+              onClick={() => void update.run(n)}
+            >
+              Update seats
+            </Button>
+          </div>
+          {update.error && <p className="mt-2 text-sm font-medium text-danger">{update.error.message}</p>}
+          {!canWrite && (
+            <div className="mt-2">
+              <ReadOnlyNotice />
+            </div>
+          )}
         </div>
       )}
     </Card>

@@ -1,23 +1,17 @@
 import { useMemo, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import {
-  Armchair,
-  CheckCircle2,
-  Clock,
-  MapPin,
-  Phone,
-  Timer,
-} from 'lucide-react'
+import { CheckCircle2, Clock, MapPin, Phone } from 'lucide-react'
 import { Badge } from '@/components/Badge'
 import { Button, buttonStyles } from '@/components/Button'
 import { Card } from '@/components/Card'
-import { SeatMark } from '@/components/Logo'
+import { LibraryArt } from '@/components/LibraryArt'
 import { PageHeader } from '@/components/PageParts'
 import { SeatStrip } from '@/components/SeatGrid'
+import { SuccessMoment } from '@/components/Steps'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
 import { NotFoundState } from '@/components/states/NotFoundState'
-import { mapsLink } from '@/domain/constants'
+import { formatPhone, isValidPhone, mapsLink } from '@/domain/constants'
 import { formatRupees } from '@/domain/money'
 import { formatShiftRange } from '@/domain/shifts'
 import type { PublicLibrary, PublicShift } from '@/domain/types'
@@ -25,25 +19,19 @@ import { services } from '@/lib/container'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
 import { useAuth } from '@/hooks/useAuth'
+import { useTitle } from '@/hooks/useTitle'
 import { cx } from '@/lib/cx'
 
-function PhotoGallery({ library }: { library: PublicLibrary }) {
+function Cover({ library }: { library: PublicLibrary }) {
   if (library.photos.length === 0) {
-    return (
-      <div
-        aria-hidden
-        className="flex h-56 items-center justify-center rounded-card bg-primary-soft text-primary sm:h-72"
-      >
-        <SeatMark className="size-16 opacity-80" />
-      </div>
-    )
+    return <LibraryArt shifts={library.shifts} className="h-56 rounded-card sm:h-72" />
   }
   return (
     <div className="grid gap-2 sm:grid-cols-2">
       <img
         src={library.photos[0]}
         alt={`${library.name} photo 1`}
-        className="h-56 w-full rounded-card object-cover sm:h-72 sm:col-span-2"
+        className="h-56 w-full rounded-card object-cover sm:col-span-2 sm:h-72"
       />
       {library.photos.slice(1, 3).map((src, i) => (
         <img
@@ -65,6 +53,10 @@ function RequestAction({
   isMemberHere,
   requestsReady,
   membershipsReady,
+  justSent,
+  onSent,
+  onReset,
+  onCancelled,
 }: {
   library: PublicLibrary
   shift: PublicShift
@@ -72,15 +64,21 @@ function RequestAction({
   isMemberHere: boolean
   requestsReady: boolean
   membershipsReady: boolean
+  justSent: boolean
+  onSent: () => void
+  onReset: () => void
+  onCancelled: () => void
 }) {
   const { user } = useAuth()
   const location = useLocation()
 
   const requestSeat = useMutation(() => services.requestSeat(library.id, shift.id), {
     success: 'Request sent',
+    onSuccess: onSent,
   })
   const cancelRequest = useMutation((id: string) => services.cancelSeatRequest(id), {
     success: 'Request cancelled',
+    onSuccess: onCancelled,
   })
 
   const full = shift.seatsLeft === 0
@@ -89,7 +87,7 @@ function RequestAction({
   if (!user) {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-ink-muted">Log in to request a seat at this library.</p>
+        <p className="text-ink-muted">Log in to request a seat at this library.</p>
         <Link
           to="/login"
           state={{ from: location.pathname + location.search }}
@@ -104,7 +102,7 @@ function RequestAction({
   // Owner or admin.
   if (user.role !== 'student') {
     return (
-      <p className="text-sm text-ink-muted">
+      <p className="text-ink-muted">
         Only students can request a seat. Sign in with a student account to request one.
       </p>
     )
@@ -120,12 +118,34 @@ function RequestAction({
     return (
       <div className="space-y-3">
         <Badge tone="success" icon={<CheckCircle2 />}>
-          You&rsquo;re a member of this shift
+          You&rsquo;re in this shift
         </Badge>
         <Link to="/student/membership" className={buttonStyles('secondary', 'w-full')}>
-          View membership
+          View my membership
         </Link>
       </div>
+    )
+  }
+
+  // Just sent: the celebratory confirmation replaces the action.
+  if (justSent) {
+    return (
+      <SuccessMoment
+        title={`Request sent to ${library.name}`}
+        className="py-6"
+        actions={
+          <>
+            <Link to="/student/requests" className={buttonStyles('primary')}>
+              View my requests
+            </Link>
+            <button type="button" onClick={onReset} className={buttonStyles('secondary')}>
+              Request another shift
+            </button>
+          </>
+        }
+      >
+        They&rsquo;ll call you on {formatPhone(user.phone)}.
+      </SuccessMoment>
     )
   }
 
@@ -136,7 +156,7 @@ function RequestAction({
         <Badge tone="warning" icon={<Clock />}>
           Request sent
         </Badge>
-        <p className="text-sm text-ink-muted">
+        <p className="text-ink-muted">
           The owner will reply soon. You can cancel while it&rsquo;s still pending.
         </p>
         <Button
@@ -151,11 +171,25 @@ function RequestAction({
     )
   }
 
+  // Student without a valid phone: block the request, point to the profile.
+  if (!isValidPhone(user.phone)) {
+    return (
+      <div className="space-y-3">
+        <p className="text-ink-muted">
+          Add your phone number so the owner can call you back about this seat.
+        </p>
+        <Link to="/profile" className={buttonStyles('primary', 'w-full')}>
+          Add your phone number
+        </Link>
+      </div>
+    )
+  }
+
   // No request yet for this shift.
   return (
     <div className="space-y-3">
       {full && (
-        <p className="text-sm text-ink-muted">
+        <p className="text-ink-muted">
           {shift.name} is full right now. You can still request a seat &mdash; the owner will reply
           when a seat opens.
         </p>
@@ -198,9 +232,9 @@ function ShiftOption({
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-semibold leading-tight">{shift.name}</p>
-          <p className="flex items-center gap-1 text-xs tabular-nums text-ink-muted">
-            <Clock aria-hidden className="size-3" />
+          <p className="break-words font-semibold leading-tight">{shift.name}</p>
+          <p className="flex items-center gap-1 text-sm tabular-nums text-ink-muted">
+            <Clock aria-hidden className="size-3.5" />
             {formatShiftRange(shift)}
           </p>
         </div>
@@ -223,6 +257,7 @@ export default function LibraryDetail() {
   const isStudent = user?.role === 'student'
 
   const library = useAsync(() => services.getPublicLibrary(id), [id])
+  useTitle(library.data?.name ?? 'Library')
 
   // Only students need their request/membership status; owners and signed-out users don't.
   const myRequests = useAsync(
@@ -243,6 +278,9 @@ export default function LibraryDetail() {
   }, [shifts])
 
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null)
+  // Which shift (if any) was just requested, so we show the confirmation for it.
+  const [sentShiftId, setSentShiftId] = useState<string | null>(null)
+
   const selectedShift =
     shifts.find((s) => s.id === (selectedShiftId ?? defaultShiftId)) ?? shifts[0] ?? null
 
@@ -266,11 +304,12 @@ export default function LibraryDetail() {
     return (
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <NotFoundState
+          heading="h1"
           title="This library isn't listed right now"
           description="It may have paused its plan. Browse other libraries instead."
           action={
             <Link to="/discover" className={buttonStyles('primary')}>
-              Back to Find a library
+              Find a library
             </Link>
           }
         />
@@ -299,6 +338,12 @@ export default function LibraryDetail() {
       ),
   )
 
+  function selectShift(shiftId: string) {
+    setSelectedShiftId(shiftId)
+    // Leaving the confirmation when picking a different shift.
+    setSentShiftId(null)
+  }
+
   const actionCard = selectedShift ? (
     <RequestAction
       library={lib}
@@ -307,26 +352,40 @@ export default function LibraryDetail() {
       isMemberHere={isMemberHere}
       requestsReady={requestsReady}
       membershipsReady={membershipsReady}
+      justSent={sentShiftId === selectedShift.id}
+      onSent={() => {
+        setSentShiftId(selectedShift.id)
+        void myRequests.reload()
+      }}
+      onReset={() => setSentShiftId(null)}
+      onCancelled={() => void myRequests.reload()}
     />
   ) : (
-    <p className="text-sm text-ink-muted">This library has no shifts open right now.</p>
+    <p className="text-ink-muted">This library has no shifts open right now.</p>
   )
 
+  const selectedSummary = selectedShift
+    ? `${selectedShift.name} · ${formatShiftRange(selectedShift)} · ${formatRupees(selectedShift.monthlyFeePaise)}/month`
+    : null
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 pb-28 sm:px-6 lg:pb-8">
+    <div className="mx-auto max-w-6xl px-4 py-8 pb-56 sm:px-6 lg:pb-8">
       <div className="mb-4">
-        <Link to="/discover" className="text-sm font-medium text-primary hover:underline">
+        <Link
+          to="/discover"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
+        >
           &larr; Find a library
         </Link>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
         <div className="space-y-6">
-          <PhotoGallery library={lib} />
+          <Cover library={lib} />
 
           <div>
             <PageHeader title={lib.name} />
-            <p className="-mt-4 flex items-center gap-1.5 text-ink-muted">
+            <p className="-mt-4 flex items-center gap-1.5 break-words text-ink-muted">
               <MapPin aria-hidden className="size-4 shrink-0" />
               {lib.areaName}, {lib.cityName}
             </p>
@@ -338,13 +397,17 @@ export default function LibraryDetail() {
               Pick a shift to request a seat. Each shift has its own fee and seats.
             </p>
             {shifts.length > 0 ? (
-              <div role="radiogroup" aria-label="Choose a shift" className="grid gap-3 sm:grid-cols-2">
+              <div
+                role="radiogroup"
+                aria-label="Choose a shift"
+                className="grid gap-3 sm:grid-cols-2"
+              >
                 {shifts.map((s) => (
                   <ShiftOption
                     key={s.id}
                     shift={s}
                     selected={selectedShift?.id === s.id}
-                    onSelect={() => setSelectedShiftId(s.id)}
+                    onSelect={() => selectShift(s.id)}
                   />
                 ))}
               </div>
@@ -352,22 +415,6 @@ export default function LibraryDetail() {
               <p className="text-sm text-ink-muted">No shifts are open right now.</p>
             )}
           </Card>
-
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-card border border-border bg-surface p-4">
-              <dt className="text-sm text-ink-muted">Monthly fee</dt>
-              <dd className="mt-1 text-lg font-semibold tabular-nums">
-                from {formatRupees(lib.fromFeePaise)}
-                <span className="text-sm font-normal text-ink-muted"> / month</span>
-              </dd>
-            </div>
-            <div className="rounded-card border border-border bg-surface p-4">
-              <dt className="flex items-center gap-1.5 text-sm text-ink-muted">
-                <Timer aria-hidden className="size-4" /> Timings
-              </dt>
-              <dd className="mt-1 text-lg font-semibold">{lib.timings}</dd>
-            </div>
-          </dl>
 
           <section>
             <h2 className="mb-2 text-lg font-semibold">Address</h2>
@@ -382,15 +429,21 @@ export default function LibraryDetail() {
               <br />
               {lib.areaName}, {lib.cityName} <span className="tabular-nums">{lib.pincode}</span>
             </address>
-            <a
-              href={maps}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={buttonStyles('secondary', 'mt-3')}
-            >
-              <MapPin aria-hidden className="size-4" />
-              Open in Google Maps
-            </a>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <a
+                href={maps}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonStyles('secondary')}
+              >
+                <MapPin aria-hidden className="size-4" />
+                Open in Google Maps
+              </a>
+              <a href={`tel:${lib.phone}`} className={buttonStyles('secondary')}>
+                <Phone aria-hidden className="size-4" />
+                Call
+              </a>
+            </div>
           </section>
 
           {lib.amenities.length > 0 && (
@@ -410,29 +463,30 @@ export default function LibraryDetail() {
         {/* Desktop sidebar action card. */}
         <aside className="hidden lg:block">
           <Card className="sticky top-20 space-y-4 p-5">
-            <div className="flex items-center gap-2 text-primary">
-              <Armchair aria-hidden className="size-5" />
-              <span className="font-semibold">
+            <div>
+              <p className="font-semibold">
                 {selectedShift ? `Request a seat in ${selectedShift.name}` : 'Request a seat'}
-              </span>
+              </p>
+              {selectedSummary && (
+                <p className="mt-0.5 text-sm tabular-nums text-ink-muted">{selectedSummary}</p>
+              )}
             </div>
             {actionCard}
-            <a href={`tel:${lib.phone}`} className={buttonStyles('secondary', 'w-full')}>
-              <Phone aria-hidden className="size-4" />
-              Call
-            </a>
           </Card>
         </aside>
       </div>
 
-      {/* Sticky bottom action bar on phones/tablets. */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface p-4 lg:hidden">
-        <div className="mx-auto flex max-w-6xl items-center gap-3">
-          <a href={`tel:${lib.phone}`} className={buttonStyles('secondary', 'flex-1')}>
-            <Phone aria-hidden className="size-4" />
-            Call
-          </a>
-          <div className="flex-1">{actionCard}</div>
+      {/* Sticky bottom action bar on phones/tablets, above the safe area. */}
+      <div
+        className={`fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden ${
+          user?.role === 'student' ? 'max-md:bottom-[calc(3.5rem+env(safe-area-inset-bottom))] max-md:pb-0' : ''
+        }`}
+      >
+        <div className="mx-auto max-w-6xl space-y-2 p-4">
+          {selectedSummary && (
+            <p className="text-sm tabular-nums text-ink-muted">{selectedSummary}</p>
+          )}
+          {actionCard}
         </div>
       </div>
     </div>

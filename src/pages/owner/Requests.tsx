@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Phone } from 'lucide-react'
+import { CircleCheck, MessageCircle, Phone } from 'lucide-react'
 import { Badge, type BadgeTone } from '@/components/Badge'
-import { Button } from '@/components/Button'
+import { Button, buttonStyles } from '@/components/Button'
 import { Card } from '@/components/Card'
 import { SelectField, TextField } from '@/components/Fields'
 import { Modal } from '@/components/Modal'
@@ -12,8 +12,8 @@ import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
 import { ConfirmModal } from '@/components/owner/members'
-import { FEE_MODES } from '@/domain/constants'
-import { addDays, formatDateTime, todayIST } from '@/domain/dates'
+import { FEE_MODES, formatPhone, whatsappLink } from '@/domain/constants'
+import { addDays, formatDate, formatDateTime, todayIST } from '@/domain/dates'
 import { formatRupees } from '@/domain/money'
 import { buildSeatCells, seatCounts } from '@/domain/seatCells'
 import { formatShiftRange } from '@/domain/shifts'
@@ -22,6 +22,7 @@ import { rupeesToPaise } from '@/domain/validation'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
 import { useOwnerLibrary } from '@/hooks/useOwnerLibrary'
+import { useTitle } from '@/hooks/useTitle'
 import { services } from '@/lib/container'
 import { useNow } from '@/lib/devState'
 
@@ -34,6 +35,7 @@ const statusBadge: Record<Exclude<RequestStatus, 'pending'>, { tone: BadgeTone; 
 type FreeSeat = { id: string; seatNumber: number }
 
 export default function Requests() {
+  useTitle('Requests')
   const now = useNow()
   const today = todayIST(now)
   const { library, canWrite } = useOwnerLibrary()
@@ -55,7 +57,6 @@ export default function Requests() {
     return m
   }, [shifts])
 
-  // Seats left per shift, computed from members scoped to that shift.
   const seatsLeftInShift = (shiftId: string) =>
     seatCounts(buildSeatCells(seats, members, today, shiftId)).free
 
@@ -122,17 +123,17 @@ export default function Requests() {
                   <li key={r.id}>
                     <Card className="p-4 sm:p-5">
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
+                        <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-medium">{r.studentName}</p>
+                            <p className="break-words font-medium">{r.studentName}</p>
                             <ShiftBadge shift={shift} />
                           </div>
                           <a
                             href={`tel:${r.studentPhone}`}
-                            className="mt-0.5 inline-flex items-center gap-1.5 text-sm text-primary underline underline-offset-2"
+                            className="mt-0.5 inline-flex min-h-11 items-center gap-1.5 text-sm text-primary underline underline-offset-2"
                           >
                             <Phone aria-hidden className="size-4" />
-                            <span className="tabular-nums">{r.studentPhone}</span>
+                            <span className="tabular-nums">{formatPhone(r.studentPhone)}</span>
                           </a>
                           {shift && (
                             <p className="mt-1 text-sm text-ink-muted tabular-nums">
@@ -147,7 +148,7 @@ export default function Requests() {
                           {shift
                             ? off
                               ? `${shift.name} is off`
-                              : `${left} seats left in ${shift.name}`
+                              : `${left} seat${left === 1 ? '' : 's'} free in ${shift.name}`
                             : 'Shift unavailable'}
                         </Badge>
                       </div>
@@ -176,9 +177,9 @@ export default function Requests() {
                   const b = statusBadge[r.status as Exclude<RequestStatus, 'pending'>]
                   return (
                     <li key={r.id} className="flex items-center justify-between gap-3 p-4">
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{r.studentName}</p>
+                          <p className="break-words font-medium">{r.studentName}</p>
                           <ShiftBadge shift={shiftById.get(r.shiftId)} />
                         </div>
                         <p className="text-sm text-ink-muted tabular-nums">
@@ -202,12 +203,14 @@ export default function Requests() {
         seats={seats}
         members={members}
         today={today}
+        libraryName={library!.name}
+        onDone={reloadAll}
       />
 
       <ConfirmModal
         open={!!declineReq}
         onClose={() => setDeclineReq(null)}
-        title={declineReq ? `Decline ${declineReq.studentName}’s request?` : 'Decline request?'}
+        title={declineReq ? `Decline ${declineReq.studentName}'s request?` : 'Decline request?'}
         description="The student is told their request was not accepted."
         confirmLabel="Decline request"
         loading={reject.loading}
@@ -228,6 +231,8 @@ function ApproveModal({
   seats,
   members,
   today,
+  libraryName,
+  onDone,
 }: {
   request: SeatRequest | null
   onClose: () => void
@@ -235,6 +240,8 @@ function ApproveModal({
   seats: Seat[]
   members: Member[]
   today: string
+  libraryName: string
+  onDone: () => void
 }) {
   const [seatId, setSeatId] = useState('')
   const [startDate, setStartDate] = useState(today)
@@ -242,11 +249,12 @@ function ApproveModal({
   const [amount, setAmount] = useState('')
   const [mode, setMode] = useState<FeeMode>('cash')
   const [error, setError] = useState<string>()
+  // After a successful approval: show a "Tell {name}?" step with a WhatsApp link.
+  const [done, setDone] = useState<{ seatNumber?: number } | null>(null)
 
   const feePaise = shift?.monthlyFeePaise ?? 0
   const shiftOff = shift ? !shift.isActive : false
 
-  // Seats free in the request's shift only.
   const freeSeats: FreeSeat[] = useMemo(() => {
     if (!shift) return []
     return buildSeatCells(seats, members, today, shift.id)
@@ -262,6 +270,7 @@ function ApproveModal({
     setAmount(feePaise ? (feePaise / 100).toString() : '')
     setMode('cash')
     setError(undefined)
+    setDone(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request, today, feePaise])
 
@@ -271,7 +280,10 @@ function ApproveModal({
   const approve = useMutation(services.approveSeatRequest, {
     success:
       toastSeat != null ? `Seat ${toastSeat} assigned to ${toastName}` : `Seat assigned to ${toastName}`,
-    onSuccess: () => onClose(),
+    onSuccess: () => {
+      setDone({ seatNumber: toastSeat })
+      onDone()
+    },
   })
 
   const noSeats = freeSeats.length === 0
@@ -301,6 +313,45 @@ function ApproveModal({
       amountPaise: paise,
       mode,
     })
+  }
+
+  // Success step: confirm and offer a WhatsApp message.
+  if (done && request) {
+    const welcome = `Hi ${request.studentName}, your ${shift?.name ?? 'study'} seat${
+      done.seatNumber != null ? ` (Seat ${done.seatNumber})` : ''
+    } at ${libraryName} is confirmed from ${formatDate(startDate)}. See you there!`
+    return (
+      <Modal
+        open
+        onClose={onClose}
+        title="Seat assigned"
+        description={
+          done.seatNumber != null
+            ? `Seat ${done.seatNumber} is now ${request.studentName}'s.`
+            : `${request.studentName} is set up.`
+        }
+        footer={
+          <Button variant="secondary" onClick={onClose}>
+            Done
+          </Button>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 rounded-card bg-success-soft p-4 text-success-ink">
+            <CircleCheck aria-hidden className="size-5 shrink-0" />
+            <p className="text-sm font-medium">Tell {request.studentName} the good news?</p>
+          </div>
+          <a
+            href={whatsappLink(request.studentPhone, welcome)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonStyles('primary', 'w-full')}
+          >
+            <MessageCircle aria-hidden className="size-4" /> Message {request.studentName} on WhatsApp
+          </a>
+        </div>
+      </Modal>
+    )
   }
 
   return (

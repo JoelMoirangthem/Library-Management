@@ -12,6 +12,7 @@ import type { Profile, Role } from '@/domain/types'
 import { homePathFor, useAuth } from '@/hooks/useAuth'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
+import { useTitle } from '@/hooks/useTitle'
 import { cx } from '@/lib/cx'
 import { demoLogin } from '@/lib/container'
 
@@ -34,6 +35,7 @@ const HINTS: Record<string, string> = {
 type Group = { key: Role; label: string; accounts: Profile[] }
 
 export default function Login() {
+  useTitle('Sign in')
   const navigate = useNavigate()
   const location = useLocation() as Location & { state?: { from?: string } }
   const [params] = useSearchParams()
@@ -128,9 +130,22 @@ function DemoChooser({
       { key: 'student', label: 'Students', accounts: students },
       { key: 'admin', label: 'Admins', accounts: admins },
     ]
-    if (!preferred) return all
-    return all.slice().sort((a, b) => (a.key === preferred ? -1 : b.key === preferred ? 1 : 0))
-  }, [data, preferred])
+    return all.filter((g) => g.accounts.length > 0)
+  }, [data])
+
+  const [active, setActive] = useState<Role>(preferred ?? 'owner')
+
+  // When the data or preference changes, make sure the active tab has accounts.
+  useEffect(() => {
+    if (groups.length === 0) return
+    const wanted = preferred ?? active
+    if (!groups.some((g) => g.key === wanted)) {
+      setActive(groups[0].key)
+    } else if (preferred && groups.some((g) => g.key === preferred)) {
+      setActive(preferred)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups, preferred])
 
   const handleSignIn = async (id: string) => {
     setPendingId(id)
@@ -141,13 +156,15 @@ function DemoChooser({
     }
   }
 
+  const current = groups.find((g) => g.key === active) ?? groups[0]
+
   return (
     <div className="mt-8 space-y-6">
       <div className="flex items-start gap-3 rounded-card border border-border bg-primary-soft/60 px-4 py-3 text-sm text-ink">
         <Info aria-hidden className="mt-0.5 size-5 shrink-0 text-primary-ink" />
-        <p>
+        <p className="min-w-0 break-words">
           <span className="font-medium">Demo mode:</span> no real Google sign-in. Pick a demo
-          account below to see the app as that person, or create a new account.
+          account to see the app as that person, or create a new account.
         </p>
       </div>
 
@@ -155,56 +172,67 @@ function DemoChooser({
         <LoadingState label="Loading demo accounts" count={3} />
       ) : error ? (
         <ErrorState title="Couldn't load demo accounts" onRetry={reload} />
-      ) : (
-        <div className="space-y-6">
-          {groups.map((group) =>
-            group.accounts.length === 0 ? null : (
-              <section key={group.key} aria-labelledby={`group-${group.key}`}>
-                <h2 id={`group-${group.key}`} className="mb-2 text-sm font-semibold text-ink-muted">
-                  {group.label}
-                  {preferred === group.key && (
-                    <span className="ml-2 font-normal text-primary-ink">(suggested)</span>
-                  )}
-                </h2>
-                <Card
+      ) : current ? (
+        <section aria-labelledby="demo-accounts">
+          <h2 id="demo-accounts" className="mb-2 text-sm font-semibold text-ink-muted">
+            Demo accounts
+          </h2>
+
+          {/* Tabs keep the three groups compact on a phone. */}
+          <div role="tablist" aria-label="Demo account type" className="flex gap-1.5">
+            {groups.map((g) => {
+              const selected = g.key === active
+              return (
+                <button
+                  key={g.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setActive(g.key)}
                   className={cx(
-                    'divide-y divide-border overflow-hidden',
-                    preferred === group.key && 'ring-1 ring-primary',
+                    'min-h-11 min-w-0 flex-1 rounded-control border px-2 text-sm font-medium transition-colors',
+                    selected
+                      ? 'border-primary bg-primary-soft text-primary-ink'
+                      : 'border-border-strong bg-surface text-ink hover:bg-canvas',
                   )}
                 >
-                  {group.accounts.map((acc) => (
-                    <button
-                      key={acc.id}
-                      type="button"
-                      onClick={() => void handleSignIn(acc.id)}
-                      disabled={pendingId !== null}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-canvas disabled:cursor-progress disabled:opacity-70"
-                    >
-                      <span
-                        aria-hidden
-                        className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary-ink"
-                      >
-                        {initials(acc.name)}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium text-ink">{acc.name}</span>
-                        <span className="block truncate text-sm text-ink-muted">{acc.email}</span>
-                        {HINTS[acc.id] && (
-                          <span className="mt-0.5 block text-sm text-ink-muted">{HINTS[acc.id]}</span>
-                        )}
-                      </span>
-                      <LogIn
-                        aria-hidden
-                        className={cx('size-4 shrink-0 text-ink-muted', pendingId === acc.id && 'motion-safe:animate-pulse')}
-                      />
-                    </button>
-                  ))}
-                </Card>
-              </section>
-            ),
-          )}
-        </div>
-      )}
+                  {g.label}
+                  {preferred === g.key && <span className="ml-1 hidden sm:inline">(for you)</span>}
+                </button>
+              )
+            })}
+          </div>
+
+          <Card className="mt-3 divide-y divide-border overflow-hidden">
+            {current.accounts.map((acc) => (
+              <button
+                key={acc.id}
+                type="button"
+                onClick={() => void handleSignIn(acc.id)}
+                disabled={pendingId !== null}
+                className="flex w-full min-h-11 items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-canvas disabled:cursor-progress disabled:opacity-70"
+              >
+                <span
+                  aria-hidden
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary-ink"
+                >
+                  {initials(acc.name)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-ink">{acc.name}</span>
+                  {HINTS[acc.id] && (
+                    <span className="block truncate text-xs text-ink-muted">{HINTS[acc.id]}</span>
+                  )}
+                </span>
+                <LogIn
+                  aria-hidden
+                  className={cx('size-4 shrink-0 text-ink-muted', pendingId === acc.id && 'motion-safe:animate-pulse')}
+                />
+              </button>
+            ))}
+          </Card>
+        </section>
+      ) : null}
 
       <NewAccountForm onSignUp={onSignUp} />
     </div>
@@ -231,18 +259,16 @@ function NewAccountForm({ onSignUp }: { onSignUp: (name: string, email: string) 
         <h2 id="new-account" className="mb-2 text-sm font-semibold text-ink-muted">
           New here
         </h2>
-        <Card className="p-4">
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="flex w-full items-center gap-3 rounded-control text-left transition-colors hover:text-primary"
-          >
-            <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full bg-canvas text-ink-muted">
-              <UserPlus className="size-5" />
-            </span>
-            <span className="font-medium">Use a new Google account</span>
-          </button>
-        </Card>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex w-full min-h-11 max-w-full items-center gap-3 rounded-card border border-border-strong bg-surface px-4 py-3 text-left transition-colors hover:bg-canvas"
+        >
+          <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-full bg-canvas text-ink-muted">
+            <UserPlus className="size-5" />
+          </span>
+          <span className="min-w-0 break-words font-medium text-ink">Use a new Google account</span>
+        </button>
       </section>
     )
   }

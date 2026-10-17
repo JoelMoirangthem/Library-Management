@@ -10,7 +10,14 @@ const STATUS: Record<PaymentStatus, { tone: BadgeTone; label: string }> = {
   failed: { tone: 'danger', label: 'Failed' },
 }
 
-export function PaymentHistory({ payments }: { payments: PlanPayment[] }) {
+export function PaymentHistory({
+  payments,
+  onSubmitAgain,
+}: {
+  payments: PlanPayment[]
+  /** Focus the UTR form when a failed row's "Submit again" is used. */
+  onSubmitAgain?: () => void
+}) {
   if (payments.length === 0) {
     return (
       <Card className="p-5 sm:p-6">
@@ -42,10 +49,17 @@ export function PaymentHistory({ payments }: { payments: PlanPayment[] }) {
                 </div>
                 <Badge tone={meta.tone}>{meta.label}</Badge>
               </div>
-              {p.status === 'failed' && p.failureReason && (
-                <p className="mt-2 text-sm text-danger">
-                  {p.failureReason} Resubmit with the correct 12-digit UTR from your UPI app.
-                </p>
+              {p.status === 'failed' && (
+                <div className="mt-2">
+                  {p.failureReason && <p className="text-sm text-danger">{p.failureReason}</p>}
+                  <button
+                    type="button"
+                    onClick={onSubmitAgain}
+                    className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
+                  >
+                    Submit again
+                  </button>
+                </div>
               )}
             </li>
           )

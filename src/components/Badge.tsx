@@ -27,7 +27,7 @@ export function Badge({
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium',
+        'inline-flex max-w-full items-center gap-1 rounded-full max-sm:whitespace-normal sm:whitespace-nowrap px-2.5 py-0.5 text-xs font-medium',
         tones[tone],
         className,
       )}

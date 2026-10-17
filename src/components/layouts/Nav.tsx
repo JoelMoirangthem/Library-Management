@@ -74,7 +74,7 @@ export function BottomTabs({ items }: { items: NavItemDef[] }) {
                   <span
                     aria-hidden
                     className={cx(
-                      'flex h-7 w-12 items-center justify-center rounded-full transition-colors [&>svg]:size-5',
+                      'flex h-7 w-12 max-w-full items-center justify-center rounded-full transition-colors [&>svg]:size-5',
                       isActive && 'bg-primary-soft',
                     )}
                   >
@@ -84,7 +84,7 @@ export function BottomTabs({ items }: { items: NavItemDef[] }) {
                   {!!it.badge && (
                     <span
                       aria-label={`${it.badge} pending`}
-                      className="absolute right-[22%] top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold tabular-nums text-white"
+                      className="absolute right-[22%] top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-accent px-1 text-xs font-semibold tabular-nums text-white"
                     >
                       {it.badge}
                     </span>

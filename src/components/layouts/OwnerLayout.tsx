@@ -1,11 +1,14 @@
+import { Suspense } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { Armchair, Building2, ClipboardList, LayoutDashboard, LogOut, Users, Wallet } from 'lucide-react'
+import { Armchair, Building2, ClipboardList, LayoutDashboard, LogOut, UserRound, Users, Wallet } from 'lucide-react'
 import { Button } from '@/components/Button'
 import { Logo } from '@/components/Logo'
 import { BottomTabs, SidebarNav, type NavItemDef } from '@/components/layouts/Nav'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
+import { PageFallback } from '@/components/PageFallback'
 import { TrialBanner } from '@/components/TrialBanner'
+import { UpdatesBanner } from '@/components/UpdatesBanner'
 import { useAsync } from '@/hooks/useAsync'
 import { useAuth } from '@/hooks/useAuth'
 import { OwnerLibraryProvider, useOwnerLibrary } from '@/hooks/useOwnerLibrary'
@@ -58,7 +61,10 @@ function Shell() {
         <div className="mt-auto border-t border-border pt-4">
           <p className="truncate px-2 text-sm font-medium">{library?.name ?? user?.name}</p>
           <p className="truncate px-2 text-sm text-ink-muted">{user?.email}</p>
-          <Button variant="ghost" className="mt-2 w-full justify-start" onClick={() => void signOut()}>
+          <Link to="/profile" className="mt-2 flex min-h-11 items-center gap-2 rounded-control px-4 text-base font-medium text-primary hover:bg-primary-soft">
+            <UserRound aria-hidden className="size-4" /> Account
+          </Link>
+          <Button variant="ghost" className="w-full justify-start" onClick={() => void signOut()}>
             <LogOut aria-hidden className="size-4" /> Log out
           </Button>
         </div>
@@ -66,7 +72,7 @@ function Shell() {
 
       <div className="min-w-0 pb-24 md:pb-10">
         {/* Phone top bar */}
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-canvas/90 px-4 backdrop-blur md:hidden">
+        <header className="sticky top-0 z-20 flex min-h-14 flex-wrap items-center gap-x-3 border-b border-border bg-canvas/90 px-4 backdrop-blur md:hidden">
           <Logo to="/owner" />
           <div className="ml-auto flex items-center gap-1">
             {!onboarding && (
@@ -90,8 +96,11 @@ function Shell() {
         </header>
 
         <main id="main" className="mx-auto max-w-5xl px-4 py-6 sm:px-6 md:py-8">
+          <UpdatesBanner className="mb-6" />
           <TrialBanner />
-          <Outlet />
+          <Suspense fallback={<PageFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

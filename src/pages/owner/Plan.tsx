@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/PageParts'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
 import { SetupState } from '@/components/states/SetupState'
-import { PaymentCard } from '@/components/owner/plan/PaymentCard'
+import { PaymentCard, UTR_INPUT_ID } from '@/components/owner/plan/PaymentCard'
 import { PaymentHistory } from '@/components/owner/plan/PaymentHistory'
 import { dateOfInstant, formatDate } from '@/domain/dates'
 import { extendedActiveUntil } from '@/domain/plan'
@@ -15,6 +15,7 @@ import type { PlanPayment } from '@/domain/types'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
 import { useOwnerLibrary } from '@/hooks/useOwnerLibrary'
+import { useTitle } from '@/hooks/useTitle'
 import { services } from '@/lib/container'
 import { useNow } from '@/lib/devState'
 
@@ -54,7 +55,14 @@ function StatusCard({
   )
 }
 
+function focusUtrForm() {
+  const el = document.getElementById(UTR_INPUT_ID)
+  el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  el?.querySelector<HTMLInputElement>('input')?.focus()
+}
+
 export default function Plan() {
+  useTitle('Plan')
   const now = useNow()
   const { library, subscription, state, daysLeft, loading, error, reload } = useOwnerLibrary()
 
@@ -65,7 +73,7 @@ export default function Plan() {
 
   const submit = useMutation(
     (utr: string) => services.submitPlanPayment(library!.id, utr),
-    { success: 'Payment submitted' },
+    { success: 'Payment submitted', onSuccess: () => payments.reload() },
   )
 
   if (loading) {
@@ -110,7 +118,7 @@ export default function Plan() {
 
   return (
     <>
-      <PageHeader title="Plan" description="Keep your library visible to students for ₹199 every 30 days." />
+      <PageHeader title="Plan" description="Keep your library visible to students for ₹199 for 30 days." />
 
       <div className="space-y-6">
         {state === 'trial' && (
@@ -159,7 +167,7 @@ export default function Plan() {
           ))}
 
         {canPay && !payments.loading && !payments.error && (
-          <PaymentHistory payments={payments.data ?? []} />
+          <PaymentHistory payments={payments.data ?? []} onSubmitAgain={focusUtrForm} />
         )}
       </div>
     </>

@@ -10,16 +10,19 @@ import { LoadingState } from '@/components/states/LoadingState'
 import {
   CopyButton,
   PaymentStatusBadge,
+  RelativeTime,
   Segmented,
+  TelLink,
   type SegOption,
 } from '@/components/admin/AdminBits'
 import { formatUntil } from '@/components/admin/planView'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
 import { useToast } from '@/components/Toast'
+import { useTitle } from '@/hooks/useTitle'
 import { services } from '@/lib/container'
 import { useNow } from '@/lib/devState'
-import { formatDateTime } from '@/domain/dates'
+import { formatDate, formatDateTime } from '@/domain/dates'
 import { formatRupees } from '@/domain/money'
 import { extendedActiveUntil } from '@/domain/plan'
 import type { AdminPaymentRow, Subscription } from '@/domain/types'
@@ -27,6 +30,7 @@ import type { AdminPaymentRow, Subscription } from '@/domain/types'
 type Filter = 'all' | 'pending' | 'verified' | 'failed'
 
 export default function Payments() {
+  useTitle('Payments')
   const now = useNow()
   const payments = useAsync(() => services.listAllPlanPayments(), [])
   const libs = useAsync(() => services.listLibrariesForAdmin(), [])
@@ -42,6 +46,13 @@ export default function Payments() {
   const subByLibrary = useMemo(() => {
     const map = new Map<string, Subscription | null>()
     for (const r of libs.data ?? []) map.set(r.library.id, r.subscription)
+    return map
+  }, [libs.data])
+
+  // Owner phone by library id, so pending cards can offer a tel link.
+  const phoneByLibrary = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const r of libs.data ?? []) map.set(r.library.id, r.ownerPhone)
     return map
   }, [libs.data])
 
@@ -101,6 +112,8 @@ export default function Payments() {
                     <PendingCard
                       key={p.id}
                       payment={p}
+                      now={now}
+                      ownerPhone={phoneByLibrary.get(p.libraryId) ?? null}
                       onVerify={() => setVerifying(p)}
                       onFail={() => setFailing(p)}
                     />
@@ -146,7 +159,11 @@ export default function Payments() {
                             <td className="px-4 py-3 tabular-nums">{formatRupees(p.amountPaise)}</td>
                             <td className="px-4 py-3 font-mono tabular-nums">{p.utr}</td>
                             <td className="px-4 py-3 tabular-nums text-ink-muted">
-                              {p.verifiedAt ? formatDateTime(p.verifiedAt) : formatDateTime(p.submittedAt)}
+                              {p.status === 'verified' && p.verifiedAt
+                                ? `Verified ${formatDate(p.verifiedAt.slice(0, 10))}`
+                                : p.verifiedAt
+                                  ? formatDateTime(p.verifiedAt)
+                                  : formatDateTime(p.submittedAt)}
                             </td>
                             <td className="px-4 py-3">
                               <PaymentStatusBadge status={p.status} />
@@ -179,34 +196,55 @@ export default function Payments() {
 
 function PendingCard({
   payment,
+  now,
+  ownerPhone,
   onVerify,
   onFail,
 }: {
   payment: AdminPaymentRow
+  now: Date
+  ownerPhone: string | null
   onVerify: () => void
   onFail: () => void
 }) {
   return (
-    <Card className="flex flex-col gap-3 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="truncate font-semibold text-ink">{payment.libraryName}</h3>
-          <p className="text-sm text-ink-muted">{payment.ownerName}</p>
-        </div>
-        <span className="text-lg font-semibold tabular-nums">{formatRupees(payment.amountPaise)}</span>
-      </div>
-
-      <div className="rounded-control bg-accent-soft px-3 py-2.5 text-accent-ink">
+    <Card className="flex flex-col gap-4 p-4">
+      {/* UTR is the thing to match against the bank app: make it the hero. */}
+      <div className="rounded-control bg-accent-soft px-3 py-3 text-accent-ink">
         <p className="text-xs">Check your bank app for this UTR</p>
-        <div className="mt-1 flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate font-mono text-lg tabular-nums">{payment.utr}</span>
+        <div className="mt-1.5 flex items-center gap-2">
+          <span className="min-w-0 flex-1 break-all font-mono text-xl font-semibold tabular-nums">
+            {payment.utr}
+          </span>
           <CopyButton value={payment.utr} toastText="UTR copied" />
         </div>
       </div>
 
-      <p className="text-sm text-ink-muted tabular-nums">Submitted {formatDateTime(payment.submittedAt)}</p>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        <div>
+          <dt className="text-ink-muted">Amount</dt>
+          <dd className="text-lg font-semibold tabular-nums">{formatRupees(payment.amountPaise)}</dd>
+        </div>
+        <div className="text-right">
+          <dt className="text-ink-muted">Submitted</dt>
+          <dd className="text-ink">
+            <RelativeTime iso={payment.submittedAt} now={now} />
+          </dd>
+        </div>
+        <div className="col-span-2">
+          <dt className="text-ink-muted">Library</dt>
+          <dd className="break-words font-medium text-ink">{payment.libraryName}</dd>
+        </div>
+        <div className="col-span-2">
+          <dt className="text-ink-muted">Owner</dt>
+          <dd className="flex flex-wrap items-center gap-x-2 text-ink">
+            {payment.ownerName}
+            {ownerPhone && <TelLink phone={ownerPhone} />}
+          </dd>
+        </div>
+      </dl>
 
-      <div className="mt-auto flex gap-2">
+      <div className="mt-auto flex flex-wrap gap-2">
         <Button variant="primary" className="flex-1" onClick={onVerify}>
           Verify
         </Button>
@@ -233,14 +271,18 @@ function HistoryCard({ payment }: { payment: AdminPaymentRow }) {
           <dt className="text-ink-muted">Amount</dt>
           <dd className="tabular-nums">{formatRupees(payment.amountPaise)}</dd>
         </div>
-        <div>
+        <div className="min-w-0">
           <dt className="text-ink-muted">UTR</dt>
-          <dd className="font-mono tabular-nums">{payment.utr}</dd>
+          <dd className="break-all font-mono tabular-nums">{payment.utr}</dd>
         </div>
         <div className="col-span-2">
           <dt className="text-ink-muted">{payment.status === 'verified' ? 'Verified' : 'Decided'}</dt>
           <dd className="tabular-nums">
-            {payment.verifiedAt ? formatDateTime(payment.verifiedAt) : formatDateTime(payment.submittedAt)}
+            {payment.status === 'verified' && payment.verifiedAt
+              ? formatDate(payment.verifiedAt.slice(0, 10))
+              : payment.verifiedAt
+                ? formatDateTime(payment.verifiedAt)
+                : formatDateTime(payment.submittedAt)}
           </dd>
         </div>
       </dl>
@@ -274,7 +316,7 @@ function VerifyModal({
     if (!payment) return
     const ok = await run(payment.id)
     if (ok !== undefined) {
-      toast.show(`Verified. Plan runs until ${until}`, 'success')
+      toast.show('Payment verified', 'success')
       onClose()
     }
   }

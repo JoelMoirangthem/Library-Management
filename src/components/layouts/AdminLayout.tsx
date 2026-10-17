@@ -1,7 +1,9 @@
+import { Suspense } from 'react'
 import { Link, Outlet } from 'react-router-dom'
 import { Building2, LogOut, MapPin, Wallet } from 'lucide-react'
 import { Button } from '@/components/Button'
 import { Logo } from '@/components/Logo'
+import { PageFallback } from '@/components/PageFallback'
 import { BottomTabs, SidebarNav, type NavItemDef } from '@/components/layouts/Nav'
 import { useAsync } from '@/hooks/useAsync'
 import { useAuth } from '@/hooks/useAuth'
@@ -36,10 +38,10 @@ export function AdminLayout() {
       </aside>
 
       <div className="min-w-0 pb-24 md:pb-10">
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-canvas/90 px-4 backdrop-blur md:hidden">
+        <header className="sticky top-0 z-20 flex min-h-14 flex-wrap items-center gap-x-3 border-b border-border bg-canvas/90 px-4 backdrop-blur md:hidden">
           <Logo to="/admin" />
           <span className="text-sm text-ink-muted">Admin</span>
-          <Link to="/" className="ml-auto text-sm text-ink-muted underline">
+          <Link to="/" className="ml-auto inline-flex min-h-11 items-center text-sm text-ink-muted underline">
             Public site
           </Link>
           <button
@@ -52,7 +54,9 @@ export function AdminLayout() {
           </button>
         </header>
         <main id="main" className="mx-auto max-w-5xl px-4 py-6 sm:px-6 md:py-8">
-          <Outlet />
+          <Suspense fallback={<PageFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

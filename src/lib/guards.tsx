@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { LoadingState } from '@/components/states/LoadingState'
+import { isValidPhone } from '@/domain/constants'
 import type { Role } from '@/domain/types'
 import { homePathFor, useAuth } from '@/hooks/useAuth'
 
@@ -20,6 +21,8 @@ export function RequireRole({ roles }: { roles: Role[] }) {
   }
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />
   if (!user.role) return <Navigate to="/choose-role" replace />
+  // Owners and students need a mobile number so libraries and students can reach each other.
+  if (user.role !== 'admin' && !isValidPhone(user.phone)) return <Navigate to="/choose-role" replace />
   if (!roles.includes(user.role)) return <Navigate to={homePathFor(user)} replace />
   return <Outlet />
 }

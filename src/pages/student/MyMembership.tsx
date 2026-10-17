@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { CalendarClock, Clock, MapPin, Phone, TriangleAlert } from 'lucide-react'
+import { Clock, MapPin, MessageCircle, Phone } from 'lucide-react'
 import { Badge, type BadgeTone } from '@/components/Badge'
 import { buttonStyles } from '@/components/Button'
 import { Card } from '@/components/Card'
@@ -7,21 +7,24 @@ import { PageHeader } from '@/components/PageParts'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
-import { formatDate, todayIST } from '@/domain/dates'
+import { daysBetween, formatDate, todayIST } from '@/domain/dates'
 import { memberDaysLeft, memberPhase } from '@/domain/members'
-import { FEE_MODES } from '@/domain/constants'
+import { FEE_MODES, whatsappLink } from '@/domain/constants'
 import { formatRupees } from '@/domain/money'
 import { formatShiftRange } from '@/domain/shifts'
 import type { FeeMode, MyMembership as Membership } from '@/domain/types'
 import { services } from '@/lib/container'
 import { useAsync } from '@/hooks/useAsync'
+import { useAuth } from '@/hooks/useAuth'
+import { useTitle } from '@/hooks/useTitle'
 import { useNow } from '@/lib/devState'
 
 const feeModeLabel = (mode: FeeMode) => FEE_MODES.find((m) => m.value === mode)?.label ?? mode
 
 /** Plain words for the days-left line. */
 function daysLeftText(daysLeft: number): string {
-  if (daysLeft < 0) return `Overdue by ${Math.abs(daysLeft)} ${Math.abs(daysLeft) === 1 ? 'day' : 'days'}`
+  if (daysLeft < 0)
+    return `Overdue by ${Math.abs(daysLeft)} ${Math.abs(daysLeft) === 1 ? 'day' : 'days'}`
   if (daysLeft === 0) return 'Expires today'
   return `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`
 }
@@ -32,134 +35,187 @@ function phaseBadge(phase: ReturnType<typeof memberPhase>): { tone: BadgeTone; l
   return { tone: 'success', label: 'Active' }
 }
 
-function MembershipCard({ m, today }: { m: Membership; today: string }) {
+/** Fee history, tucked behind a disclosure so the ticket stays clean. */
+function Payments({ m }: { m: Membership }) {
+  const payments = [...m.payments].sort((a, b) => b.paidOn.localeCompare(a.paidOn))
+  return (
+    <details className="group rounded-card border border-border">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-4 text-sm font-semibold">
+        Payments
+        <span className="text-ink-muted tabular-nums">
+          {payments.length} {payments.length === 1 ? 'entry' : 'entries'}
+        </span>
+      </summary>
+      <div className="border-t border-border px-4 py-3">
+        {payments.length === 0 ? (
+          <p className="text-sm text-ink-muted">No payments recorded yet.</p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {payments.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+                <div>
+                  <p className={p.isVoid ? 'text-ink-muted line-through' : 'font-medium tabular-nums'}>
+                    {formatRupees(p.amountPaise)}
+                  </p>
+                  <p className="text-ink-muted tabular-nums">
+                    {formatDate(p.paidOn)} · {feeModeLabel(p.mode)}
+                  </p>
+                </div>
+                {p.isVoid && <Badge tone="neutral">Voided</Badge>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </details>
+  )
+}
+
+function MembershipCard({
+  m,
+  today,
+  studentName,
+}: {
+  m: Membership
+  today: string
+  studentName: string
+}) {
   // A membership whose shift we can't resolve shows nothing.
   if (!m.shift) return null
 
   const phase = memberPhase(m.member, today)
   const daysLeft = memberDaysLeft(m.member, today)
   const badge = phaseBadge(phase)
-  const libName = m.library?.name ?? 'Your library'
   const showReminder = phase === 'expiring' || phase === 'expired'
-  const payments = [...m.payments].sort((a, b) => b.paidOn.localeCompare(a.paidOn))
+
+  // Progress across the paid period. Clamp so overdue reads as full and future starts read as empty.
+  const span = Math.max(1, daysBetween(m.member.startDate, m.member.expiryDate))
+  const elapsed = daysBetween(m.member.startDate, today)
+  const percent = Math.min(100, Math.max(0, Math.round((elapsed / span) * 100)))
+
+  const libPhone = m.library?.phone
+  const libName = m.library?.name ?? 'your library'
+  const waMessage = `Hi, I'd like to renew my ${m.shift.name} seat. — ${studentName}`
 
   return (
     <Card className="overflow-hidden">
-      <div className="space-y-5 p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold leading-tight">
-              {m.library ? (
-                <Link to={`/library/${m.library.id}`} className="hover:underline">
-                  {libName}
-                </Link>
-              ) : (
-                libName
-              )}
-            </h2>
-            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+      {/* Ticket head: the seat number is the one bold beat. */}
+      <div className="flex items-stretch gap-4 border-b border-dashed border-border bg-primary-soft p-5">
+        <div className="flex flex-col items-center justify-center">
+          <span className="text-xs font-medium text-primary-ink">Seat</span>
+          <span className="text-5xl font-semibold leading-none tabular-nums text-primary-ink">
+            {m.seatNumber ?? '—'}
+          </span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <Badge tone="primary">{m.shift.name}</Badge>
               <span className="flex items-center gap-1 text-sm tabular-nums text-ink-muted">
                 <Clock aria-hidden className="size-3.5" />
                 {formatShiftRange(m.shift)}
               </span>
             </p>
-            {m.library ? (
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-muted">
-                <MapPin aria-hidden className="size-4 shrink-0" />
-                {m.library.areaName}, {m.library.cityName}
-              </p>
-            ) : (
-              <p className="mt-1 text-sm text-ink-muted">This library is not currently listed.</p>
-            )}
+            <Badge tone={badge.tone}>{badge.label}</Badge>
           </div>
-          <Badge tone={badge.tone}>{badge.label}</Badge>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-card bg-canvas p-4 text-center">
-            <p className="text-sm text-ink-muted">Seat</p>
-            <p className="mt-1 text-3xl font-semibold tabular-nums">
-              {m.seatNumber ?? '—'}
+          {m.library ? (
+            <p className="mt-2 flex items-center gap-1.5 break-words text-sm text-ink-muted">
+              <MapPin aria-hidden className="size-4 shrink-0" />
+              {m.library.areaName}, {m.library.cityName}
             </p>
-          </div>
-          <div className="rounded-card bg-canvas p-4">
-            <p className="text-sm text-ink-muted">Started</p>
-            <p className="mt-1 font-semibold tabular-nums">{formatDate(m.member.startDate)}</p>
-          </div>
-          <div className="rounded-card bg-canvas p-4">
-            <p className="text-sm text-ink-muted">Expires</p>
-            <p className="mt-1 font-semibold tabular-nums">{formatDate(m.member.expiryDate)}</p>
-          </div>
-        </div>
-
-        <p className="flex items-center gap-1.5 text-sm font-medium tabular-nums">
-          <CalendarClock aria-hidden className="size-4 text-ink-muted" />
-          {daysLeftText(daysLeft)}
-        </p>
-
-        {showReminder && (
-          <div
-            role="status"
-            className="flex items-start gap-2 rounded-card bg-warning-soft px-4 py-3 text-sm text-warning-ink"
-          >
-            <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
-            <p>
-              {phase === 'expired'
-                ? `Your membership has ended. Ask ${libName} to renew.`
-                : `Your membership ends in ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}. Ask ${libName} to renew.`}
-            </p>
-          </div>
-        )}
-
-        {m.library && (
-          <a href={`tel:${m.library.phone}`} className={buttonStyles('secondary')}>
-            <Phone aria-hidden className="size-4" />
-            Call library
-          </a>
-        )}
-
-        <div>
-          <h3 className="mb-2 text-sm font-semibold">Fee history</h3>
-          {payments.length === 0 ? (
-            <p className="text-sm text-ink-muted">No payments recorded yet.</p>
           ) : (
-            <ul className="divide-y divide-border rounded-card border border-border">
-              {payments.map((p) => (
-                <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                  <div>
-                    <p className={p.isVoid ? 'text-ink-muted line-through' : 'font-medium tabular-nums'}>
-                      {formatRupees(p.amountPaise)}
-                    </p>
-                    <p className="text-ink-muted tabular-nums">
-                      {formatDate(p.paidOn)} · {feeModeLabel(p.mode)}
-                    </p>
-                  </div>
-                  {p.isVoid && <Badge tone="neutral">Voided</Badge>}
-                </li>
-              ))}
-            </ul>
+            <p className="mt-2 text-sm text-ink-muted">This library is not currently listed.</p>
           )}
         </div>
+      </div>
+
+      <div className="space-y-5 p-5">
+        <div>
+          <div className="mb-1.5 flex items-center justify-between gap-2 text-sm">
+            <span className="font-medium tabular-nums">{daysLeftText(daysLeft)}</span>
+            <span className="text-ink-muted tabular-nums">Ends {formatDate(m.member.expiryDate)}</span>
+          </div>
+          <div
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percent}
+            aria-valuetext={daysLeftText(daysLeft)}
+            className="h-2 overflow-hidden rounded-full bg-border"
+          >
+            <div
+              className={phase === 'expired' ? 'h-full bg-danger' : 'h-full bg-primary'}
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+          <div className="mt-1.5 flex items-center justify-between text-xs text-ink-muted tabular-nums">
+            <span>Started {formatDate(m.member.startDate)}</span>
+            <span>{formatDate(m.member.expiryDate)}</span>
+          </div>
+        </div>
+
+        {showReminder && libPhone && (
+          <div className="space-y-3 rounded-card bg-warning-soft px-4 py-4 text-warning-ink">
+            <p className="text-sm font-medium">
+              {phase === 'expired'
+                ? `Your seat has expired. Renew with ${libName} to keep it.`
+                : `Your seat expires soon. Renew with ${libName} to keep it.`}
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <a
+                href={whatsappLink(libPhone, waMessage)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonStyles('primary')}
+              >
+                <MessageCircle aria-hidden className="size-4" />
+                Message on WhatsApp
+              </a>
+              <a href={`tel:${libPhone}`} className={buttonStyles('secondary')}>
+                <Phone aria-hidden className="size-4" />
+                Call
+              </a>
+            </div>
+          </div>
+        )}
+
+        <Payments m={m} />
       </div>
     </Card>
   )
 }
 
 export default function MyMembership() {
+  useTitle('My membership')
+  const { user } = useAuth()
   const now = useNow()
   const today = todayIST(now)
   const memberships = useAsync(() => services.listMyMemberships(), [])
+  const studentName = user?.name ?? 'A student'
+
+  // Group memberships by library so two seats at one library sit together.
+  const groups = (() => {
+    const data = memberships.data ?? []
+    const map = new Map<string, { name: string; items: Membership[] }>()
+    for (const m of data) {
+      const key = m.library?.id ?? m.member.libraryId
+      const name = m.library?.name ?? 'Your library'
+      const group = map.get(key) ?? { name, items: [] }
+      group.items.push(m)
+      map.set(key, group)
+    }
+    return [...map.values()]
+  })()
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-      <PageHeader title="My membership" description="Your seat, dates and fee history." />
+      <PageHeader title="My membership" description="Your seat, dates and payments." />
 
       {memberships.loading ? (
         <LoadingState layout="cards" count={1} label="Loading your membership" />
       ) : memberships.error ? (
         <ErrorState onRetry={memberships.reload} retrying={memberships.refreshing} />
-      ) : !memberships.data || memberships.data.length === 0 ? (
+      ) : groups.length === 0 ? (
         <EmptyState
           title="You're not a member of a library yet"
           description="Request a seat at a library and it'll show up here once the owner approves."
@@ -170,10 +226,29 @@ export default function MyMembership() {
           }
         />
       ) : (
-        <div className="space-y-6">
-          {memberships.data.map((m) => (
-            <MembershipCard key={m.member.id} m={m} today={today} />
-          ))}
+        <div className="space-y-8">
+          {groups.map((group, i) => {
+            const libId = group.items[0].library?.id
+            return (
+              <section key={libId ?? i} aria-label={group.name} className="space-y-4">
+                <h2 className="text-lg font-semibold leading-tight">
+                  {libId ? (
+                    <Link
+                      to={`/library/${libId}`}
+                      className="inline-flex min-h-11 items-center break-words hover:underline"
+                    >
+                      {group.name}
+                    </Link>
+                  ) : (
+                    group.name
+                  )}
+                </h2>
+                {group.items.map((m) => (
+                  <MembershipCard key={m.member.id} m={m} today={today} studentName={studentName} />
+                ))}
+              </section>
+            )
+          })}
         </div>
       )}
     </div>

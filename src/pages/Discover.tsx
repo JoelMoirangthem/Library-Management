@@ -1,33 +1,38 @@
 import { useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ListFilter, Search, X } from 'lucide-react'
 import { buttonStyles } from '@/components/Button'
-import { ChipCheckbox, SelectField } from '@/components/Fields'
+import { SelectField } from '@/components/Fields'
 import { PageHeader } from '@/components/PageParts'
+import { FilterSheet } from '@/components/student/FilterSheet'
 import { LibraryCard } from '@/components/student/LibraryCard'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
-import { AMENITIES } from '@/domain/constants'
+import { FEE_OPTIONS, feeOptionLabel } from '@/components/student/discoverOptions'
+import type { PublicLibrary } from '@/domain/types'
 import { services } from '@/lib/container'
 import { useAsync } from '@/hooks/useAsync'
+import { useTitle } from '@/hooks/useTitle'
 
-/** Fee options in paise. "Any" is the empty value. */
-const FEE_OPTIONS = [
-  { value: '80000', label: 'Up to ₹800' },
-  { value: '100000', label: 'Up to ₹1,000' },
-  { value: '120000', label: 'Up to ₹1,200' },
-  { value: '150000', label: 'Up to ₹1,500' },
-] as const
+type SortKey = 'seats' | 'fee'
+
+/** Free seats across all active shifts, used for the 'Most seats free' sort. */
+function totalSeatsFree(lib: PublicLibrary): number {
+  return lib.shifts.reduce((sum, s) => sum + s.seatsLeft, 0)
+}
 
 export default function Discover() {
+  useTitle('Find a library')
   const [params, setParams] = useSearchParams()
 
   const cityId = params.get('city') ?? ''
   const areaId = params.get('area') ?? ''
   const maxFee = params.get('maxFee') ?? ''
+  const q = params.get('q') ?? ''
+  const sort = (params.get('sort') as SortKey) || 'seats'
+  const sheetOpen = params.get('filters') === '1'
   const amenities = useMemo(() => params.getAll('amenity'), [params])
-
-  const hasFilters = Boolean(cityId || areaId || maxFee || amenities.length)
 
   const cities = useAsync(() => services.listCities(), [])
   // Areas depend on the chosen city; skip the call entirely when no city is picked.
@@ -47,51 +52,103 @@ export default function Discover() {
     [cityId, areaId, maxFee, amenities.join(',')],
   )
 
+  const cityName = cities.data?.find((c) => c.id === cityId)?.name
+  const areaName = areas.data?.find((a) => a.id === areaId)?.name
+
   /** Write the whole next query string at once so related changes stay in sync. */
   function update(next: {
     city?: string
     area?: string
     maxFee?: string
     amenities?: string[]
+    q?: string
+    sort?: SortKey
+    filters?: boolean
   }) {
     const nextCity = next.city ?? cityId
     // Changing city clears the area selection.
     const nextArea = next.city !== undefined ? '' : (next.area ?? areaId)
     const nextFee = next.maxFee ?? maxFee
     const nextAmenities = next.amenities ?? amenities
+    const nextQ = next.q ?? q
+    const nextSort = next.sort ?? sort
+    const nextFilters = next.filters ?? sheetOpen
 
     const sp = new URLSearchParams()
+    if (nextQ) sp.set('q', nextQ)
     if (nextCity) sp.set('city', nextCity)
     if (nextArea) sp.set('area', nextArea)
     if (nextFee) sp.set('maxFee', nextFee)
     for (const a of nextAmenities) sp.append('amenity', a)
+    if (nextSort !== 'seats') sp.set('sort', nextSort)
+    if (nextFilters) sp.set('filters', '1')
     setParams(sp, { replace: true })
   }
 
-  function toggleAmenity(name: string, on: boolean) {
-    update({ amenities: on ? [...amenities, name] : amenities.filter((a) => a !== name) })
-  }
-
-  function clearFilters() {
+  function clearAll() {
     setParams(new URLSearchParams(), { replace: true })
   }
 
-  const count = results.data?.length ?? 0
+  // Filters the sheet counts and the chips below the search (city/area live in the top row).
+  const sheetFilterCount = (maxFee ? 1 : 0) + amenities.length
+  const activeChips: { key: string; label: string; onRemove: () => void }[] = []
+  if (cityName) activeChips.push({ key: 'city', label: cityName, onRemove: () => update({ city: '' }) })
+  if (areaName) activeChips.push({ key: 'area', label: areaName, onRemove: () => update({ area: '' }) })
+  if (maxFee)
+    activeChips.push({ key: 'maxFee', label: feeOptionLabel(maxFee), onRemove: () => update({ maxFee: '' }) })
+  for (const a of amenities)
+    activeChips.push({
+      key: `amenity-${a}`,
+      label: a,
+      onRemove: () => update({ amenities: amenities.filter((x) => x !== a) }),
+    })
+
+  // Server returns the city/area/fee/amenity matches; name/area/landmark search is applied here.
+  const searched = useMemo(() => {
+    const list = results.data ?? []
+    const needle = q.trim().toLowerCase()
+    const filtered = needle
+      ? list.filter((lib) =>
+          [lib.name, lib.areaName, lib.landmark].some((f) => f.toLowerCase().includes(needle)),
+        )
+      : list
+    const sorted = [...filtered].sort((a, b) =>
+      sort === 'fee' ? a.fromFeePaise - b.fromFeePaise : totalSeatsFree(b) - totalSeatsFree(a),
+    )
+    return sorted
+  }, [results.data, q, sort])
+
+  const count = searched.length
+  const hasAnyFilter = Boolean(cityId || areaId || maxFee || q || amenities.length)
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <PageHeader
         title="Find a study library"
-        description="Pick your city and area to see libraries with a free seat near you."
+        description="Search, then pick your city and area to see libraries with a free seat near you."
       />
 
-      <section aria-label="Filters" className="mb-8 space-y-4">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <SelectField
-            label="City"
-            value={cityId}
-            onChange={(e) => update({ city: e.target.value })}
-          >
+      <section aria-label="Search and filters" className="mb-6 space-y-4">
+        <div className="relative">
+          <Search
+            aria-hidden
+            className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-ink-muted"
+          />
+          <label htmlFor="library-search" className="sr-only">
+            Search by library name
+          </label>
+          <input
+            id="library-search"
+            type="search"
+            value={q}
+            onChange={(e) => update({ q: e.target.value })}
+            placeholder="Search by library name"
+            className="block w-full min-h-11 rounded-control border border-border-strong bg-surface py-2 pl-10 pr-3 text-base text-ink placeholder:text-ink-muted/70"
+          />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
+          <SelectField label="City" value={cityId} onChange={(e) => update({ city: e.target.value })}>
             <option value="">All cities</option>
             {cities.data?.map((c) => (
               <option key={c.id} value={c.id}>
@@ -115,34 +172,47 @@ export default function Discover() {
             ))}
           </SelectField>
 
-          <SelectField
-            label="Max monthly fee"
-            value={maxFee}
-            hint="Shows libraries with a shift at or under this fee"
-            onChange={(e) => update({ maxFee: e.target.value })}
-          >
-            <option value="">Any</option>
-            {FEE_OPTIONS.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
-              </option>
-            ))}
-          </SelectField>
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={() => update({ filters: true })}
+              className={buttonStyles('secondary', 'w-full sm:w-auto')}
+              aria-haspopup="dialog"
+            >
+              <ListFilter aria-hidden className="size-4" />
+              Filters
+              {sheetFilterCount > 0 && (
+                <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold tabular-nums text-white">
+                  {sheetFilterCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
-        <fieldset>
-          <legend className="mb-2 text-sm font-medium">Amenities</legend>
-          <div className="flex flex-wrap gap-2">
-            {AMENITIES.map((a) => (
-              <ChipCheckbox
-                key={a}
-                label={a}
-                checked={amenities.includes(a)}
-                onChange={(on) => toggleAmenity(a, on)}
-              />
+        {activeChips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {activeChips.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={chip.onRemove}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border-strong bg-surface px-3 text-sm font-medium text-ink hover:bg-canvas"
+              >
+                {chip.label}
+                <X aria-hidden className="size-4 text-ink-muted" />
+                <span className="sr-only">Remove filter</span>
+              </button>
             ))}
+            <button
+              type="button"
+              onClick={clearAll}
+              className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-primary hover:underline"
+            >
+              Clear all
+            </button>
           </div>
-        </fieldset>
+        )}
       </section>
 
       <section aria-label="Results" aria-busy={results.refreshing || undefined}>
@@ -155,8 +225,8 @@ export default function Discover() {
             title="No libraries match"
             description="Try a different city or area, or relax your filters."
             action={
-              hasFilters ? (
-                <button type="button" onClick={clearFilters} className={buttonStyles('secondary')}>
+              hasAnyFilter ? (
+                <button type="button" onClick={clearAll} className={buttonStyles('secondary')}>
                   Clear filters
                 </button>
               ) : (
@@ -168,11 +238,24 @@ export default function Discover() {
           />
         ) : (
           <>
-            <p className="mb-4 text-sm text-ink-muted tabular-nums" aria-live="polite">
-              {count} {count === 1 ? 'library' : 'libraries'}
-            </p>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-ink-muted tabular-nums" aria-live="polite">
+                {count} {count === 1 ? 'library' : 'libraries'}
+              </p>
+              <label className="flex min-w-0 max-w-full items-center gap-2 text-sm text-ink-muted">
+                Sort
+                <select
+                  value={sort}
+                  onChange={(e) => update({ sort: e.target.value as SortKey })}
+                  className="min-h-11 max-w-full cursor-pointer rounded-control border border-border-strong bg-surface px-3 text-base text-ink"
+                >
+                  <option value="seats">Most seats free</option>
+                  <option value="fee">Lowest fee</option>
+                </select>
+              </label>
+            </div>
             <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {results.data?.map((lib) => (
+              {searched.map((lib) => (
                 <li key={lib.id}>
                   <LibraryCard library={lib} />
                 </li>
@@ -181,6 +264,20 @@ export default function Discover() {
           </>
         )}
       </section>
+
+      <FilterSheet
+        open={sheetOpen}
+        onClose={() => update({ filters: false })}
+        maxFee={maxFee}
+        amenities={amenities}
+        feeOptions={FEE_OPTIONS}
+        resultCount={count}
+        onChangeMaxFee={(v) => update({ maxFee: v })}
+        onToggleAmenity={(name, on) =>
+          update({ amenities: on ? [...amenities, name] : amenities.filter((a) => a !== name) })
+        }
+        onClear={() => update({ maxFee: '', amenities: [] })}
+      />
     </div>
   )
 }

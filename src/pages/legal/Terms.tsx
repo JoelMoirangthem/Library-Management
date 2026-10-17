@@ -1,6 +1,8 @@
 import { LegalPage } from '@/components/landing/LegalPage'
+import { useTitle } from '@/hooks/useTitle'
 
 export default function Terms() {
+  useTitle('Terms of use')
   return (
     <LegalPage
       title="Terms of use"

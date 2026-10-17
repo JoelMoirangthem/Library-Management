@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Phone } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
 import { Card } from '@/components/Card'
@@ -12,16 +12,19 @@ import { LoadingState } from '@/components/states/LoadingState'
 import {
   DetailRow,
   Segmented,
+  TelLink,
   type SegOption,
 } from '@/components/admin/AdminBits'
 import { formatUntil, planStatusView } from '@/components/admin/planView'
 import { useAsync } from '@/hooks/useAsync'
 import { useMutation } from '@/hooks/useMutation'
 import { useToast } from '@/components/Toast'
+import { useTitle } from '@/hooks/useTitle'
 import { services } from '@/lib/container'
 import { useNow } from '@/lib/devState'
 import { formatDate } from '@/domain/dates'
 import { formatRupees } from '@/domain/money'
+import { normalizePhone } from '@/domain/constants'
 import { extendedActiveUntil, planState, TRIAL_DAYS } from '@/domain/plan'
 import { formatShiftRange, sortShifts } from '@/domain/shifts'
 import type { AdminLibraryRow, Shift } from '@/domain/types'
@@ -48,10 +51,12 @@ function ShiftChips({ shifts }: { shifts: Shift[] }) {
 type Tab = 'pending' | 'live' | 'expired' | 'rejected' | 'all'
 
 export default function Libraries() {
+  useTitle('Libraries')
   const now = useNow()
   const { data, error, loading, reload } = useAsync(() => services.listLibrariesForAdmin(), [])
 
   const [tab, setTab] = useState<Tab | null>(null)
+  const [query, setQuery] = useState('')
   const [detail, setDetail] = useState<AdminLibraryRow | null>(null)
   const [approving, setApproving] = useState<AdminLibraryRow | null>(null)
   const [rejecting, setRejecting] = useState<AdminLibraryRow | null>(null)
@@ -76,10 +81,10 @@ export default function Libraries() {
     return { pending, live, expired, rejected }
   }, [withState])
 
-  // Default tab: Pending if anything waits, else All.
+  // Default tab: Needs review if anything waits, else All.
   const activeTab: Tab = tab ?? (counts.pending > 0 ? 'pending' : 'all')
 
-  const filtered = withState.filter(({ state }) => {
+  const byTab = withState.filter(({ state }) => {
     switch (activeTab) {
       case 'pending':
         return state === 'pending'
@@ -94,8 +99,25 @@ export default function Libraries() {
     }
   })
 
+  const q = query.trim().toLowerCase()
+  const searched = q
+    ? byTab.filter(({ row }) => {
+        const hay = `${row.library.name} ${row.ownerName} ${row.areaName} ${row.cityName}`.toLowerCase()
+        if (hay.includes(q)) return true
+        const digits = normalizePhone(q)
+        return digits.length > 0 && normalizePhone(row.ownerPhone).includes(digits)
+      })
+    : byTab
+
+  // Pending reviewed oldest-first so nothing is missed; others newest-first.
+  const filtered = [...searched].sort((a, b) => {
+    const ta = Date.parse(a.row.library.createdAt)
+    const tb = Date.parse(b.row.library.createdAt)
+    return activeTab === 'pending' ? ta - tb : tb - ta
+  })
+
   const tabs: SegOption<Tab>[] = [
-    { value: 'pending', label: 'Pending', count: counts.pending },
+    { value: 'pending', label: 'Needs review', count: counts.pending },
     { value: 'live', label: 'Live', count: counts.live },
     { value: 'expired', label: 'Expired', count: counts.expired },
     { value: 'rejected', label: 'Rejected', count: counts.rejected },
@@ -113,16 +135,33 @@ export default function Libraries() {
       ) : (
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatCard label="Pending review" value={counts.pending} tone={counts.pending ? 'warning' : 'default'} />
+            <StatCard label="Needs review" value={counts.pending} tone={counts.pending ? 'warning' : 'default'} />
             <StatCard label="Live" value={counts.live} tone="primary" />
             <StatCard label="Expired" value={counts.expired} />
             <StatCard label="Rejected" value={counts.rejected} />
           </div>
 
-          <Segmented options={tabs} value={activeTab} onChange={setTab} ariaLabel="Filter libraries" />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <Segmented options={tabs} value={activeTab} onChange={setTab} ariaLabel="Filter libraries" />
+            <div className="relative sm:w-64">
+              <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search name, owner or area"
+                aria-label="Search libraries"
+                className="min-h-11 w-full rounded-control border border-border-strong bg-surface pl-9 pr-3 text-sm text-ink placeholder:text-ink-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              />
+            </div>
+          </div>
 
           {filtered.length === 0 ? (
-            <EmptyTab tab={activeTab} />
+            q ? (
+              <EmptyState title="No matches" description="Try a different name, owner or area." />
+            ) : (
+              <EmptyTab tab={activeTab} />
+            )
           ) : (
             <>
               {/* Phone: cards */}
@@ -148,11 +187,8 @@ export default function Libraries() {
                       <th scope="col" className="px-4 py-3 font-medium">Library</th>
                       <th scope="col" className="px-4 py-3 font-medium">Owner</th>
                       <th scope="col" className="px-4 py-3 font-medium">Location</th>
-                      <th scope="col" className="hidden px-4 py-3 font-medium 2xl:table-cell">Seats</th>
                       <th scope="col" className="px-4 py-3 font-medium">Shifts</th>
-                      <th scope="col" className="hidden px-4 py-3 font-medium 2xl:table-cell">Submitted</th>
-                      <th scope="col" className="px-4 py-3 font-medium">Status</th>
-                      <th scope="col" className="px-4 py-3 text-right font-medium">Actions</th>
+                      <th scope="col" className="px-4 py-3 text-right font-medium">Status and actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -161,56 +197,43 @@ export default function Libraries() {
                       return (
                         <tr key={row.library.id} className="align-top">
                           <td className="px-4 py-3">
-                            <button
-                              type="button"
-                              onClick={() => setDetail(row)}
-                              className="cursor-pointer text-left font-medium text-ink hover:text-primary hover:underline"
-                            >
-                              {row.library.name}
-                            </button>
+                            <div className="font-medium text-ink">{row.library.name}</div>
+                            <div className="text-xs text-ink-muted tabular-nums">
+                              {row.library.capacity} seats · submitted {formatDate(row.library.createdAt.slice(0, 10))}
+                            </div>
                           </td>
                           <td className="px-4 py-3">
                             <div>{row.ownerName}</div>
-                            <a
-                              href={`tel:${row.ownerPhone}`}
-                              className="inline-flex items-center gap-1 text-ink-muted tabular-nums hover:text-primary hover:underline"
-                            >
-                              <Phone aria-hidden className="size-3.5" />
-                              {row.ownerPhone}
-                            </a>
+                            <TelLink phone={row.ownerPhone} className="text-ink-muted" />
                           </td>
                           <td className="px-4 py-3 text-ink-muted">
                             {row.areaName}, {row.cityName}
                           </td>
-                          <td className="hidden px-4 py-3 tabular-nums 2xl:table-cell">{row.library.capacity}</td>
                           <td className="px-4 py-3">
                             <ShiftChips shifts={row.shifts} />
                           </td>
-                          <td className="hidden px-4 py-3 tabular-nums text-ink-muted 2xl:table-cell">
-                            {formatDate(row.library.createdAt.slice(0, 10))}
-                          </td>
                           <td className="px-4 py-3">
-                            <Badge tone={view.tone}>{view.label}</Badge>
-                            {state === 'rejected' && row.library.rejectionReason && (
-                              <p className="mt-1 max-w-48 text-xs text-ink-muted">{row.library.rejectionReason}</p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex justify-end gap-2">
-                              {state === 'pending' ? (
-                                <>
-                                  <Button variant="primary" className="px-3" onClick={() => setApproving(row)}>
-                                    Approve
-                                  </Button>
-                                  <Button variant="secondary" className="px-3" onClick={() => setRejecting(row)}>
-                                    Reject
-                                  </Button>
-                                </>
-                              ) : (
-                                <Button variant="ghost" className="px-3" onClick={() => setDetail(row)}>
-                                  Details
-                                </Button>
+                            <div className="flex flex-col items-end gap-2">
+                              <Badge tone={view.tone}>{view.label}</Badge>
+                              {state === 'rejected' && row.library.rejectionReason && (
+                                <p className="max-w-48 text-right text-xs text-ink-muted">{row.library.rejectionReason}</p>
                               )}
+                              <div className="flex flex-wrap justify-end gap-2">
+                                {state === 'pending' ? (
+                                  <>
+                                    <Button variant="primary" className="px-3" onClick={() => setApproving(row)}>
+                                      Approve
+                                    </Button>
+                                    <Button variant="secondary" className="px-3" onClick={() => setRejecting(row)}>
+                                      Reject
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Button variant="secondary" className="px-3" onClick={() => setDetail(row)}>
+                                    Details
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           </td>
                         </tr>
@@ -261,12 +284,12 @@ function LibraryCard({
   return (
     <Card className="p-4">
       <div className="flex items-start justify-between gap-3">
-        <button type="button" onClick={onDetail} className="min-w-0 cursor-pointer text-left">
-          <h3 className="truncate font-semibold text-ink">{row.library.name}</h3>
+        <div className="min-w-0">
+          <h3 className="break-words font-semibold text-ink">{row.library.name}</h3>
           <p className="text-sm text-ink-muted">
             {row.areaName}, {row.cityName}
           </p>
-        </button>
+        </div>
         <Badge tone={view.tone}>{view.label}</Badge>
       </div>
 
@@ -278,10 +301,7 @@ function LibraryCard({
         <div>
           <dt className="text-ink-muted">Phone</dt>
           <dd>
-            <a href={`tel:${row.ownerPhone}`} className="inline-flex items-center gap-1 tabular-nums text-primary">
-              <Phone aria-hidden className="size-3.5" />
-              {row.ownerPhone}
-            </a>
+            <TelLink phone={row.ownerPhone} />
           </dd>
         </div>
         <div>
@@ -306,7 +326,7 @@ function LibraryCard({
         </p>
       )}
 
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex flex-wrap gap-2">
         {state === 'pending' ? (
           <>
             <Button variant="primary" className="flex-1" onClick={onApprove}>
@@ -315,10 +335,13 @@ function LibraryCard({
             <Button variant="secondary" className="flex-1" onClick={onReject}>
               Reject
             </Button>
+            <Button variant="ghost" className="w-full" onClick={onDetail}>
+              Details
+            </Button>
           </>
         ) : (
           <Button variant="secondary" className="flex-1" onClick={onDetail}>
-            View details
+            Details
           </Button>
         )}
       </div>
@@ -347,15 +370,13 @@ function DetailModal({ row, now, onClose }: { row: AdminLibraryRow | null; now: 
       </div>
       <dl className="divide-y divide-border">
         <DetailRow label="Owner">
-          {row.ownerName} ·{' '}
-          <a href={`tel:${row.ownerPhone}`} className="tabular-nums text-primary">
-            {row.ownerPhone}
-          </a>
+          <span className="flex flex-wrap items-center gap-x-2">
+            {row.ownerName}
+            <TelLink phone={row.ownerPhone} />
+          </span>
         </DetailRow>
         <DetailRow label="Library phone">
-          <a href={`tel:${lib.phone}`} className="tabular-nums text-primary">
-            {lib.phone}
-          </a>
+          <TelLink phone={lib.phone} />
         </DetailRow>
         <DetailRow label="Address">{lib.address}</DetailRow>
         <DetailRow label="Landmark">{lib.landmark || '—'}</DetailRow>

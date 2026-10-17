@@ -29,7 +29,8 @@ type Props = {
   presetShiftId?: string | null
   /** Today in IST, used as the default start date. */
   today: string
-  onAdded?: () => void
+  /** Called with the new student's name so the list can show them straight away. */
+  onAdded?: (name: string) => void
 }
 
 const QUICK_MONTHS = [1, 2, 3]
@@ -126,8 +127,8 @@ export function AddStudentModal({
 
   const add = useMutation(services.addMember, {
     success: 'Student added',
-    onSuccess: () => {
-      onAdded?.()
+    onSuccess: (member) => {
+      onAdded?.(member.name)
       onClose()
     },
   })
