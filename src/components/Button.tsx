@@ -1,15 +1,16 @@
 import type { ButtonHTMLAttributes } from 'react'
 import { LoaderCircle } from 'lucide-react'
+import { cx } from '@/lib/cx'
 
-type Variant = 'primary' | 'secondary' | 'accent' | 'danger' | 'ghost'
+export type ButtonVariant = 'primary' | 'secondary' | 'accent' | 'danger' | 'ghost'
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: Variant
+  variant?: ButtonVariant
   /** Shows a spinner and blocks clicks. Keeps the label so the button doesn't change width. */
   loading?: boolean
 }
 
-const variants: Record<Variant, string> = {
+const variants: Record<ButtonVariant, string> = {
   primary: 'bg-primary text-white hover:bg-primary-hover',
   secondary: 'bg-surface text-ink border border-border-strong hover:bg-canvas',
   accent: 'bg-accent text-white hover:bg-accent-hover',
@@ -17,12 +18,25 @@ const variants: Record<Variant, string> = {
   ghost: 'text-primary hover:bg-primary-soft',
 }
 
-/** 44px minimum height on every size: these are used one-handed on phones. */
+/**
+ * Class string for anything that should look like a button, e.g. a router <Link>:
+ *   <Link to="/x" className={buttonStyles('primary')}>Go</Link>
+ * 44px minimum height: these are used one-handed on phones.
+ */
+export function buttonStyles(variant: ButtonVariant = 'primary', extra?: string) {
+  return cx(
+    'inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-control px-4',
+    'text-base font-medium transition-colors duration-150',
+    variants[variant],
+    extra,
+  )
+}
+
 export function Button({
   variant = 'primary',
   loading = false,
   disabled,
-  className = '',
+  className,
   children,
   type = 'button',
   ...rest
@@ -32,14 +46,14 @@ export function Button({
       type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={[
-        'inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-control px-4',
-        'text-base font-medium transition-colors duration-150',
-        // Loading keeps full contrast (it's busy, not unavailable); only truly disabled dims.
-        loading ? 'cursor-progress' : 'disabled:cursor-not-allowed disabled:opacity-60',
-        variants[variant],
-        className,
-      ].join(' ')}
+      className={buttonStyles(
+        variant,
+        cx(
+          // Loading keeps full contrast (it's busy, not unavailable); only truly disabled dims.
+          loading ? 'cursor-progress' : 'disabled:cursor-not-allowed disabled:opacity-60',
+          className,
+        ),
+      )}
       {...rest}
     >
       {loading && <LoaderCircle aria-hidden className="size-4 motion-safe:animate-spin" />}

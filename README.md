@@ -10,11 +10,12 @@ Requires Node.js 24+ and Git.
 
 ```bash
 npm install
-cp .env.example .env     # then fill in your Supabase URL and anon key
 npm run dev              # http://localhost:5173
 ```
 
-Only the public anon key belongs in `.env`. Never use the `service_role` key in this app. `.env` is git-ignored.
+The app runs in **dummy mode** by default: everything happens in your browser on fake data (saved in localStorage), so no keys are needed. Use the **Demo** button (bottom-right) to switch between owner, student and admin accounts, move the date forward to test trial expiry and renewals, force loading and error screens, or reset the data.
+
+Later, for Supabase mode, copy `.env.example` to `.env` and fill in the URL and anon key. Only the public anon key belongs there. Never use the `service_role` key in this app. `.env` is git-ignored.
 
 ## Scripts
 

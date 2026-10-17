@@ -23,3 +23,8 @@ Newest at the bottom. Each entry: decision, reason.
 - **D-018 Seat state is never colour alone.** Each state has a second cue (fill shape, ring, clock dot, hatching). Seats are real `<button>`s with descriptive labels. Detailed in the SeatGrid component when built.
 - **D-019 Non-happy-path screens share one component set:** `LoadingState`, `EmptyState`, `ErrorState` (retry), `NotFoundState`, `SetupState`, all built on `StateShell`. Error means "retry may work"; not found means "does not exist".
 - **D-020 `/dev/styleguide` is development-only.** It sits behind `import.meta.env.DEV`; the production build contains neither the route nor its code (checked by searching `dist/`).
+
+- **D-021 Dummy-first.** The whole UI runs on mock repositories (in-memory, saved to localStorage) that implement the same interfaces as the future Supabase ones. `VITE_DATA_MODE=mock` is the default. The mock enforces the same rules as the SQL (see `src/repositories/mock/mockRules.test.ts`), but it cannot prove security: Row Level Security must still be tested against real Supabase with two real accounts.
+- **D-022 All time comes from one place.** Pure rule functions take `now`/`today` as parameters; the app asks `getNow()` / `useNow()` (`src/lib/devState.ts`), which the Demo panel can shift. No business logic calls `new Date()` directly.
+- **D-023 A mock write bumps a data-version counter** so every mounted query refetches; pages rarely refetch by hand.
+- **D-024 Seat cells are built in one place** (`src/domain/seatCells.ts`), so the grid, dashboard and student list can never disagree.
