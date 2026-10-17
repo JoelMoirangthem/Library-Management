@@ -1,11 +1,10 @@
 import { Clock, TriangleAlert, UserRoundPlus } from 'lucide-react'
 import { Badge } from '@/components/Badge'
 import { Card } from '@/components/Card'
-import { SeatStrip } from '@/components/SeatGrid'
 
 /**
  * A static, non-interactive miniature of the owner "Today" screen, built from the real
- * components owners use (Card, Badge, SeatStrip). It shows illustrative data so owners can
+ * components owners use (Card, Badge). It shows illustrative data so owners can
  * see what they get at a glance, without wiring up any live data. Decorative and fully
  * hidden from assistive tech (`aria-hidden`); the surrounding copy carries the meaning.
  */
@@ -39,10 +38,6 @@ export function OwnerProductPeek() {
           <p className="text-lg font-semibold tabular-nums text-primary-ink">8</p>
           <p className="text-xs text-ink-muted">Free</p>
         </div>
-      </div>
-
-      <div className="mt-4">
-        <SeatStrip total={39} free={8} max={39} />
       </div>
 
       <ul className="mt-4 space-y-2">

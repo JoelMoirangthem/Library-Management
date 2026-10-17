@@ -14,7 +14,6 @@ import { buttonStyles } from '@/components/Button'
 import { Card } from '@/components/Card'
 import { CardBody, CardGrid, GridCard, GridItem } from '@/components/CardGrid'
 import { PageHeader, StatCard } from '@/components/PageParts'
-import { SeatStrip } from '@/components/SeatGrid'
 import { ShiftTabs } from '@/components/ShiftTabs'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
@@ -354,9 +353,6 @@ export default function Dashboard() {
                           {!s.isActive && studentCount > 0 ? ' still tagged' : ''}
                         </span>
                       </p>
-                      {counts.total > 0 && (
-                        <SeatStrip total={counts.total} free={counts.free} />
-                      )}
                     </CardBody>
                   </GridCard>
                 </GridItem>

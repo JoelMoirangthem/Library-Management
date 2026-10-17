@@ -1,48 +1,79 @@
 import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
+import { Badge, type BadgeTone } from '@/components/Badge'
 import { CardFooter, GridCard } from '@/components/CardGrid'
-import { SeatMark } from '@/components/Logo'
-import { ShiftBars } from '@/components/LibraryArt'
 import { Skeleton } from '@/components/Skeleton'
 import { formatRupees } from '@/domain/money'
-import type { PublicLibrary } from '@/domain/types'
+import { formatShiftRange } from '@/domain/shifts'
+import type { PublicLibrary, PublicShift } from '@/domain/types'
 
-/** 56px square: the first photo, or the seat mark when there is none. Always present, so every card has the same header. */
-function Thumb({ photo }: { photo?: string }) {
+/** The words carry the meaning; colour only reinforces it. */
+function seatsLabel(seatsLeft: number): { tone: BadgeTone; label: string } {
+  if (seatsLeft === 0) return { tone: 'neutral', label: 'Full' }
+  if (seatsLeft <= 5) return { tone: 'warning', label: `${seatsLeft} free` }
+  return { tone: 'success', label: `${seatsLeft} free` }
+}
+
+/** "GD" for "Gyan Deep Study Hub": a calm identity tile when the library has no photo. */
+function initialsOf(name: string): string {
+  const words = name.replace(/[^\p{L}\p{N}\s]/gu, '').split(/\s+/).filter(Boolean)
+  return (words[0]?.[0] ?? '?').toUpperCase() + (words[1]?.[0] ?? '').toUpperCase()
+}
+
+function Tile({ name, photo }: { name: string; photo?: string }) {
   return (
-    <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-control border border-border bg-canvas">
-      {photo ? (
-        <img src={photo} alt="" loading="lazy" className="size-full object-cover" />
-      ) : (
-        <SeatMark className="size-8" />
-      )}
+    <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-control bg-primary-soft text-base font-semibold text-primary-ink">
+      {photo ? <img src={photo} alt="" loading="lazy" className="size-full object-cover" /> : initialsOf(name)}
     </div>
   )
 }
 
+const ROW_H = 'h-11'
+
+function ShiftRow({ shift }: { shift: PublicShift }) {
+  const seats = seatsLabel(shift.seatsLeft)
+  return (
+    <li className={`flex items-center justify-between gap-3 border-t border-border ${ROW_H}`}>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium leading-tight">{shift.name}</p>
+        <p className="truncate text-xs tabular-nums leading-tight text-ink-muted">{formatShiftRange(shift)}</p>
+      </div>
+      <Badge tone={seats.tone}>{seats.label}</Badge>
+    </li>
+  )
+}
+
 /**
- * The one library card, used on Discover and the Home teaser. Fixed structure, so it is
+ * The one library card (Discover and the Home teaser). Text only, fixed structure, so it is
  * the same size with 1, 2 or 3 shifts, a short or a long name, with or without a photo:
  *
- *   [thumb] Name (2 lines reserved)
- *           Area, City
- *   ┌ Morning  ████░░░░  18 free ┐   <- always 3 rows
- *   from ₹500 / month         View >
+ *   [GD]  Gyan Deep Study Hub
+ *         Faizabad Road, Lucknow
+ *   -----------------------------
+ *   Morning    8:30 am to 12:30 pm      Full
+ *   Afternoon  1:00 pm to 5:00 pm    31 free
+ *   Evening    6:00 pm to 9:00 pm    27 free
+ *   -----------------------------
+ *   from ?700 / month               View >
  *
- * Must sit inside a `GridItem` from CardGrid.
+ * Always three shift rows; an empty one stays invisible. Must sit inside a CardGrid `GridItem`.
  */
 export function LibraryCard({ library }: { library: PublicLibrary }) {
+  const rows = library.shifts.slice(0, 3)
+  const empty = Math.max(0, 3 - rows.length)
+
   return (
     <GridCard className="group relative transition-colors hover:border-border-strong">
-      <div className="flex-1 space-y-4 p-4">
-        <div className="flex items-start gap-3">
-          <Thumb photo={library.photos[0]} />
+      <div className="flex flex-1 flex-col gap-3 p-4 pb-2">
+        <div className="flex items-center gap-3">
+          <Tile name={library.name} photo={library.photos[0]} />
           <div className="min-w-0 flex-1">
-            <h3 className="min-h-[2.5rem] text-base font-semibold leading-tight">
+            <h3 className="text-base font-semibold leading-tight">
               {/* The whole card is one real link through a stretched hit area. No nested links. */}
               <Link
                 to={`/library/${library.id}`}
-                className="line-clamp-2 break-words rounded-control outline-none after:absolute after:inset-0 after:content-[''] focus-visible:ring-2 focus-visible:ring-primary"
+                title={library.name}
+                className="block truncate rounded-control outline-none after:absolute after:inset-0 after:content-[''] focus-visible:ring-2 focus-visible:ring-primary"
               >
                 {library.name}
               </Link>
@@ -53,10 +84,17 @@ export function LibraryCard({ library }: { library: PublicLibrary }) {
           </div>
         </div>
 
-        <ShiftBars shifts={library.shifts} tinted />
+        <ul aria-label="Seats free by shift" className="mt-auto">
+          {rows.map((s) => (
+            <ShiftRow key={s.id} shift={s} />
+          ))}
+          {Array.from({ length: empty }, (_, i) => (
+            <li key={`empty-${i}`} aria-hidden className={`invisible border-t ${ROW_H}`} />
+          ))}
+        </ul>
       </div>
 
-      <CardFooter className="justify-between">
+      <CardFooter className="justify-between py-3">
         <p className="text-sm">
           <span className="text-ink-muted">from </span>
           <span className="font-semibold tabular-nums">{formatRupees(library.fromFeePaise)}</span>
@@ -75,23 +113,24 @@ export function LibraryCard({ library }: { library: PublicLibrary }) {
 export function LibraryCardSkeleton() {
   return (
     <GridCard>
-      <div className="flex-1 space-y-4 p-4">
-        <div className="flex items-start gap-3">
-          <Skeleton className="size-14 shrink-0" />
-          <div className="min-w-0 flex-1 space-y-2 pt-1">
+      <div className="flex flex-1 flex-col gap-3 p-4 pb-2">
+        <div className="flex items-center gap-3">
+          <Skeleton className="size-12 shrink-0" />
+          <div className="min-w-0 flex-1 space-y-2">
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-3 w-1/2" />
           </div>
         </div>
-        <div className="space-y-1.5">
+        <ul className="mt-auto">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="flex h-7 items-center rounded-control bg-primary-soft px-3">
-              <Skeleton className="h-3 w-full" />
-            </div>
+            <li key={i} className={`flex items-center justify-between gap-3 border-t border-border ${ROW_H}`}>
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-5 w-14 rounded-full" />
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
-      <CardFooter className="justify-between">
+      <CardFooter className="justify-between py-3">
         <Skeleton className="h-4 w-28" />
         <Skeleton className="h-4 w-10" />
       </CardFooter>

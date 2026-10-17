@@ -5,9 +5,7 @@ import { Badge } from '@/components/Badge'
 import { Button, buttonStyles } from '@/components/Button'
 import { Card } from '@/components/Card'
 import { CardGrid, GridItem } from '@/components/CardGrid'
-import { LibraryArt } from '@/components/LibraryArt'
 import { PageHeader } from '@/components/PageParts'
-import { SeatStrip } from '@/components/SeatGrid'
 import { SuccessMoment } from '@/components/Steps'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
@@ -24,9 +22,8 @@ import { useTitle } from '@/hooks/useTitle'
 import { cx } from '@/lib/cx'
 
 function Cover({ library }: { library: PublicLibrary }) {
-  if (library.photos.length === 0) {
-    return <LibraryArt shifts={library.shifts} className="h-48 rounded-card sm:h-56" />
-  }
+  // No photos: no cover at all. The name, shifts and seats below carry the page.
+  if (library.photos.length === 0) return null
   return (
     <div className="grid gap-2 sm:grid-cols-2">
       <img
@@ -247,10 +244,6 @@ function ShiftOption({
       <p className="text-sm font-medium tabular-nums">
         {full ? 'Full' : `${shift.seatsLeft} of ${shift.totalSeats} seats free`}
       </p>
-      {/* Pin the seat strip to the bottom so it sits at the same y in every card. */}
-      <div className="mt-auto">
-        <SeatStrip total={shift.totalSeats} free={shift.seatsLeft} />
-      </div>
     </button>
   )
 }
