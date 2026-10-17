@@ -25,7 +25,7 @@ import { cx } from '@/lib/cx'
 
 function Cover({ library }: { library: PublicLibrary }) {
   if (library.photos.length === 0) {
-    return <LibraryArt shifts={library.shifts} className="h-56 rounded-card sm:h-72" />
+    return <LibraryArt shifts={library.shifts} className="h-48 rounded-card sm:h-56" />
   }
   return (
     <div className="grid gap-2 sm:grid-cols-2">
@@ -384,7 +384,7 @@ export default function LibraryDetail() {
       </div>
 
       <div className="grid items-start gap-8 lg:grid-cols-[1fr_20rem]">
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Cover library={lib} />
 
           <div>
