@@ -1,1 +1,100 @@
 @import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+/*
+ * StudySeat design tokens (light mode only in v1).
+ *
+ * Components use these semantic names (bg-surface, text-ink-muted ...), never raw hex.
+ * The default Tailwind palette is switched off below so a stray `bg-gray-100` fails loudly
+ * instead of silently drifting from the system.
+ *
+ * Contrast (WCAG 2.x, measured, not estimated):
+ *   ink on canvas 16.05 · ink-muted on canvas 7.00 · primary on surface 5.47 · primary on canvas 5.02
+ *   white on primary 5.47 · white on primary-hover 7.58 · white on accent 5.18
+ *   primary-ink on primary-soft 6.71 · success/warning/danger text on canvas 4.60 / 4.61 / 5.94
+ *   border-strong on surface 4.80 (form controls need >= 3:1)
+ */
+@theme {
+  --color-*: initial;
+
+  /* Warm neutrals */
+  --color-canvas: #f7f5f0;
+  --color-surface: #ffffff;
+  --color-border: #e7e5e4;        /* dividers and card edges (decorative) */
+  --color-border-strong: #78716c; /* input and control edges (>= 3:1) */
+  --color-ink: #1c1917;
+  --color-ink-muted: #57534e;
+  --color-white: #ffffff;
+
+  /* Primary: calm teal. Free seats, links, buttons, active tab. */
+  --color-primary: #0f766e;
+  --color-primary-hover: #115e59;
+  --color-primary-soft: #e6f4f1;
+  --color-primary-ink: #115e59;   /* text on primary-soft */
+
+  /* Accent: orange, used rarely (Activate plan, trial ending). */
+  --color-accent: #c2410c;
+  --color-accent-hover: #9a3412;
+  --color-accent-soft: #ffedd5;
+  --color-accent-ink: #9a3412;
+
+  /* Status. Base colour for text/icons on canvas or surface; soft + ink for badges. */
+  --color-success: #15803d;
+  --color-success-soft: #dcfce7;
+  --color-success-ink: #166534;
+  --color-warning: #b45309;
+  --color-warning-soft: #fef3c7;
+  --color-warning-ink: #92400e;
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fee2e2;
+  --color-danger-ink: #991b1b;
+
+  /* One family. Inter has real tabular figures (tnum); apply with `tabular-nums`. */
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+
+  /* Two radii: controls and containers. */
+  --radius-control: 0.625rem;
+  --radius-card: 1rem;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    /* 16px base keeps iOS Safari from zooming into inputs. */
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+
+  /* Keyboard focus is always visible and never clipped to colour alone. */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
