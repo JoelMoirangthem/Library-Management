@@ -28,4 +28,4 @@ For the real backend (Supabase), copy `.env.example` to `.env`, set `VITE_DATA_M
 
 ## Docs
 
-See `docs/`: `REQUIREMENTS.md`, `DATABASE.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `DECISIONS.md`.
+See `docs/`: `REQUIREMENTS.md`, `DATABASE.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `DECISIONS.md`, `DEPLOYMENT.md` (going live on Vercel and Supabase).

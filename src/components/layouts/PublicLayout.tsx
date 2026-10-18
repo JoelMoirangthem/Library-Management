@@ -1,3 +1,4 @@
+import { dataMode } from '@/lib/container'
 import { Suspense, useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { ClipboardList, IdCard, Search } from 'lucide-react'
@@ -133,7 +134,7 @@ export function PublicLayout() {
           </nav>
         </div>
         <p className="border-t border-border px-4 py-4 text-center text-sm text-ink-muted">
-          © {new Date().getFullYear()} StudySeat. Demo data only.
+          © {new Date().getFullYear()} StudySeat.{dataMode === 'mock' && ' Demo data only.'}
         </p>
       </footer>
 

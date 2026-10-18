@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEMO_UPI_ID, EnvError, parseEnv, parseUpiId, UpiConfigError } from '@/lib/env'
+import { DEMO_UPI_ID, EnvError, parseEnv, parseUpiId, resolveDataMode, UpiConfigError } from '@/lib/env'
 
 describe('parseEnv', () => {
   it('returns the values when both variables are set', () => {
@@ -51,5 +51,25 @@ describe('parseUpiId (the UPI ID owners pay to comes only from VITE_UPI_ID)', ()
 
   it('dummy mode still uses the env value when one is set', () => {
     expect(parseUpiId({ VITE_UPI_ID: 'mine@oksbi' }, 'mock')).toBe('mine@oksbi')
+  })
+})
+
+describe('resolveDataMode (a production build must never fall back to dummy data by accident)', () => {
+  it('development defaults to dummy mode', () => {
+    expect(resolveDataMode(undefined, false)).toBe('mock')
+    expect(resolveDataMode('', false)).toBe('mock')
+  })
+
+  it('production defaults to the real backend when the setting is missing', () => {
+    expect(resolveDataMode(undefined, true)).toBe('supabase')
+    expect(resolveDataMode('', true)).toBe('supabase')
+    expect(resolveDataMode('nonsense', true)).toBe('supabase')
+  })
+
+  it('an explicit value always wins, in both builds', () => {
+    expect(resolveDataMode('supabase', false)).toBe('supabase')
+    expect(resolveDataMode('supabase', true)).toBe('supabase')
+    expect(resolveDataMode('mock', false)).toBe('mock')
+    expect(resolveDataMode('mock', true)).toBe('mock')
   })
 })

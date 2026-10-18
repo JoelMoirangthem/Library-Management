@@ -1,3 +1,4 @@
+import { resolveDataMode, type DataMode } from '@/lib/env'
 import { MockPhotoRepository } from '@/repositories/mock/MockPhotoRepository'
 import { createServices, type Repositories } from '@/services/createServices'
 import type { DemoLogin } from '@/repositories/interfaces'
@@ -36,13 +37,13 @@ import { refreshAfterWrites } from '@/repositories/supabase/refreshAfterWrites'
  * The one place that knows which repository implementations exist (Dependency Inversion).
  * Everything else imports `services` from here.
  *
- * VITE_DATA_MODE=mock (default) uses in-browser dummy data.
- * VITE_DATA_MODE=supabase uses the real database. Repositories that are not built yet are
- * `notConnected` stubs that fail loudly, so nothing quietly falls back to dummy data.
+ * VITE_DATA_MODE=mock uses in-browser dummy data; VITE_DATA_MODE=supabase uses the real database.
+ * When it is not set, a development build uses dummy data and a PRODUCTION build uses the real database
+ * (see resolveDataMode), so a missing setting on the host can never ship fake data.
  */
-export type DataMode = 'mock' | 'supabase'
+export type { DataMode }
 
-export const dataMode: DataMode = import.meta.env.VITE_DATA_MODE === 'supabase' ? 'supabase' : 'mock'
+export const dataMode: DataMode = resolveDataMode(import.meta.env.VITE_DATA_MODE, import.meta.env.PROD)
 
 function mockRepositories(): Repositories {
   return {

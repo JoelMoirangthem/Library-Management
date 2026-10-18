@@ -68,6 +68,17 @@ export function parseUpiId(raw: Record<string, string | undefined>, mode: 'mock'
 
 /** Reads the real Vite env. Throws UpiConfigError in real mode when it is missing or invalid. */
 export function getUpiId(): string {
-  const mode = import.meta.env.VITE_DATA_MODE === 'supabase' ? 'supabase' : 'mock'
-  return parseUpiId(import.meta.env, mode)
+  return parseUpiId(import.meta.env, resolveDataMode(import.meta.env.VITE_DATA_MODE, import.meta.env.PROD))
+}
+
+export type DataMode = 'mock' | 'supabase'
+
+/**
+ * Which data the app runs on. An explicit mock or supabase always wins. When the setting is missing or
+ * unreadable, a development build uses dummy data (no keys needed) but a PRODUCTION build uses the real
+ * backend, so forgetting this one setting on the host can never ship fake data and the demo panel to real users.
+ */
+export function resolveDataMode(value: string | undefined, isProduction: boolean): DataMode {
+  if (value === 'mock' || value === 'supabase') return value
+  return isProduction ? 'supabase' : 'mock'
 }

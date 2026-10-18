@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /owner
+Disallow: /admin
+Disallow: /student
+Disallow: /profile
+Disallow: /choose-role
+Disallow: /login
