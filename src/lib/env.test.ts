@@ -1,5 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import { DEMO_UPI_ID, EnvError, parseEnv, parseUpiId, resolveDataMode, UpiConfigError } from '@/lib/env'
+import { DEMO_UPI_ID, EnvError, hasSupabaseConfig, isConfigError, parseEnv, parseUpiId, resolveDataMode, UpiConfigError } from '@/lib/env'
+
+describe('isConfigError (a missing Supabase URL/key must be shown, not swallowed as "logged out")', () => {
+  it('is true for an EnvError', () => {
+    expect(isConfigError(new EnvError(['VITE_SUPABASE_URL']))).toBe(true)
+  })
+
+  it('is true for any error named EnvError (survives duplicate modules)', () => {
+    const e = new Error('missing')
+    e.name = 'EnvError'
+    expect(isConfigError(e)).toBe(true)
+  })
+
+  it('is false for ordinary errors and non-errors', () => {
+    expect(isConfigError(new Error('network down'))).toBe(false)
+    expect(isConfigError(new UpiConfigError('nope'))).toBe(false)
+    expect(isConfigError(null)).toBe(false)
+    expect(isConfigError('EnvError')).toBe(false)
+  })
+})
 
 describe('parseEnv', () => {
   it('returns the values when both variables are set', () => {
@@ -71,5 +90,17 @@ describe('resolveDataMode (a production build must never fall back to dummy data
     expect(resolveDataMode('supabase', true)).toBe('supabase')
     expect(resolveDataMode('mock', false)).toBe('mock')
     expect(resolveDataMode('mock', true)).toBe('mock')
+  })
+})
+
+describe('hasSupabaseConfig (startup code must not touch Supabase when it is not configured, or the page stays blank)', () => {
+  it('is true only when both the URL and the key are present', () => {
+    expect(hasSupabaseConfig({ VITE_SUPABASE_URL: 'https://x.supabase.co', VITE_SUPABASE_ANON_KEY: 'k' })).toBe(true)
+  })
+
+  it('is false when either is missing or blank', () => {
+    expect(hasSupabaseConfig({})).toBe(false)
+    expect(hasSupabaseConfig({ VITE_SUPABASE_URL: 'https://x.supabase.co' })).toBe(false)
+    expect(hasSupabaseConfig({ VITE_SUPABASE_URL: ' ', VITE_SUPABASE_ANON_KEY: ' ' })).toBe(false)
   })
 })

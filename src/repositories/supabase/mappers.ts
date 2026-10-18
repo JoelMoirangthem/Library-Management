@@ -12,6 +12,7 @@ import type {
 } from '@/domain/types'
 import { getSupabase } from '@/lib/supabase'
 
+
 /** Row shapes exactly as the database returns them (snake_case). Mappers turn them into app types. */
 export type LibraryRow = {
   id: string

@@ -6,6 +6,7 @@ import type {
   SeatRequestRepository,
 } from '@/repositories/interfaces'
 import { toAppErrorFromSupabase, unwrap } from '@/repositories/supabase/errors'
+import { chunk, fetchAll } from '@/repositories/supabase/paging'
 import {
   currentUserId,
   PLAN_PAYMENT_COLUMNS,
@@ -18,12 +19,15 @@ import {
 /** Plan payments: the amount, the 30-day extension and the status all come from database functions. */
 export class SupabasePlanPaymentRepository implements PlanPaymentRepository {
   async listByLibrary(libraryId: string): Promise<PlanPayment[]> {
-    const rows = unwrap(
-      await getSupabase()
+    const supabase = getSupabase()
+    const rows = await fetchAll((from, to) =>
+      supabase
         .from('plan_payments')
         .select(PLAN_PAYMENT_COLUMNS)
         .eq('library_id', libraryId)
         .order('submitted_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to)
         .returns<PlanPaymentRow[]>(),
     )
     return rows.map(toPlanPayment)
@@ -42,13 +46,19 @@ export class SupabasePlanPaymentRepository implements PlanPaymentRepository {
   async listAll(): Promise<AdminPaymentRow[]> {
     const supabase = getSupabase()
     const [pays, libs, owners] = await Promise.all([
-      supabase.from('plan_payments').select(PLAN_PAYMENT_COLUMNS).order('submitted_at', { ascending: false }).returns<PlanPaymentRow[]>(),
-      supabase.from('libraries').select('id, name, owner_id').returns<{ id: string; name: string; owner_id: string }[]>(),
-      supabase.from('profiles').select('id, name').returns<{ id: string; name: string }[]>(),
+      fetchAll((from, to) =>
+        supabase.from('plan_payments').select(PLAN_PAYMENT_COLUMNS).order('submitted_at', { ascending: false }).order('id', { ascending: false }).range(from, to).returns<PlanPaymentRow[]>(),
+      ),
+      fetchAll((from, to) =>
+        supabase.from('libraries').select('id, name, owner_id').order('id').range(from, to).returns<{ id: string; name: string; owner_id: string }[]>(),
+      ),
+      fetchAll((from, to) =>
+        supabase.from('profiles').select('id, name').order('id').range(from, to).returns<{ id: string; name: string }[]>(),
+      ),
     ])
-    const libById = new Map(unwrap(libs).map((l) => [l.id, l]))
-    const ownerById = new Map(unwrap(owners).map((o) => [o.id, o.name]))
-    return unwrap(pays).map((row) => {
+    const libById = new Map(libs.map((l) => [l.id, l]))
+    const ownerById = new Map(owners.map((o) => [o.id, o.name]))
+    return pays.map((row) => {
       const lib = libById.get(row.library_id)
       return {
         ...toPlanPayment(row),
@@ -107,18 +117,25 @@ export class SupabaseSeatRequestRepository implements SeatRequestRepository {
   /** Owners read the requests for their library, and the names/phones of the students who sent them. */
   async listByLibrary(libraryId: string): Promise<SeatRequest[]> {
     const supabase = getSupabase()
-    const rows = unwrap(
-      await supabase
+    const rows = await fetchAll((from, to) =>
+      supabase
         .from('seat_requests')
         .select(SEAT_REQUEST_COLUMNS)
         .eq('library_id', libraryId)
         .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to)
         .returns<SeatRequestRow[]>(),
     )
     const ids = [...new Set(rows.map((r) => r.student_id))]
-    const people = ids.length
-      ? unwrap(await supabase.from('profiles').select('id, name, phone').in('id', ids).returns<{ id: string; name: string; phone: string }[]>())
-      : []
+    // Ids travel in the web address, so look the students up in groups of 100 rather than all at once.
+    const people = (
+      await Promise.all(
+        chunk(ids, 100).map(async (group) =>
+          unwrap(await supabase.from('profiles').select('id, name, phone').in('id', group).returns<{ id: string; name: string; phone: string }[]>()),
+        ),
+      )
+    ).flat()
     const byId = new Map(people.map((p) => [p.id, p]))
     return rows.map((r) => toRequest(r, byId.get(r.student_id)?.name || 'Student', byId.get(r.student_id)?.phone ?? ''))
   }

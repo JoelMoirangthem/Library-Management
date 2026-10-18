@@ -1,4 +1,4 @@
-import { resolveDataMode, type DataMode } from '@/lib/env'
+import { hasSupabaseConfig, resolveDataMode, type DataMode } from '@/lib/env'
 import { MockPhotoRepository } from '@/repositories/mock/MockPhotoRepository'
 import { createServices, type Repositories } from '@/services/createServices'
 import type { DemoLogin } from '@/repositories/interfaces'
@@ -99,7 +99,9 @@ export const demoLogin: DemoLogin | null = dataMode === 'mock' ? new MockDemoLog
 
 // Real mode: when Supabase finishes sign-in (after the Google redirect), sign-out, or refreshes a
 // token, tell every mounted query to reload so the screen matches the session.
-if (dataMode === 'supabase') {
+// Skipped when the settings are missing: touching Supabase then would throw during startup and leave a blank page,
+// whereas the app can still start and show a readable "not set up" screen (see useAuth).
+if (dataMode === 'supabase' && hasSupabaseConfig(import.meta.env)) {
   getSupabase().auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
       // Deferred: supabase-js forbids calling its own methods inside this callback.

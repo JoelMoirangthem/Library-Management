@@ -35,7 +35,7 @@ The current project is the one used for building and testing. For launch, create
 
 1. Create the project (choose the region closest to your users) and put it on a **paid plan before real owners arrive**:
    free projects are paused after about a week of low activity, and paid projects are not.
-2. Apply the schema: link the CLI to the new project and run `supabase db push`. The 10 files in `supabase/migrations`
+2. Apply the schema: link the CLI to the new project and run `supabase db push`. The 11 files in `supabase/migrations`
    create the tables, security rules, functions, places, and the photo storage rules. Run them in order; do not edit applied files.
 3. Storage: migration 0010 creates the public `LibraryImages` bucket (5 MB, JPEG and PNG) if it does not exist.
 4. Authentication, URL configuration: set **Site URL** to the live address and add it (and any preview address you use) to **Redirect URLs**.

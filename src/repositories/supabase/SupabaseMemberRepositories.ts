@@ -4,6 +4,7 @@ import type { FeePayment, Member, MyMembership, PublicLibrary } from '@/domain/t
 import { getSupabase } from '@/lib/supabase'
 import type { FeeRepository, MemberRepository, NewMember, RenewInput } from '@/repositories/interfaces'
 import { toAppErrorFromSupabase, unwrap } from '@/repositories/supabase/errors'
+import { fetchAll } from '@/repositories/supabase/paging'
 import {
   currentUserId,
   FEE_COLUMNS,
@@ -24,8 +25,16 @@ async function loadMember(id: string): Promise<Member> {
 /** Every change goes through a database function that checks the caller and does the whole job in one step. */
 export class SupabaseMemberRepository implements MemberRepository {
   async listByLibrary(libraryId: string): Promise<Member[]> {
-    const rows = unwrap(
-      await getSupabase().from('members').select(MEMBER_COLUMNS).eq('library_id', libraryId).returns<MemberRow[]>(),
+    const supabase = getSupabase()
+    const rows = await fetchAll((from, to) =>
+      supabase
+        .from('members')
+        .select(MEMBER_COLUMNS)
+        .eq('library_id', libraryId)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to)
+        .returns<MemberRow[]>(),
     )
     return rows.map(toMember)
   }
@@ -126,19 +135,30 @@ export class SupabaseMemberRepository implements MemberRepository {
 
 export class SupabaseFeeRepository implements FeeRepository {
   async listByLibrary(libraryId: string): Promise<FeePayment[]> {
-    const rows = unwrap(
-      await getSupabase().from('fee_payments').select(FEE_COLUMNS).eq('library_id', libraryId).returns<FeeRow[]>(),
+    const supabase = getSupabase()
+    const rows = await fetchAll((from, to) =>
+      supabase
+        .from('fee_payments')
+        .select(FEE_COLUMNS)
+        .eq('library_id', libraryId)
+        .order('paid_on', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to)
+        .returns<FeeRow[]>(),
     )
     return rows.map(toFee)
   }
 
   async listByMember(memberId: string): Promise<FeePayment[]> {
-    const rows = unwrap(
-      await getSupabase()
+    const supabase = getSupabase()
+    const rows = await fetchAll((from, to) =>
+      supabase
         .from('fee_payments')
         .select(FEE_COLUMNS)
         .eq('member_id', memberId)
         .order('paid_on', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to)
         .returns<FeeRow[]>(),
     )
     return rows.map(toFee)

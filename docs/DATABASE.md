@@ -105,7 +105,7 @@ All are `security definer` with a fixed `search_path`, and each checks the calle
 | `submit_plan_payment(library_id, utr)` | owner | inserts pending payment, amount 19900; allowed when expired |
 | `verify_plan_payment(payment_id)` | admin | `select … for update`; must be pending; sets verified; if `active_until > submitted_at` (paid in advance) then `active_until + 30 days`, else `now() + 30 days` (paid after expiry) |
 | `fail_plan_payment(payment_id, reason)` | admin | `pending → failed` |
-| `set_capacity(library_id, capacity)` | owner, active | adds seats or deactivates free seats only |
+| `set_library_capacity(library_id, capacity)` | owner, active | adds seats or deactivates free seats only |
 | `renew_member(member_id, amount_paise, mode, new_expiry)` | owner, active | inserts fee + updates expiry atomically |
 | `void_fee_payment(fee_id, reason)` | owner, active | marks void |
 | `approve_seat_request(request_id, seat_id, start_date, expiry_date, amount_paise, mode)` | owner, active | creates member, assigns seat, optional fee, marks approved — atomically |
@@ -128,7 +128,7 @@ All are `security definer` with a fixed `search_path`, and each checks the calle
 
 ## Storage
 
-Bucket `library-photos`, public read. Path `{library_id}/{filename}`. Insert/update/delete allowed only when `is_library_owner((storage.foldername(name))[1]::uuid)`.
+Bucket `LibraryImages`, public read. Files live at `<owner user id>/<random>.jpg|png` (one flat folder per owner). Insert/list/delete allowed only in the caller's own folder (`(storage.foldername(name))[1] = auth.uid()::text`). See the **Photos (storage)** section below for the full rules (migration 0010).
 
 ## Testing RLS
 
@@ -161,7 +161,7 @@ Must hold:
 - **libraries**: `monthly_fee_paise` is removed (fees live on shifts).
 - **members** and **seat_requests** gain `shift_id` (not null, same library as the row).
 - Occupancy rule changes to `unique (seat_id, shift_id) where status = 'active' and seat_id is not null`. `public_libraries` returns seats left per active shift and the lowest fee.
-- `approve_seat_request` takes the shift from the request. `set_capacity` only deactivates seats free in every shift. Shift writes follow the profile rule (allowed unless the plan has expired).
+- `approve_seat_request` takes the shift from the request. `set_library_capacity` only deactivates seats free in every shift. Shift writes follow the profile rule (allowed unless the plan has expired).
 
 ## Photos (storage)
 
@@ -171,3 +171,7 @@ Must hold:
 - Another owner, a student, an admin account and a logged-out visitor cannot upload or delete anyone's photo.
 - An .html or .exe file, a file over 5 MB, a sub-folder, or a 21st file is refused.
 - `libraries.photos` refuses a data: blob, another website, another owner's folder, a .webp, a path with `..`, or a fifth photo.
+
+## Hardening (migration 0011)
+
+Helper, trigger and constraint functions (`touch_updated_at`, `forbid_delete`, `freeze_fee_payment`, `enforce_shift_rules`, `shift_overlaps`, `photos_are_valid`) have `search_path = public` pinned. Their EXECUTE grants are intentionally left in place: the shift trigger and the photos check constraint run with the signed-in owner's rights. `libraries_update_owner` requires `is_library_editable(id)` in both USING and WITH CHECK.

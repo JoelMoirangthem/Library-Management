@@ -9,7 +9,8 @@ import type {
 } from '@/domain/types'
 import { getSupabase } from '@/lib/supabase'
 import type { LibraryRepository } from '@/repositories/interfaces'
-import { toAppErrorFromSupabase, unwrap } from '@/repositories/supabase/errors'
+import { toAppErrorFromSupabase } from '@/repositories/supabase/errors'
+import { fetchAll } from '@/repositories/supabase/paging'
 import {
   currentUserId,
   LIBRARY_COLUMNS,
@@ -130,21 +131,31 @@ export class SupabaseLibraryRepository implements LibraryRepository {
 
   async listForAdmin(): Promise<AdminLibraryRow[]> {
     const supabase = getSupabase()
-    const [libs, owners, cities, areas, subs, shifts] = await Promise.all([
-      supabase.from('libraries').select(LIBRARY_COLUMNS).order('created_at').returns<LibraryRow[]>(),
-      supabase.from('profiles').select('id, name, phone').returns<{ id: string; name: string; phone: string }[]>(),
-      supabase.from('cities').select('id, name').returns<{ id: string; name: string }[]>(),
-      supabase.from('areas').select('id, name').returns<{ id: string; name: string }[]>(),
-      supabase.from('subscriptions').select('library_id, trial_ends_at, active_until').returns<SubscriptionRow[]>(),
-      supabase.from('shifts').select(SHIFT_COLUMNS).returns<ShiftRow[]>(),
+    // Each list is read page by page (the API caps one request at 1000 rows) with a unique sort order.
+    const [libs, owners, cities, areas, subs, shiftRows] = await Promise.all([
+      fetchAll((from, to) =>
+        supabase.from('libraries').select(LIBRARY_COLUMNS).order('created_at').order('id').range(from, to).returns<LibraryRow[]>(),
+      ),
+      fetchAll((from, to) =>
+        supabase.from('profiles').select('id, name, phone').order('id').range(from, to).returns<{ id: string; name: string; phone: string }[]>(),
+      ),
+      fetchAll((from, to) =>
+        supabase.from('cities').select('id, name').order('id').range(from, to).returns<{ id: string; name: string }[]>(),
+      ),
+      fetchAll((from, to) =>
+        supabase.from('areas').select('id, name').order('id').range(from, to).returns<{ id: string; name: string }[]>(),
+      ),
+      fetchAll((from, to) =>
+        supabase.from('subscriptions').select('library_id, trial_ends_at, active_until').order('library_id').range(from, to).returns<SubscriptionRow[]>(),
+      ),
+      fetchAll((from, to) => supabase.from('shifts').select(SHIFT_COLUMNS).order('id').range(from, to).returns<ShiftRow[]>()),
     ])
-    const ownerById = new Map(unwrap(owners).map((o) => [o.id, o]))
-    const cityById = new Map(unwrap(cities).map((c) => [c.id, c.name]))
-    const areaById = new Map(unwrap(areas).map((a) => [a.id, a.name]))
-    const subByLib = new Map(unwrap(subs).map((s) => [s.library_id, toSubscription(s)]))
-    const shiftRows = unwrap(shifts)
+    const ownerById = new Map(owners.map((o) => [o.id, o]))
+    const cityById = new Map(cities.map((c) => [c.id, c.name]))
+    const areaById = new Map(areas.map((a) => [a.id, a.name]))
+    const subByLib = new Map(subs.map((s) => [s.library_id, toSubscription(s)]))
 
-    return unwrap(libs).map((row) => {
+    return libs.map((row) => {
       const library = toLibrary(row)
       const owner = ownerById.get(row.owner_id)
       return {

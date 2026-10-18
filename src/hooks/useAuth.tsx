@@ -1,7 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Wrench } from 'lucide-react'
 import type { Profile, Role } from '@/domain/types'
+import { StateShell } from '@/components/states/StateShell'
 import { demoLogin, services } from '@/lib/container'
 import { dataVersion } from '@/lib/devState'
+import { isConfigError } from '@/lib/env'
 import { useStore } from '@/lib/store'
 
 type AuthApi = {
@@ -40,6 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const version = useStore(dataVersion)
   const [user, setUser] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  // A missing Supabase URL/key is a setup problem, not "signed out". Surface it instead of a blank, logged-out site.
+  const [configError, setConfigError] = useState<Error | null>(null)
 
   // Re-read the session after every write (role chosen, profile edited, account switched).
   useEffect(() => {
@@ -47,7 +52,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     services
       .getSession()
       .then((u) => !cancelled && setUser(u))
-      .catch(() => !cancelled && setUser(null))
+      .catch((e: unknown) => {
+        if (cancelled) return
+        if (isConfigError(e)) {
+          setConfigError(e as Error)
+        } else {
+          // A real "no session" (or a transient read failure): treat as signed out.
+          setUser(null)
+        }
+      })
       .finally(() => !cancelled && setLoading(false))
     return () => {
       cancelled = true
@@ -93,6 +106,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({ user, loading, signInAs, signUpNew, signInWithGoogle, signOut, chooseRole, updateProfile }),
     [user, loading, signInAs, signUpNew, signInWithGoogle, signOut, chooseRole, updateProfile],
   )
+
+  if (configError) {
+    return (
+      <StateShell
+        role="alert"
+        tone="danger"
+        heading="h1"
+        icon={<Wrench className="size-6" />}
+        title="StudySeat isn't set up yet"
+        description={configError.message}
+      />
+    )
+  }
 
   return <AuthContext.Provider value={api}>{children}</AuthContext.Provider>
 }

@@ -16,6 +16,15 @@ export class EnvError extends Error {
   }
 }
 
+/**
+ * True when an error means the app is misconfigured (a missing/blank Supabase URL or anon key),
+ * so the UI can show a readable setup message instead of silently rendering a logged-out site.
+ * Matches by name so it survives module duplication (HMR, separate bundles).
+ */
+export function isConfigError(e: unknown): boolean {
+  return e instanceof EnvError || (e instanceof Error && e.name === 'EnvError')
+}
+
 /** Pure: validates a raw env record so it can be tested without Vite. */
 export function parseEnv(raw: Record<string, string | undefined>): AppEnv {
   const url = raw.VITE_SUPABASE_URL?.trim()
@@ -81,4 +90,14 @@ export type DataMode = 'mock' | 'supabase'
 export function resolveDataMode(value: string | undefined, isProduction: boolean): DataMode {
   if (value === 'mock' || value === 'supabase') return value
   return isProduction ? 'supabase' : 'mock'
+}
+
+/** True when the real-backend settings are present. Startup code checks this before touching Supabase. */
+export function hasSupabaseConfig(raw: Record<string, string | undefined>): boolean {
+  try {
+    parseEnv(raw)
+    return true
+  } catch {
+    return false
+  }
 }
