@@ -89,6 +89,17 @@ export function AddStudentModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, presetSeatId, presetShiftId, today])
 
+  // The shifts can finish loading after the form opened, when the reset above ran with none. Fill in the default
+  // shift and its fee then, without wiping what the owner has already typed. Otherwise the dropdown looks
+  // filled in (it shows the first option) while the form holds no shift and refuses to save.
+  useEffect(() => {
+    if (!open || shiftId || activeShifts.length === 0) return
+    const initialShift = presetShiftId ?? activeShifts[0].id
+    const fee = activeShifts.find((s) => s.id === initialShift)?.monthlyFeePaise ?? 0
+    setShiftId(initialShift)
+    setAmount((a) => (a === '' && fee ? (fee / 100).toString() : a))
+  }, [open, shiftId, activeShifts, presetShiftId])
+
   const onShiftChange = (value: string) => {
     setShiftId(value)
     // Keep the seat only if it is free in the newly chosen shift; prefill the shift's fee.

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toAppError, type AppError } from '@/domain/errors'
 import { useToast } from '@/components/Toast'
 
@@ -19,21 +19,29 @@ export function useMutation<A extends unknown[], R>(fn: (...args: A) => Promise<
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<AppError | null>(null)
 
+  // run() is memoised, so it must read the LATEST options when the save finishes. Reading them from the first
+  // render made messages built from later data stale (Renew said "Renewed" instead of "Renewed until 16 Jan").
+  const optionsRef = useRef(options)
+  useEffect(() => {
+    optionsRef.current = options
+  })
+
   const run = useCallback(
     async (...args: A): Promise<R | undefined> => {
       setLoading(true)
       setError(null)
       try {
         const result = await fn(...args)
-        if (options.success) toast.show(options.success, 'success')
-        options.onSuccess?.(result)
+        const latest = optionsRef.current
+        if (latest.success) toast.show(latest.success, 'success')
+        latest.onSuccess?.(result)
         // Writes that return nothing still need a value that differs from the failure
         // value (undefined), so callers can write `if (await run(...) !== undefined)`.
         return result === undefined ? (true as unknown as R) : result
       } catch (e) {
         const err = toAppError(e)
         setError(err)
-        if (!options.silent) toast.show(err.message, 'error')
+        if (!optionsRef.current.silent) toast.show(err.message, 'error')
         return undefined
       } finally {
         setLoading(false)
