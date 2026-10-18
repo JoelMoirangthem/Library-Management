@@ -1,15 +1,17 @@
 import { useId, useRef, useState } from 'react'
 import { ImagePlus, X } from 'lucide-react'
 import { Button } from '@/components/Button'
+import { MAX_PHOTOS } from '@/domain/photos'
+import { toAppError } from '@/domain/errors'
+import { services } from '@/lib/container'
 import { cx } from '@/lib/cx'
 
-const MAX_PHOTOS = 4
 const MAX_BYTES = 8 * 1024 * 1024
 const MAX_WIDTH = 1000
 const JPEG_QUALITY = 0.75
 
-/** Resize an image file to a <=1000px-wide JPEG data URL, using a canvas (browser only). */
-function resizeToDataUrl(file: File): Promise<string> {
+/** Resize an image file to a <=1000px-wide JPEG, using a canvas (browser only). */
+function resizeToJpeg(file: File): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file)
     const img = new Image()
@@ -25,7 +27,11 @@ function resizeToDataUrl(file: File): Promise<string> {
         return
       }
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      resolve(canvas.toDataURL('image/jpeg', JPEG_QUALITY))
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error('Could not process this image.'))),
+        'image/jpeg',
+        JPEG_QUALITY,
+      )
     }
     img.onerror = () => {
       URL.revokeObjectURL(url)
@@ -41,9 +47,14 @@ type Props = {
   disabled?: boolean
 }
 
-/** Up to 4 photos, resized client-side and stored as data URLs. */
+/**
+ * Up to 4 photos. Each is shrunk in the browser, uploaded straight away, and only its link is kept in the form.
+ * A photo added and then removed in the same visit is deleted from storage at once; photos that were already
+ * saved are deleted when the library is saved (the save tidies up everything no longer used).
+ */
 export function PhotoPicker({ photos, onChange, disabled }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const uploadedHere = useRef(new Set<string>())
   const [error, setError] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
   const id = useId()
@@ -65,9 +76,11 @@ export function PhotoPicker({ photos, onChange, disabled }: Props) {
         continue
       }
       try {
-        added.push(await resizeToDataUrl(file))
+        const url = await services.uploadPhoto(await resizeToJpeg(file))
+        uploadedHere.current.add(url)
+        added.push(url)
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not process that image.')
+        setError(toAppError(e).message)
       }
     }
     setWorking(false)
@@ -87,7 +100,7 @@ export function PhotoPicker({ photos, onChange, disabled }: Props) {
       {photos.length > 0 && (
         <ul className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {photos.map((src, i) => (
-            <li key={src.slice(0, 32) + i} className="relative">
+            <li key={src} className="relative">
               <img
                 src={src}
                 alt={`Library photo ${i + 1}`}
@@ -96,7 +109,11 @@ export function PhotoPicker({ photos, onChange, disabled }: Props) {
               {!disabled && (
                 <button
                   type="button"
-                  onClick={() => onChange(photos.filter((_, j) => j !== i))}
+                  onClick={() => {
+                    const gone = photos[i]
+                    onChange(photos.filter((_, j) => j !== i))
+                    if (uploadedHere.current.delete(gone)) void services.removePhotos([gone]).catch(() => undefined)
+                  }}
                   aria-label={`Remove photo ${i + 1}`}
                   className="absolute right-1.5 top-1.5 flex size-8 cursor-pointer items-center justify-center rounded-full bg-ink/70 text-white hover:bg-ink"
                 >

@@ -1,3 +1,4 @@
+import { MockPhotoRepository } from '@/repositories/mock/MockPhotoRepository'
 import { createServices, type Repositories } from '@/services/createServices'
 import type { DemoLogin } from '@/repositories/interfaces'
 import {
@@ -13,6 +14,7 @@ import {
   MockShiftRepository,
   MockSubscriptionRepository,
 } from '@/repositories/mock/mockRepos'
+import { SupabasePhotoRepository } from '@/repositories/supabase/SupabasePhotoRepository'
 import { SupabaseAuthRepository } from '@/repositories/supabase/SupabaseAuthRepository'
 import { SupabaseCatalogRepository } from '@/repositories/supabase/SupabaseCatalogRepository'
 import { SupabaseLibraryRepository } from '@/repositories/supabase/SupabaseLibraryRepository'
@@ -54,6 +56,7 @@ function mockRepositories(): Repositories {
     members: new MockMemberRepository(),
     fees: new MockFeeRepository(),
     seatRequests: new MockSeatRequestRepository(),
+    photos: new MockPhotoRepository(),
   }
 }
 
@@ -71,6 +74,7 @@ function supabaseRepositories(): Repositories {
     members: new SupabaseMemberRepository(),
     fees: new SupabaseFeeRepository(),
     seatRequests: new SupabaseSeatRequestRepository(),
+    photos: new SupabasePhotoRepository(),
   }
   return {
     auth: refreshAfterWrites(r.auth, bump),
@@ -83,6 +87,7 @@ function supabaseRepositories(): Repositories {
     members: refreshAfterWrites(r.members, bump),
     fees: refreshAfterWrites(r.fees, bump),
     seatRequests: refreshAfterWrites(r.seatRequests, bump),
+    photos: r.photos, // uploads do not change any screen's data; the library save does
   }
 }
 

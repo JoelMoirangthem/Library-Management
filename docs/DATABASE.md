@@ -162,3 +162,12 @@ Must hold:
 - **members** and **seat_requests** gain `shift_id` (not null, same library as the row).
 - Occupancy rule changes to `unique (seat_id, shift_id) where status = 'active' and seat_id is not null`. `public_libraries` returns seats left per active shift and the lowest fee.
 - `approve_seat_request` takes the shift from the request. `set_capacity` only deactivates seats free in every shift. Shift writes follow the profile rule (allowed unless the plan has expired).
+
+## Photos (storage)
+
+Bucket `LibraryImages` (public, JPEG/PNG, 5 MB). Files live at `<owner user id>/<random>.jpg`. Rules on `storage.objects` (migration 0010): insert only by an owner, only in their own folder, name ending .jpg/.jpeg/.png, at most 20 files per owner; select and delete only in their own folder. `libraries.photos` must satisfy `photos_are_valid`: at most 4 links, each a public link to a .jpg/.png in that owner's own folder.
+
+Must hold:
+- Another owner, a student, an admin account and a logged-out visitor cannot upload or delete anyone's photo.
+- An .html or .exe file, a file over 5 MB, a sub-folder, or a 21st file is refused.
+- `libraries.photos` refuses a data: blob, another website, another owner's folder, a .webp, a path with `..`, or a fifth photo.

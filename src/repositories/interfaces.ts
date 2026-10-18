@@ -160,3 +160,13 @@ export interface SeatRequestRepository {
 }
 
 export type { Role }
+
+/** Library photos: files in storage, referenced from the library by their public links. */
+export interface PhotoRepository {
+  /** Stores one (already shrunk) JPEG in the signed-in owner's own folder and returns its public link. */
+  upload(image: Blob): Promise<string>
+  /** Deletes stored files by their links. Links that are not stored files are ignored. */
+  remove(urls: string[]): Promise<void>
+  /** Deletes every file in the owner's folder that is not in urls: tidies up abandoned uploads. */
+  keepOnly(urls: string[]): Promise<void>
+}

@@ -1,9 +1,11 @@
+import type { LibraryInput, ShiftInput } from '@/domain/types'
 import type {
   AuthRepository,
   CatalogRepository,
   FeeRepository,
   LibraryRepository,
   MemberRepository,
+  PhotoRepository,
   PlanPaymentRepository,
   SeatRepository,
   SeatRequestRepository,
@@ -22,6 +24,7 @@ export type Repositories = {
   members: MemberRepository
   fees: FeeRepository
   seatRequests: SeatRequestRepository
+  photos: PhotoRepository
 }
 
 /**
@@ -49,8 +52,19 @@ export function createServices(r: Repositories) {
     // library
     getMyLibrary: () => r.libraries.getMine(),
     getLibrary: (id: string) => r.libraries.getById(id),
-    createLibrary: r.libraries.create.bind(r.libraries),
-    updateLibrary: r.libraries.update.bind(r.libraries),
+    // After a save, delete any photo files the library no longer uses. A failed tidy-up never fails the save.
+    createLibrary: async (input: LibraryInput, shifts: ShiftInput[]) => {
+      const lib = await r.libraries.create(input, shifts)
+      await r.photos.keepOnly(lib.photos).catch(() => undefined)
+      return lib
+    },
+    updateLibrary: async (id: string, input: LibraryInput) => {
+      const lib = await r.libraries.update(id, input)
+      await r.photos.keepOnly(lib.photos).catch(() => undefined)
+      return lib
+    },
+    uploadPhoto: (image: Blob) => r.photos.upload(image),
+    removePhotos: (urls: string[]) => r.photos.remove(urls),
     resubmitLibrary: (id: string) => r.libraries.submitForReview(id),
     searchLibraries: r.libraries.searchPublic.bind(r.libraries),
     getPublicLibrary: (id: string) => r.libraries.getPublic(id),
