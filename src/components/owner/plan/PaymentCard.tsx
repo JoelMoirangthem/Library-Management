@@ -19,8 +19,8 @@ const UPI_LINK = `upi://pay?pa=${encodeURIComponent(ADMIN_UPI_ID)}&pn=StudySeat&
 type Props = {
   /** The payment that is currently awaiting admin review, if any. */
   pending: PlanPayment | null
-  /** Human date the plan would run until after this payment is verified. */
-  runsUntil: string
+  /** Date the plan will run until after this payment is verified, or null when the plan has already ended (the 30 days then start the day it is activated). */
+  runsUntil: string | null
   onSubmit: (utr: string) => Promise<unknown>
   submitting: boolean
 }
@@ -164,9 +164,15 @@ function PayFlow({
       </section>
 
       <p className="mt-5 text-sm text-ink-muted">
-        Renew early and the days stack: you never lose days you've already paid for. After we verify
-        this payment, your plan will run until{' '}
-        <span className="font-medium text-ink tabular-nums">{formatDate(runsUntil)}</span>.
+        {runsUntil ? (
+          <>
+            Renew early and the days stack: you never lose days you've already paid for. After we verify
+            this payment, your plan will run until{' '}
+            <span className="font-medium text-ink tabular-nums">{formatDate(runsUntil)}</span>.
+          </>
+        ) : (
+          <>Your plan has ended, so the 30 days start on the day we verify this payment.</>
+        )}
       </p>
     </Card>
   )

@@ -10,7 +10,7 @@ let client: SupabaseClient | undefined
 export function getSupabase(): SupabaseClient {
   if (!client) {
     const { supabaseUrl, supabaseAnonKey } = getEnv()
-    client = createClient(supabaseUrl, supabaseAnonKey)
+    client = createClient(supabaseUrl, supabaseAnonKey, { auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true } })
   }
   return client
 }

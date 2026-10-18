@@ -114,7 +114,11 @@ export default function Plan() {
   const activeUntilDate = subscription ? dateOfInstant(subscription.activeUntil) : null
   const canPay = state === 'trial' || state === 'paid' || state === 'expired'
   const pending = (payments.data ?? []).find((p: PlanPayment) => p.status === 'pending') ?? null
-  const runsUntil = dateOfInstant(extendedActiveUntil(subscription, now).toISOString())
+  // Same rule the database uses. Paying in advance stacks 30 days on the days left, so the new end date is
+  // known now. If the plan has already ended, the 30 days start the day an admin activates it: unknown yet.
+  const paidAt = pending ? new Date(pending.submittedAt) : now
+  const stillActive = subscription !== null && new Date(subscription.activeUntil) > paidAt
+  const runsUntil = stillActive ? dateOfInstant(extendedActiveUntil(subscription, paidAt).toISOString()) : null
 
   return (
     <>

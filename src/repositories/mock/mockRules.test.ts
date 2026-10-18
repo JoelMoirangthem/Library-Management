@@ -71,6 +71,39 @@ describe('roles', () => {
 })
 
 describe('plan payments (BR-4, BR-5)', () => {
+  it('after the plan expired, counts the 30 days from the day the admin activates it', async () => {
+    // lib_scholars' plan ended 5 days ago. The owner pays now; the admin only activates it 3 days later.
+    await login.signInAs('u_farah')
+    const payment = await payments.submit('lib_scholars', '555000111222')
+    setClockOffsetDays(3)
+    await login.signInAs('u_admin')
+    await payments.verify(payment.id)
+    const end = new Date(getDb().subscriptions.find((s) => s.libraryId === 'lib_scholars')!.activeUntil).getTime()
+    const activatedAt = Date.now() + 3 * 86_400_000
+    expect(Math.abs(end - (activatedAt + 30 * 86_400_000))).toBeLessThan(5_000)
+  })
+
+  it('paid in advance with days left: those days stack, even if verified later', async () => {
+    await login.signInAs('u_manoj')
+    const before = new Date(getDb().subscriptions.find((s) => s.libraryId === 'lib_quiet')!.activeUntil).getTime()
+    await login.signInAs('u_admin')
+    await payments.verify('pp_3')
+    const end = new Date(getDb().subscriptions.find((s) => s.libraryId === 'lib_quiet')!.activeUntil).getTime()
+    expect(Math.abs(end - (before + 30 * 86_400_000))).toBeLessThan(5_000)
+  })
+
+  it('keeps the days left when the owner paid while still active, even if verified after the plan ended', async () => {
+    // lib_quiet has about 1.5 days left. The owner pays now; the admin verifies 4 days later (after it ended).
+    await login.signInAs('u_manoj')
+    const before = new Date(getDb().subscriptions.find((s) => s.libraryId === 'lib_quiet')!.activeUntil).getTime()
+    const submitted = getDb().planPayments.find((p) => p.id === 'pp_3')!
+    setClockOffsetDays(4)
+    await login.signInAs('u_admin')
+    await payments.verify(submitted.id)
+    const end = new Date(getDb().subscriptions.find((s) => s.libraryId === 'lib_quiet')!.activeUntil).getTime()
+    expect(Math.abs(end - (before + 30 * 86_400_000))).toBeLessThan(5_000)
+  })
+
   it('verifying twice adds 30 days once', async () => {
     await login.signInAs('u_admin')
     const before = new Date(getDb().subscriptions.find((s) => s.libraryId === 'lib_quiet')!.activeUntil).getTime()

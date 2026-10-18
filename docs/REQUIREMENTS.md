@@ -15,7 +15,7 @@ Library owners manage their study library (seats, students, fees, expiry). Stude
 - **BR-1** Library states: `pending` → `approved` or `rejected`. A rejected owner can edit and resubmit (back to `pending`).
 - **BR-2** A library is *active* when it is `approved` and `now() < active_until`. Only active libraries are visible to students and can receive seat requests.
 - **BR-3** The 14-day trial starts on the **first** approval only. Re-approval never resets it.
-- **BR-4** A verified payment sets `active_until = greatest(now(), active_until) + 30 days` (keeps leftover trial days, early renewal stacks).
+- **BR-4** A verified payment adds 30 days. Paid in advance (the plan still had days left on the date the UTR was submitted): the days left stay and 30 stack on top, so 3 days left becomes 33 days, even if the admin verifies after the plan has ended. Paid after the plan expired: 30 days from the day the admin verifies. Unused trial days count as days left.
 - **BR-5** Plan amount is fixed by the database at 19900 paise. Each UTR can be used once. A payment moves `pending → verified | failed` exactly once.
 - **BR-6** Expired library: owner can read everything; all writes to seats, members, fee payments, seat-request decisions, and the library profile are blocked. The only allowed write is submitting a plan payment.
 - **BR-7** Users choose `student` or `owner` exactly once. The client can never change the role afterwards. `admin` is set only via SQL.

@@ -321,14 +321,34 @@ function NewAccountForm({ onSignUp }: { onSignUp: (name: string, email: string) 
 }
 
 function RealGoogleSignIn() {
+  const { signInWithGoogle } = useAuth()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function start() {
+    setBusy(true)
+    setError(null)
+    try {
+      await signInWithGoogle() // the browser leaves for Google, so there is nothing to do after this
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not start Google sign-in.')
+      setBusy(false)
+    }
+  }
+
   return (
     <Card className="mt-8 p-6 text-center">
       <p className="text-ink-muted">Sign in with your Google account to continue.</p>
-      <Button className="mt-4 w-full" disabled>
+      <Button className="mt-4 w-full" loading={busy} onClick={() => void start()}>
         Continue with Google
       </Button>
+      {error && (
+        <p role="alert" className="mt-3 text-sm font-medium text-danger">
+          {error}
+        </p>
+      )}
       <p className="mt-3 text-sm text-ink-muted">
-        Google sign-in is configured in production builds.
+        You choose Student or Owner once, right after you sign in.
       </p>
     </Card>
   )

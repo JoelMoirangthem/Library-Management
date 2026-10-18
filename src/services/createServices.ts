@@ -33,6 +33,7 @@ export function createServices(r: Repositories) {
   return {
     // auth
     getSession: () => r.auth.getSession(),
+    signInWithGoogle: () => r.auth.signInWithGoogle(),
     signOut: () => r.auth.signOut(),
     chooseRole: (role: 'student' | 'owner') => r.auth.setMyRole(role),
     updateProfile: (patch: { name: string; phone: string }) => r.auth.updateProfile(patch),

@@ -103,7 +103,7 @@ All are `security definer` with a fixed `search_path`, and each checks the calle
 | `approve_library(library_id)` | admin | `pending → approved`; creates subscription with 14-day trial only if none exists |
 | `reject_library(library_id, reason)` | admin | `pending → rejected` |
 | `submit_plan_payment(library_id, utr)` | owner | inserts pending payment, amount 19900; allowed when expired |
-| `verify_plan_payment(payment_id)` | admin | `select … for update`; must be pending; sets verified; `active_until = greatest(now(), active_until) + interval '30 days'` |
+| `verify_plan_payment(payment_id)` | admin | `select … for update`; must be pending; sets verified; if `active_until > submitted_at` (paid in advance) then `active_until + 30 days`, else `now() + 30 days` (paid after expiry) |
 | `fail_plan_payment(payment_id, reason)` | admin | `pending → failed` |
 | `set_capacity(library_id, capacity)` | owner, active | adds seats or deactivates free seats only |
 | `renew_member(member_id, amount_paise, mode, new_expiry)` | owner, active | inserts fee + updates expiry atomically |
@@ -152,7 +152,7 @@ Must fail:
 
 Must hold:
 - Verifying the same payment twice adds 30 days once.
-- Paying during the trial keeps remaining trial days; early renewal stacks.
+- Paying in advance (trial or paid plan) keeps the days left and adds 30: 3 days left becomes 33. Paying after expiry gives 30 days from the day the admin verifies.
 - After `active_until` passes, the library is absent from `public_libraries`.
 
 ## Shifts (added after the first draft)

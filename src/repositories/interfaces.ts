@@ -31,6 +31,8 @@ import type {
 
 export interface AuthRepository {
   getSession(): Promise<Profile | null>
+  /** Real mode: sends the browser to Google. Mock mode uses DemoLogin instead and throws here. */
+  signInWithGoogle(): Promise<void>
   signOut(): Promise<void>
   /** Once only: student or owner (BR-7). */
   setMyRole(role: 'student' | 'owner'): Promise<Profile>

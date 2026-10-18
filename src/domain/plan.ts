@@ -40,9 +40,23 @@ export function canEditProfile(state: PlanState): boolean {
   return state !== 'expired'
 }
 
-/** BR-4: a verified payment adds 30 days on top of whichever is later, now or the current end. */
-export function extendedActiveUntil(sub: Subscription | null, now: Date, days = PLAN_DAYS): Date {
-  const base = sub && new Date(sub.activeUntil) > now ? new Date(sub.activeUntil) : now
+/**
+ * BR-4 (owner's rule): a verified payment adds 30 days.
+ *  - Paid IN ADVANCE (the plan still had days left on the paid date): the days left stay and the 30 stack
+ *    on top, e.g. 3 days left + 30 = 33 days from the paid date. This holds even if the admin only verifies
+ *    after the plan has ended.
+ *  - Paid AFTER the plan expired: there is nothing to stack on, so the 30 days start the day the admin
+ *    activates the plan (ctivatedAt).
+ * paidAt is when the UTR was submitted; ctivatedAt is when the admin verifies (defaults to paidAt).
+ */
+export function extendedActiveUntil(
+  sub: Subscription | null,
+  paidAt: Date,
+  activatedAt: Date = paidAt,
+  days = PLAN_DAYS,
+): Date {
+  const stillActive = sub !== null && new Date(sub.activeUntil) > paidAt
+  const base = stillActive ? new Date(sub.activeUntil) : activatedAt
   return addDaysToDate(base, days)
 }
 

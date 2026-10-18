@@ -385,7 +385,8 @@ function VerifyModal({
   const { run, loading } = useMutation(services.verifyPlanPayment, { silent: true })
 
   if (!payment) return null
-  const until = formatUntil(extendedActiveUntil(sub, now))
+  // Paid in advance: stacks on the days left. Paid after expiry: 30 days from today's activation.
+  const until = formatUntil(extendedActiveUntil(sub, new Date(payment.submittedAt), now))
 
   async function submit() {
     if (!payment) return

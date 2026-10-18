@@ -399,7 +399,7 @@ function ApproveModal({ row, onClose }: { row: AdminLibraryRow | null; onClose: 
   const { run, loading } = useMutation(services.approveLibrary, { silent: true })
 
   if (!row) return null
-  const trialEnds = formatUntil(extendedActiveUntil(null, now, TRIAL_DAYS))
+  const trialEnds = formatUntil(extendedActiveUntil(null, now, now, TRIAL_DAYS))
 
   async function submit() {
     if (!row) return

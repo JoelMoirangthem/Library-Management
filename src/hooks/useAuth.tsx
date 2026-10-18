@@ -12,6 +12,8 @@ type AuthApi = {
   signInAs: (userId: string) => Promise<Profile>
   /** Mock mode: a brand new Google user with no role yet. */
   signUpNew: (name: string, email: string) => Promise<Profile>
+  /** Real mode: sends the browser to Google. */
+  signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
   chooseRole: (role: 'student' | 'owner') => Promise<Profile>
   updateProfile: (patch: { name: string; phone: string }) => Promise<Profile>
@@ -66,6 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return u
   }, [])
 
+  const signInWithGoogle = useCallback(async () => {
+    await services.signInWithGoogle()
+  }, [])
+
   const signOut = useCallback(async () => {
     await services.signOut()
     setUser(null)
@@ -84,8 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const api = useMemo<AuthApi>(
-    () => ({ user, loading, signInAs, signUpNew, signOut, chooseRole, updateProfile }),
-    [user, loading, signInAs, signUpNew, signOut, chooseRole, updateProfile],
+    () => ({ user, loading, signInAs, signUpNew, signInWithGoogle, signOut, chooseRole, updateProfile }),
+    [user, loading, signInAs, signUpNew, signInWithGoogle, signOut, chooseRole, updateProfile],
   )
 
   return <AuthContext.Provider value={api}>{children}</AuthContext.Provider>

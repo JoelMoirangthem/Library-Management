@@ -37,3 +37,6 @@ dist-ssr
 
 # Isolated feature worktrees
 .worktrees/
+
+# Supabase CLI local link state
+supabase/.temp/

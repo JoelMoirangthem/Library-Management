@@ -73,6 +73,27 @@ describe('plan stacking (BR-4)', () => {
   })
 })
 
+describe('renewal rules (owner decision)', () => {
+  it('paid in advance with 3 days left: 30 + 3 = 33 days from today', () => {
+    const next = extendedActiveUntil(sub(-20, 3), now, now)
+    expect((next.getTime() - now.getTime()) / day).toBeCloseTo(33)
+  })
+
+  it('paid in advance but verified after the plan ended: the days left still stack', () => {
+    // Paid today with 2 days left; the admin only activates it 4 days later.
+    const activatedAt = new Date(now.getTime() + 4 * day)
+    const next = extendedActiveUntil(sub(-20, 2), now, activatedAt)
+    expect((next.getTime() - now.getTime()) / day).toBeCloseTo(32)
+  })
+
+  it('paid after the plan already expired: 30 days from the day the admin activates it', () => {
+    // Plan ended 3 days ago; the owner paid yesterday; the admin activates today.
+    const paidAt = new Date(now.getTime() - 1 * day)
+    const next = extendedActiveUntil(sub(-30, -3), paidAt, now)
+    expect((next.getTime() - now.getTime()) / day).toBeCloseTo(30)
+  })
+})
+
 describe('newTrial (BR-3)', () => {
   it('lasts 14 days from approval and trial end equals active_until', () => {
     const t = newTrial('l', now)

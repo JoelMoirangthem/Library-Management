@@ -27,7 +27,7 @@ Finish and test each step, commit, then move on. "Done when" is the test script.
   *Done when:* numbers match Seats and Members pages exactly.
 
 - [ ] **Step 8 — Plan and billing.** Countdown banner; Plan page (₹199, UPI ID/QR, UTR via `submit_plan_payment`); payment history; admin Verify/Fail.
-  *Done when:* verify adds 30 days once; trial days are kept; early renewal stacks; expired library is hidden and read-only but can still submit a payment.
+  *Done when:* verify adds 30 days once; trial days are kept; paying in advance stacks (3 days left becomes 33); paying after expiry counts 30 days from verification; expired library is hidden and read-only but can still submit a payment.
 
 - [ ] **Step 9 — Student discovery.** City/area dropdowns, fee and amenity filters via `public_libraries`; detail page with photos, fees, timings, Call, Google Maps link.
   *Done when:* students see only active libraries, never expired/pending/rejected ones.

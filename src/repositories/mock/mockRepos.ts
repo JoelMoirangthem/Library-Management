@@ -198,6 +198,9 @@ export class MockAuthRepository implements AuthRepository {
   getSession() {
     return run(() => currentUser())
   }
+  signInWithGoogle(): Promise<void> {
+    return Promise.reject(new AppError('unknown', 'Google sign-in is only available with the real database. Use a demo account.'))
+  }
   signOut() {
     return run(() => {
       getDb().sessionUserId = null
@@ -591,7 +594,8 @@ export class MockPlanPaymentRepository implements PlanPaymentRepository {
       if (p.status !== 'pending') throw new AppError('conflict', 'This payment was already handled.')
       const now = getNow()
       const sub = subscriptionOf(p.libraryId)
-      const until = extendedActiveUntil(sub, now).toISOString()
+      // Paid in advance: stacks on the days left. Paid after expiry: 30 days from this activation.
+      const until = extendedActiveUntil(sub, new Date(p.submittedAt), now).toISOString()
       if (sub) sub.activeUntil = until
       else db.subscriptions.push({ libraryId: p.libraryId, trialEndsAt: now.toISOString(), activeUntil: until })
       p.status = 'verified'
