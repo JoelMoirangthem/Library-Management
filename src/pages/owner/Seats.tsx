@@ -282,7 +282,7 @@ export default function Seats() {
                 value={find}
                 onChange={(e) => setFind(e.target.value)}
                 placeholder={`Search ${selectedShift?.name ?? 'this shift'} by name or phone`}
-                className="block min-h-11 w-full rounded-control border border-border-strong bg-surface py-2 pl-9 pr-3 text-base text-ink placeholder:text-ink-muted/70"
+                className="block min-h-11 pointer-fine:min-h-9 w-full rounded-control border border-border-strong bg-surface py-2 pl-9 pr-3 text-base pointer-fine:text-sm text-ink placeholder:text-ink-muted/70"
               />
             </div>
             {find.trim() && (
@@ -363,7 +363,7 @@ export default function Seats() {
                         id="assign-seat"
                         value={assignTo}
                         onChange={(e) => setAssignTo(e.target.value)}
-                        className="block min-h-11 w-full cursor-pointer rounded-control border border-border-strong bg-surface px-3 py-2 text-base text-ink"
+                        className="block min-h-11 pointer-fine:min-h-9 w-full cursor-pointer rounded-control border border-border-strong bg-surface px-3 py-2 text-base pointer-fine:text-sm text-ink"
                       >
                         <option value="">Choose a student</option>
                         {studentsWithoutSeat.map((m) => (

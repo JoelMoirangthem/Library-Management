@@ -9,11 +9,12 @@ import { cx } from '@/lib/cx'
 
 /**
  * Form fields. Visible label above the control (never placeholder-only), hint below,
- * error right under the field in words. 16px text so iOS doesn't zoom on focus.
+ * error right under the field in words. 16px text on touch so iOS doesn't zoom on focus;
+ * tighter (14px, 36px tall) on pointer devices.
  */
 
 const control =
-  'block w-full min-h-11 rounded-control border bg-surface px-3 py-2 text-base text-ink ' +
+  'block w-full min-h-11 pointer-fine:min-h-9 rounded-control border bg-surface px-3 py-2 text-base pointer-fine:text-sm text-ink ' +
   'placeholder:text-ink-muted/70 disabled:cursor-not-allowed disabled:bg-canvas disabled:text-ink-muted'
 
 function borderFor(error?: string) {
@@ -135,7 +136,7 @@ export function ChipCheckbox({
   return (
     <label
       className={cx(
-        'inline-flex min-h-11 cursor-pointer select-none items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
+        'inline-flex min-h-11 pointer-fine:min-h-9 cursor-pointer select-none items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
         checked
           ? 'border-primary bg-primary-soft text-primary-ink'
           : 'border-border-strong bg-surface text-ink hover:bg-canvas',

@@ -1,12 +1,21 @@
 import { useState, type ReactNode } from 'react'
+import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
+import { OperationalRow } from '@/components/OperationalRow'
+import { Panel } from '@/components/Panel'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
 import { NotFoundState } from '@/components/states/NotFoundState'
 import { SetupState } from '@/components/states/SetupState'
 
-/** Dev-only visual test page. Every component in every state lives here. */
+/**
+ * Dev-only visual test page. Every component in every state lives here.
+ *
+ * Validation checklist:
+ * - Capture the panel and operational-row preview at desktop width.
+ * - Capture the same preview at 390px width.
+ */
 
 const swatches: { name: string; cls: string; note?: string }[] = [
   { name: 'canvas', cls: 'bg-canvas border border-border' },
@@ -111,6 +120,18 @@ export default function Styleguide() {
           <Button loading>Saving</Button>
           <Button disabled>Disabled</Button>
         </div>
+      </Section>
+
+      <Section title="Panels and operational rows">
+        <Panel title="Needs your attention" action={<Button>Review requests</Button>}>
+          <OperationalRow
+            primary="Ishita Nair"
+            context="Morning · Seat 1"
+            status={<Badge tone="danger">Overdue by 6 days</Badge>}
+            primaryAction={<Button>Renew</Button>}
+            moreAction={<Button variant="secondary">More</Button>}
+          />
+        </Panel>
       </Section>
 
       <Section title="States">

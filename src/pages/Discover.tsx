@@ -143,7 +143,7 @@ export default function Discover() {
             value={q}
             onChange={(e) => update({ q: e.target.value })}
             placeholder="Search by library name"
-            className="block w-full min-h-11 rounded-control border border-border-strong bg-surface py-2 pl-10 pr-3 text-base text-ink placeholder:text-ink-muted/70"
+            className="block w-full min-h-11 pointer-fine:min-h-9 rounded-control border border-border-strong bg-surface py-2 pl-10 pr-3 text-base pointer-fine:text-sm text-ink placeholder:text-ink-muted/70"
           />
         </div>
 
@@ -197,7 +197,7 @@ export default function Discover() {
                 key={chip.key}
                 type="button"
                 onClick={chip.onRemove}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border-strong bg-surface px-3 text-sm font-medium text-ink hover:bg-canvas"
+                className="inline-flex min-h-11 pointer-fine:min-h-9 items-center gap-1.5 rounded-full border border-border-strong bg-surface px-3 text-sm font-medium text-ink hover:bg-canvas"
               >
                 {chip.label}
                 <X aria-hidden className="size-4 text-ink-muted" />
@@ -253,7 +253,7 @@ export default function Discover() {
                 <select
                   value={sort}
                   onChange={(e) => update({ sort: e.target.value as SortKey })}
-                  className="min-h-11 max-w-full cursor-pointer rounded-control border border-border-strong bg-surface px-3 text-base text-ink"
+                  className="min-h-11 pointer-fine:min-h-9 max-w-full cursor-pointer rounded-control border border-border-strong bg-surface px-3 text-base pointer-fine:text-sm text-ink"
                 >
                   <option value="seats">Most seats free</option>
                   <option value="fee">Lowest fee</option>

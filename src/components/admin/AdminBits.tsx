@@ -6,7 +6,7 @@ import { cx } from '@/lib/cx'
 import { formatPhone } from '@/domain/constants'
 import { formatDateTime } from '@/domain/dates'
 
-/** A 44px tel link that shows the number with formatPhone and a leading phone icon. */
+/** A tel link: 44px touch target on phones, inline text height on pointer devices. */
 export function TelLink({
   phone,
   className,
@@ -18,7 +18,7 @@ export function TelLink({
     <a
       href={`tel:${phone}`}
       className={cx(
-        'inline-flex min-h-11 items-center gap-1.5 tabular-nums text-primary hover:underline',
+        'inline-flex min-h-11 pointer-fine:min-h-0 items-center gap-1.5 tabular-nums text-primary hover:underline',
         className,
       )}
     >
@@ -90,7 +90,7 @@ export function Segmented<T extends string>({
             aria-pressed={active}
             onClick={() => onChange(o.value)}
             className={cx(
-              'inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-control border px-3.5 text-sm font-medium transition-colors',
+              'inline-flex min-h-11 pointer-fine:min-h-9 cursor-pointer items-center gap-2 rounded-control border px-3.5 text-sm font-medium transition-colors',
               active
                 ? 'border-primary bg-primary-soft text-primary-ink'
                 : 'border-border-strong bg-surface text-ink hover:bg-canvas',
@@ -177,7 +177,7 @@ export function CopyButton({ value, toastText }: { value: string; toastText: str
           toast.show("Couldn't copy. Select and copy it by hand.", 'error')
         }
       }}
-      className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-control border border-border-strong text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
+      className="inline-flex size-11 pointer-fine:size-8 shrink-0 cursor-pointer items-center justify-center rounded-control border border-border-strong text-ink-muted transition-colors hover:bg-canvas hover:text-ink active:bg-canvas"
     >
       {copied ? <Check aria-hidden className="size-4 text-success-ink" /> : <Copy aria-hidden className="size-4" />}
     </button>

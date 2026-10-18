@@ -37,7 +37,7 @@ export function StatCard({
   tone?: 'default' | 'primary' | 'warning'
 }) {
   return (
-    <Card className="p-4 sm:p-5">
+    <Card className="min-w-0 p-4 sm:p-5">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-ink-muted">{label}</p>
         {icon && (

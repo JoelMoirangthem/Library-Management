@@ -35,7 +35,7 @@ export function SidebarNav({ items }: { items: NavItemDef[] }) {
           end={it.end}
           className={({ isActive }) =>
             cx(
-              'flex min-h-11 items-center gap-3 rounded-control px-3 text-base font-medium transition-colors',
+              'flex min-h-11 pointer-fine:min-h-9 items-center gap-3 rounded-control px-3 text-base pointer-fine:text-sm font-medium transition-colors',
               isActive ? 'bg-primary-soft text-primary-ink' : 'text-ink-muted hover:bg-canvas hover:text-ink',
             )
           }

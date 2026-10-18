@@ -21,7 +21,8 @@ const variants: Record<ButtonVariant, string> = {
 /**
  * Class string for anything that should look like a button, e.g. a router <Link>:
  *   <Link to="/x" className={buttonStyles('primary')}>Go</Link>
- * 44px minimum height: these are used one-handed on phones.
+ * 44px minimum height on touch (used one-handed on phones); 36px on pointer devices,
+ * which is the desktop control standard and stops the UI reading as oversized.
  */
 export function buttonStyles(variant: ButtonVariant = 'primary', extra?: string) {
   // Tailwind can't tell which of two conflicting utilities you meant, so the defaults step aside
@@ -30,9 +31,9 @@ export function buttonStyles(variant: ButtonVariant = 'primary', extra?: string)
   const hidden = /(^|\s)hidden(\s|$)/.test(extra ?? '')
   return cx(
     !hidden && 'inline-flex',
-    'min-h-11 cursor-pointer items-center justify-center gap-2 rounded-control',
+    'min-h-11 pointer-fine:min-h-9 cursor-pointer items-center justify-center gap-2 rounded-control',
     !customPadding && 'px-4',
-    'text-base font-medium transition-colors duration-150',
+    'text-base pointer-fine:text-sm font-medium transition-colors duration-150 active:translate-y-px',
     variants[variant],
     extra,
   )

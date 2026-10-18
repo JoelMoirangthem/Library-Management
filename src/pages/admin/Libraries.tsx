@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
-import { CardBody, CardFooter, CardGrid, GridCard, GridItem } from '@/components/CardGrid'
+import { Card } from '@/components/Card'
 import { Modal } from '@/components/Modal'
 import { PageHeader, StatCard } from '@/components/PageParts'
 import { TextAreaField } from '@/components/Fields'
@@ -26,37 +26,8 @@ import { formatDate } from '@/domain/dates'
 import { formatRupees } from '@/domain/money'
 import { normalizePhone } from '@/domain/constants'
 import { extendedActiveUntil, planState, TRIAL_DAYS } from '@/domain/plan'
-import { MAX_ACTIVE_SHIFTS, formatShiftRange, sortShifts } from '@/domain/shifts'
-import type { AdminLibraryRow, Shift } from '@/domain/types'
-
-/**
- * Shift chips for a card, always reserving MAX_ACTIVE_SHIFTS rows so every card in a row is
- * the same height. Missing rows render as invisible placeholders that hold the same height.
- */
-function ShiftRows({ shifts }: { shifts: Shift[] }) {
-  const sorted = sortShifts(shifts)
-  const rows = Array.from({ length: MAX_ACTIVE_SHIFTS }, (_, i) => sorted[i] ?? null)
-  return (
-    <ul className="space-y-1.5">
-      {rows.map((s, i) => (
-        <li key={s?.id ?? `empty-${i}`} className={s ? undefined : 'invisible'} aria-hidden={s ? undefined : true}>
-          <Badge tone={s && s.isActive ? 'primary' : 'neutral'}>
-            <span className="tabular-nums">
-              {s ? (
-                <>
-                  {s.name} {formatRupees(s.monthlyFeePaise)}
-                  {!s.isActive && ' · off'}
-                </>
-              ) : (
-                'placeholder'
-              )}
-            </span>
-          </Badge>
-        </li>
-      ))}
-    </ul>
-  )
-}
+import { formatShiftCount, formatShiftRange, sortShifts } from '@/domain/shifts'
+import type { AdminLibraryRow } from '@/domain/types'
 
 type Tab = 'pending' | 'live' | 'expired' | 'rejected' | 'all'
 
@@ -139,7 +110,7 @@ export default function Libraries() {
       <PageHeader title="Libraries" description="Review new libraries and keep an eye on plans." />
 
       {loading ? (
-        <LoadingState layout="cards" label="Loading libraries" />
+        <LoadingState layout="list" label="Loading libraries" />
       ) : error ? (
         <ErrorState onRetry={reload} />
       ) : (
@@ -161,7 +132,7 @@ export default function Libraries() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search name, owner or area"
                 aria-label="Search libraries"
-                className="min-h-11 w-full rounded-control border border-border-strong bg-surface pl-9 pr-3 text-sm text-ink placeholder:text-ink-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                className="min-h-11 pointer-fine:min-h-9 w-full rounded-control border border-border-strong bg-surface pl-9 pr-3 text-sm text-ink placeholder:text-ink-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               />
             </div>
           </div>
@@ -173,10 +144,12 @@ export default function Libraries() {
               <EmptyTab tab={activeTab} />
             )
           ) : (
-            <CardGrid count={filtered.length}>
-              {filtered.map(({ row, state }) => (
-                <GridItem key={row.library.id}>
+            <>
+              {/* Below lg: compact cards (a table doesn't fit next to the sidebar). */}
+              <div className="space-y-3 lg:hidden">
+                {filtered.map(({ row, state }) => (
                   <LibraryCard
+                    key={row.library.id}
                     row={row}
                     now={now}
                     state={state}
@@ -185,9 +158,41 @@ export default function Libraries() {
                     onApprove={() => setApproving(row)}
                     onReject={() => setRejecting(row)}
                   />
-                </GridItem>
-              ))}
-            </CardGrid>
+                ))}
+              </div>
+
+              {/* lg+: one dense row per library, same pattern as the Payments history table. */}
+              <Card className="hidden overflow-hidden lg:block">
+                <table className="w-full text-left text-sm">
+                  <caption className="sr-only">Libraries</caption>
+                  <thead className="border-b border-border bg-canvas text-ink-muted">
+                    <tr>
+                      <th scope="col" className="px-4 py-3 font-medium">Library</th>
+                      <th scope="col" className="px-4 py-3 font-medium">Owner</th>
+                      <th scope="col" className="px-4 py-3 font-medium">Area</th>
+                      <th scope="col" className="hidden px-4 py-3 font-medium xl:table-cell">Seats</th>
+                      <th scope="col" className="hidden px-4 py-3 font-medium xl:table-cell">Shifts</th>
+                      <th scope="col" className="hidden px-4 py-3 font-medium xl:table-cell">Submitted</th>
+                      <th scope="col" className="px-4 py-3 text-right font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filtered.map(({ row, state }) => (
+                      <LibraryRow
+                        key={row.library.id}
+                        row={row}
+                        now={now}
+                        state={state}
+                        showRejection={activeTab === 'rejected'}
+                        onDetail={() => setDetail(row)}
+                        onApprove={() => setApproving(row)}
+                        onReject={() => setRejecting(row)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            </>
           )}
         </div>
       )}
@@ -210,15 +215,7 @@ function EmptyTab({ tab }: { tab: Tab }) {
   return <EmptyState title={copy[tab].title} description={copy[tab].description} />
 }
 
-function LibraryCard({
-  row,
-  now,
-  state,
-  showRejection,
-  onDetail,
-  onApprove,
-  onReject,
-}: {
+type LibraryActionProps = {
   row: AdminLibraryRow
   now: Date
   state: ReturnType<typeof planState>
@@ -226,63 +223,114 @@ function LibraryCard({
   onDetail: () => void
   onApprove: () => void
   onReject: () => void
-}) {
+}
+
+/** Phone card: one compact block, no fixed heights — rows don't need to line up in a column. */
+function LibraryCard({ row, now, state, showRejection, onDetail, onApprove, onReject }: LibraryActionProps) {
   const view = planStatusView(state, row.subscription, now)
+  const lib = row.library
   const pending = state === 'pending'
   return (
-    <GridCard>
-      <CardBody className="space-y-3">
-        {/* Header: name clamps to two reserved lines so badges below line up across cards. */}
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="line-clamp-2 min-h-[2.75rem] break-words font-semibold text-ink">
-            {row.library.name}
-          </h3>
-          <Badge tone={view.tone}>{view.label}</Badge>
-        </div>
+    <Card className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="min-w-0 break-words font-semibold text-ink">{lib.name}</h3>
+        <Badge tone={view.tone}>{view.label}</Badge>
+      </div>
 
-        <div className="space-y-1 text-sm">
-          <p className="text-ink">{row.ownerName}</p>
-          <TelLink phone={row.ownerPhone} className="text-ink-muted" />
-          <p className="text-ink-muted">
-            {row.areaName}, {row.cityName}
-          </p>
-        </div>
+      <div className="mt-1 text-sm">
+        <p className="text-ink">{row.ownerName}</p>
+        <TelLink phone={row.ownerPhone} className="whitespace-nowrap text-ink-muted" />
+      </div>
 
-        <p className="text-xs text-ink-muted tabular-nums">
-          {row.library.capacity} seats · submitted {formatDate(row.library.createdAt.slice(0, 10))}
+      <p className="mt-1 text-sm text-ink-muted">
+        {row.areaName}, {row.cityName}
+      </p>
+
+      <p className="mt-1 text-xs text-ink-muted tabular-nums">
+        {lib.capacity} seats · {formatShiftCount(row.shifts.length)} · submitted {formatDate(lib.createdAt.slice(0, 10))}
+      </p>
+
+      {showRejection && (
+        <p className="mt-2 rounded-control bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+          {lib.rejectionReason || ''}
         </p>
+      )}
 
-        {/* Shift area reserves three chip rows so footers align across cards. */}
-        <ShiftRows shifts={row.shifts} />
-
-        {/* Rejection reason: a reserved region only on the Rejected tab, omitted everywhere else. */}
-        {showRejection && (
-          <p className="min-h-[2.5rem] rounded-control bg-danger-soft px-3 py-2 text-sm text-danger-ink">
-            {row.library.rejectionReason || ''}
-          </p>
-        )}
-      </CardBody>
-
-      <CardFooter>
-        {pending ? (
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+        {pending && (
           <>
-            <Button variant="primary" className="flex-1 px-3" onClick={onApprove}>
+            <Button variant="primary" className="flex-1 px-3" aria-label={`Approve ${lib.name}`} onClick={onApprove}>
               Approve
             </Button>
-            <Button variant="secondary" className="flex-1 px-3" onClick={onReject}>
+            <Button variant="secondary" className="flex-1 px-3" aria-label={`Reject ${lib.name}`} onClick={onReject}>
               Reject
             </Button>
           </>
-        ) : null}
+        )}
         <Button
           variant={pending ? 'ghost' : 'secondary'}
           className={pending ? 'w-full' : 'flex-1 px-3'}
+          aria-label={`Details for ${lib.name}`}
           onClick={onDetail}
         >
           Details
         </Button>
-      </CardFooter>
-    </GridCard>
+      </div>
+    </Card>
+  )
+}
+
+/** One table row per library, from lg up. Repeats "Approve"/"Reject", so labels name the library. */
+function LibraryRow({ row, now, state, showRejection, onDetail, onApprove, onReject }: LibraryActionProps) {
+  const view = planStatusView(state, row.subscription, now)
+  const lib = row.library
+  const pending = state === 'pending'
+  return (
+    <tr className="align-top">
+      <td className="px-4 py-3">
+        <p className="break-words font-medium text-ink">{lib.name}</p>
+        <div className="mt-1">
+          <Badge tone={view.tone}>{view.label}</Badge>
+        </div>
+        {showRejection && lib.rejectionReason && (
+          <p className="mt-1 max-w-64 text-xs text-ink-muted">{lib.rejectionReason}</p>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        <p className="text-ink">{row.ownerName}</p>
+        <TelLink phone={row.ownerPhone} className="whitespace-nowrap text-ink-muted" />
+      </td>
+      <td className="px-4 py-3 text-ink-muted">
+        {row.areaName}, {row.cityName}
+      </td>
+      <td className="hidden px-4 py-3 tabular-nums xl:table-cell">{lib.capacity}</td>
+      <td className="hidden whitespace-nowrap px-4 py-3 text-ink-muted xl:table-cell">{formatShiftCount(row.shifts.length)}</td>
+      <td className="hidden whitespace-nowrap px-4 py-3 text-ink-muted tabular-nums xl:table-cell">
+        {formatDate(lib.createdAt.slice(0, 10))}
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex flex-wrap items-center justify-end gap-2 xl:flex-nowrap">
+          {pending && (
+            <>
+              <Button variant="primary" className="px-3" aria-label={`Approve ${lib.name}`} onClick={onApprove}>
+                Approve
+              </Button>
+              <Button variant="secondary" className="px-3" aria-label={`Reject ${lib.name}`} onClick={onReject}>
+                Reject
+              </Button>
+            </>
+          )}
+          <Button
+            variant={pending ? 'ghost' : 'secondary'}
+            className="px-3"
+            aria-label={`Details for ${lib.name}`}
+            onClick={onDetail}
+          >
+            Details
+          </Button>
+        </div>
+      </td>
+    </tr>
   )
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_SHIFTS,
+  formatShiftCount,
   formatShiftRange,
   formatTime,
   shiftsOverlap,
@@ -41,6 +42,14 @@ describe('shiftsOverlap', () => {
     expect(shiftsOverlap(night, s('Early', '05:00', '08:00'))).toBe(true)
     expect(shiftsOverlap(night, s('Day', '06:00', '22:00'))).toBe(false)
     expect(shiftsOverlap(night, s('Late', '23:00', '23:30'))).toBe(true)
+  })
+})
+
+describe('formatShiftCount', () => {
+  it('reads naturally for zero, one and many', () => {
+    expect(formatShiftCount(0)).toBe('No shifts')
+    expect(formatShiftCount(1)).toBe('1 shift')
+    expect(formatShiftCount(3)).toBe('3 shifts')
   })
 })
 

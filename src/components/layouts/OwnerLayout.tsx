@@ -61,7 +61,7 @@ function Shell() {
         <div className="mt-auto border-t border-border pt-4">
           <p className="truncate px-2 text-sm font-medium">{library?.name ?? user?.name}</p>
           <p className="truncate px-2 text-sm text-ink-muted">{user?.email}</p>
-          <Link to="/profile" className="mt-2 flex min-h-11 items-center gap-2 rounded-control px-4 text-base font-medium text-primary hover:bg-primary-soft">
+          <Link to="/profile" className="mt-2 flex min-h-11 pointer-fine:min-h-9 items-center gap-2 rounded-control px-4 text-base pointer-fine:text-sm font-medium text-primary hover:bg-primary-soft">
             <UserRound aria-hidden className="size-4" /> Account
           </Link>
           <Button variant="ghost" className="w-full justify-start" onClick={() => void signOut()}>

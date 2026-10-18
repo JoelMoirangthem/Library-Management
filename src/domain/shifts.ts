@@ -92,3 +92,9 @@ export function sortShifts<T extends Shift>(shifts: T[]): T[] {
     (a, b) => Number(b.isActive) - Number(a.isActive) || toMinutes(a.startTime) - toMinutes(b.startTime),
   )
 }
+
+/** `3 shifts`, `1 shift`, `No shifts` — compact count for dense list rows. */
+export function formatShiftCount(count: number): string {
+  if (count === 0) return 'No shifts'
+  return count === 1 ? '1 shift' : `${count} shifts`
+}

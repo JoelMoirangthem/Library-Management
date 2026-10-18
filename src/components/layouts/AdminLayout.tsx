@@ -41,7 +41,7 @@ export function AdminLayout() {
         <header className="sticky top-0 z-20 flex min-h-14 flex-wrap items-center gap-x-3 border-b border-border bg-canvas/90 px-4 backdrop-blur md:hidden">
           <Logo to="/admin" />
           <span className="text-sm text-ink-muted">Admin</span>
-          <Link to="/" className="ml-auto inline-flex min-h-11 items-center text-sm text-ink-muted underline">
+          <Link to="/" className="ml-auto inline-flex min-h-11 pointer-fine:min-h-9 items-center text-sm text-ink-muted underline">
             Public site
           </Link>
           <button

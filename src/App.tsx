@@ -4,7 +4,7 @@ import { DevPanel } from '@/components/DevPanel'
 import { AdminLayout } from '@/components/layouts/AdminLayout'
 import { OwnerLayout } from '@/components/layouts/OwnerLayout'
 import { PublicLayout } from '@/components/layouts/PublicLayout'
-import { LoadingState } from '@/components/states/LoadingState'
+import { PageFallback } from '@/components/PageFallback'
 import { ToastProvider } from '@/components/Toast'
 import { AuthProvider } from '@/hooks/useAuth'
 import { dataMode } from '@/lib/container'
@@ -43,58 +43,59 @@ export default function App() {
     <BrowserRouter>
       <ToastProvider>
         <AuthProvider>
-          <Suspense
-            fallback={
-              <div className="mx-auto max-w-3xl p-6">
-                <LoadingState />
-              </div>
-            }
-          >
-            <Routes>
-              <Route element={<PublicLayout />}>
-                <Route index element={<Home />} />
-                <Route path="login" element={<Login />} />
-                <Route path="discover" element={<Discover />} />
-                <Route path="library/:id" element={<LibraryDetail />} />
-                <Route path="privacy" element={<Privacy />} />
-                <Route path="terms" element={<Terms />} />
-                <Route path="refund" element={<Refund />} />
+          <Routes>
+            <Route element={<PublicLayout />}>
+              <Route index element={<Home />} />
+              <Route path="login" element={<Login />} />
+              <Route path="discover" element={<Discover />} />
+              <Route path="library/:id" element={<LibraryDetail />} />
+              <Route path="privacy" element={<Privacy />} />
+              <Route path="terms" element={<Terms />} />
+              <Route path="refund" element={<Refund />} />
 
-                <Route element={<RequireSignedIn />}>
-                  <Route path="choose-role" element={<ChooseRole />} />
-                  <Route path="profile" element={<Profile />} />
-                </Route>
-
-                <Route element={<RequireRole roles={['student']} />}>
-                  <Route path="student/requests" element={<MyRequests />} />
-                  <Route path="student/membership" element={<MyMembership />} />
-                </Route>
-
-                <Route path="*" element={<NotFound />} />
+              <Route element={<RequireSignedIn />}>
+                <Route path="choose-role" element={<ChooseRole />} />
+                <Route path="profile" element={<Profile />} />
               </Route>
 
-              <Route element={<RequireRole roles={['owner']} />}>
-                <Route element={<OwnerLayout />}>
-                  <Route path="owner" element={<OwnerDashboard />} />
-                  <Route path="owner/seats" element={<OwnerSeats />} />
-                  <Route path="owner/students" element={<OwnerStudents />} />
-                  <Route path="owner/requests" element={<OwnerRequests />} />
-                  <Route path="owner/plan" element={<OwnerPlan />} />
-                  <Route path="owner/library" element={<OwnerLibraryProfile />} />
-                </Route>
+              <Route element={<RequireRole roles={['student']} />}>
+                <Route path="student/requests" element={<MyRequests />} />
+                <Route path="student/membership" element={<MyMembership />} />
               </Route>
 
-              <Route element={<RequireRole roles={['admin']} />}>
-                <Route element={<AdminLayout />}>
-                  <Route path="admin" element={<AdminLibraries />} />
-                  <Route path="admin/payments" element={<AdminPayments />} />
-                  <Route path="admin/places" element={<AdminPlaces />} />
-                </Route>
-              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Route>
 
-              {Styleguide && <Route path="dev/styleguide" element={<Styleguide />} />}
-            </Routes>
-          </Suspense>
+            <Route element={<RequireRole roles={['owner']} />}>
+              <Route element={<OwnerLayout />}>
+                <Route path="owner" element={<OwnerDashboard />} />
+                <Route path="owner/seats" element={<OwnerSeats />} />
+                <Route path="owner/students" element={<OwnerStudents />} />
+                <Route path="owner/requests" element={<OwnerRequests />} />
+                <Route path="owner/plan" element={<OwnerPlan />} />
+                <Route path="owner/library" element={<OwnerLibraryProfile />} />
+              </Route>
+            </Route>
+
+            <Route element={<RequireRole roles={['admin']} />}>
+              <Route element={<AdminLayout />}>
+                <Route path="admin" element={<AdminLibraries />} />
+                <Route path="admin/payments" element={<AdminPayments />} />
+                <Route path="admin/places" element={<AdminPlaces />} />
+              </Route>
+            </Route>
+
+            {Styleguide && (
+              <Route
+                path="dev/styleguide"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <Styleguide />
+                  </Suspense>
+                }
+              />
+            )}
+          </Routes>
           {dataMode === 'mock' && <DevPanel />}
         </AuthProvider>
       </ToastProvider>

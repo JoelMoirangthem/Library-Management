@@ -56,6 +56,11 @@
   /* Two radii: controls and containers. */
   --radius-control: 0.625rem;
   --radius-card: 1rem;
+
+  /* One soft elevation step (cards rest almost flat on the warm canvas);
+     lift is only for interactive cards on hover. Shadows stay in warm ink, low alpha. */
+  --shadow-card: 0 1px 2px rgb(28 25 23 / 0.04), 0 2px 4px rgb(28 25 23 / 0.04);
+  --shadow-lift: 0 4px 10px rgb(28 25 23 / 0.08), 0 2px 4px rgb(28 25 23 / 0.05);
 }
 
 @keyframes draw {
@@ -64,6 +69,18 @@
   }
   to {
     stroke-dashoffset: 0;
+  }
+}
+
+/* Gentle entrance for empty/error states. Wrapped in motion-safe at the call site. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

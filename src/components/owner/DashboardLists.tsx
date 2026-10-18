@@ -33,7 +33,7 @@ function CallLink({ phone, name }: { phone: string; name: string }) {
     <a
       href={`tel:${phone}`}
       aria-label={`Call ${name}`}
-      className={buttonStyles('secondary', 'size-11 shrink-0 px-0')}
+      className={buttonStyles('secondary', 'size-11 pointer-fine:size-9 shrink-0 px-0')}
     >
       <Phone aria-hidden className="size-4" />
     </a>

@@ -29,7 +29,7 @@ export function StateShell({ icon, title, description, action, tone = 'neutral',
   return (
     <div
       role={role}
-      className="mx-auto flex max-w-md flex-col items-center px-6 py-16 text-center"
+      className="mx-auto flex max-w-md flex-col items-center px-6 py-16 text-center motion-safe:animate-[rise_0.3s_ease-out]"
     >
       <div
         aria-hidden

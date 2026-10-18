@@ -48,7 +48,7 @@ export function Modal({ open, onClose, title, description, children, footer }: P
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="-m-2 cursor-pointer rounded-control p-2 text-ink-muted hover:bg-canvas hover:text-ink"
+              className="-m-2 cursor-pointer rounded-control p-2 text-ink-muted transition-colors hover:bg-canvas hover:text-ink active:bg-canvas"
             >
               <X aria-hidden className="size-5" />
             </button>

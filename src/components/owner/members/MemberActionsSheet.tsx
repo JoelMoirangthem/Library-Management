@@ -17,7 +17,7 @@ type RowProps = {
 function ActionRow({ icon, label, onClick, danger, href }: RowProps) {
   const cls = cx(
     'flex min-h-14 w-full items-center gap-3 rounded-control px-3 text-left text-base font-medium transition-colors',
-    danger ? 'text-danger hover:bg-danger-soft' : 'text-ink hover:bg-canvas',
+    danger ? 'text-danger hover:bg-danger-soft active:bg-danger-soft' : 'text-ink hover:bg-canvas active:bg-canvas',
   )
   if (href) {
     return (

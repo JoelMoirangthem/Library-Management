@@ -30,7 +30,7 @@ function ScrollManager() {
 
 const topLink = ({ isActive }: { isActive: boolean }) =>
   cx(
-    'inline-flex min-h-11 items-center rounded-control px-3 py-2 text-base font-medium transition-colors',
+    'inline-flex min-h-11 pointer-fine:min-h-9 items-center rounded-control px-3 py-2 text-base pointer-fine:text-sm font-medium transition-colors',
     isActive ? 'text-primary' : 'text-ink-muted hover:text-ink',
   )
 
@@ -125,11 +125,11 @@ export function PublicLayout() {
             </p>
           </div>
           <nav aria-label="Footer" className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
-            <Link to="/discover" className="inline-flex min-h-11 items-center text-ink-muted hover:text-ink">Find a library</Link>
-            <Link to="/login?as=owner" className="inline-flex min-h-11 items-center text-ink-muted hover:text-ink">List your library</Link>
-            <Link to="/privacy" className="inline-flex min-h-11 items-center text-ink-muted hover:text-ink">Privacy</Link>
-            <Link to="/terms" className="inline-flex min-h-11 items-center text-ink-muted hover:text-ink">Terms</Link>
-            <Link to="/refund" className="inline-flex min-h-11 items-center text-ink-muted hover:text-ink">Refunds</Link>
+            <Link to="/discover" className="inline-flex min-h-11 pointer-fine:min-h-6 items-center text-ink-muted hover:text-ink">Find a library</Link>
+            <Link to="/login?as=owner" className="inline-flex min-h-11 pointer-fine:min-h-6 items-center text-ink-muted hover:text-ink">List your library</Link>
+            <Link to="/privacy" className="inline-flex min-h-11 pointer-fine:min-h-6 items-center text-ink-muted hover:text-ink">Privacy</Link>
+            <Link to="/terms" className="inline-flex min-h-11 pointer-fine:min-h-6 items-center text-ink-muted hover:text-ink">Terms</Link>
+            <Link to="/refund" className="inline-flex min-h-11 pointer-fine:min-h-6 items-center text-ink-muted hover:text-ink">Refunds</Link>
           </nav>
         </div>
         <p className="border-t border-border px-4 py-4 text-center text-sm text-ink-muted">

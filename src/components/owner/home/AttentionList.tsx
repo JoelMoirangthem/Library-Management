@@ -98,7 +98,7 @@ export function AttentionBlock({
               <a
                 href={`tel:${m.phone}`}
                 aria-label={`Call ${m.name} on ${formatPhone(m.phone)}`}
-                className={buttonStyles('secondary', 'size-11 px-0 shrink-0')}
+                className={buttonStyles('secondary', 'size-11 pointer-fine:size-9 px-0 shrink-0')}
               >
                 <Phone aria-hidden className="size-4" />
               </a>

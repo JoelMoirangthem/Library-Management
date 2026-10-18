@@ -277,7 +277,7 @@ export default function Students() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by name or phone"
               aria-label="Search students by name or phone"
-              className="block min-h-11 w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-base text-ink placeholder:text-ink-muted/70"
+              className="block min-h-11 pointer-fine:min-h-9 w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-base pointer-fine:text-sm text-ink placeholder:text-ink-muted/70"
             />
             <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
               {statusChips.map((c) => (
@@ -287,7 +287,7 @@ export default function Students() {
                   aria-pressed={status === c.key}
                   onClick={() => setFilter(c.key)}
                   className={cx(
-                    'inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
+                    'inline-flex min-h-11 pointer-fine:min-h-9 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
                     status === c.key
                       ? 'border-primary bg-primary-soft text-primary-ink'
                       : 'border-border-strong bg-surface text-ink hover:bg-canvas',
@@ -305,7 +305,7 @@ export default function Students() {
                   aria-pressed={shiftFilter === 'all'}
                   onClick={() => setShiftFilter('all')}
                   className={cx(
-                    'inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
+                    'inline-flex min-h-11 pointer-fine:min-h-9 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
                     shiftFilter === 'all'
                       ? 'border-primary bg-primary-soft text-primary-ink'
                       : 'border-border-strong bg-surface text-ink hover:bg-canvas',
@@ -321,7 +321,7 @@ export default function Students() {
                     aria-pressed={shiftFilter === s.id}
                     onClick={() => setShiftFilter(s.id)}
                     className={cx(
-                      'inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
+                      'inline-flex min-h-11 pointer-fine:min-h-9 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
                       shiftFilter === s.id
                         ? 'border-primary bg-primary-soft text-primary-ink'
                         : 'border-border-strong bg-surface text-ink hover:bg-canvas',

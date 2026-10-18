@@ -222,10 +222,10 @@ function ShiftOption({
       aria-checked={selected}
       onClick={onSelect}
       className={cx(
-        'flex h-full w-full flex-col gap-3 rounded-card border p-4 text-left transition-colors',
+        'flex h-full w-full flex-col gap-3 rounded-card border p-4 text-left transition-[background-color,border-color,box-shadow] duration-200',
         selected
-          ? 'border-primary bg-primary-soft'
-          : 'border-border-strong bg-surface hover:bg-canvas',
+          ? 'border-primary bg-primary-soft shadow-lift'
+          : 'border-border-strong bg-surface shadow-card hover:bg-canvas',
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">

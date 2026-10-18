@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
-import { CardBody, CardFooter, CardGrid, GridCard, GridItem } from '@/components/CardGrid'
 import { Modal } from '@/components/Modal'
 import { PageHeader } from '@/components/PageParts'
 import { TextAreaField } from '@/components/Fields'
@@ -90,7 +89,7 @@ export default function Payments() {
       <PageHeader title="Payments" description="Verify UPI payments by checking the UTR in your bank app." />
 
       {loading ? (
-        <LoadingState layout="cards" label="Loading payments" />
+        <LoadingState layout="list" label="Loading payments" />
       ) : error ? (
         <ErrorState onRetry={() => { payments.reload(); libs.reload() }} />
       ) : (
@@ -108,19 +107,49 @@ export default function Payments() {
                   description="New ones appear here when owners submit a UTR."
                 />
               ) : (
-                <CardGrid count={pending.length}>
-                  {pending.map((p) => (
-                    <GridItem key={p.id}>
+                <>
+                  {/* Below lg: compact cards (a table doesn't fit next to the sidebar). */}
+                  <div className="space-y-3 lg:hidden">
+                    {pending.map((p) => (
                       <PendingCard
+                        key={p.id}
                         payment={p}
                         now={now}
                         ownerPhone={phoneByLibrary.get(p.libraryId) ?? null}
                         onVerify={() => setVerifying(p)}
                         onFail={() => setFailing(p)}
                       />
-                    </GridItem>
-                  ))}
-                </CardGrid>
+                    ))}
+                  </div>
+                  {/* lg+: one dense row per payment, same pattern as the history table. */}
+                  <Card className="hidden overflow-hidden lg:block">
+                    <table className="w-full text-left text-sm">
+                      <caption className="sr-only">Payments waiting for verification</caption>
+                      <thead className="border-b border-border bg-canvas text-ink-muted">
+                        <tr>
+                          <th scope="col" className="px-4 py-3 font-medium">Library</th>
+                          <th scope="col" className="px-4 py-3 font-medium">Owner</th>
+                          <th scope="col" className="px-4 py-3 font-medium">Amount</th>
+                          <th scope="col" className="px-4 py-3 font-medium">UTR</th>
+                          <th scope="col" className="hidden px-4 py-3 font-medium xl:table-cell">Submitted</th>
+                          <th scope="col" className="px-4 py-3 text-right font-medium">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {pending.map((p) => (
+                          <PendingRow
+                            key={p.id}
+                            payment={p}
+                            now={now}
+                            ownerPhone={phoneByLibrary.get(p.libraryId) ?? null}
+                            onVerify={() => setVerifying(p)}
+                            onFail={() => setFailing(p)}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </Card>
+                </>
               )}
             </section>
           )}
@@ -134,15 +163,16 @@ export default function Payments() {
                 <EmptyState title="Nothing here yet" description="Verified and failed payments show here." />
               ) : (
                 <>
-                  {/* Phone: cards */}
-                  <div className="space-y-3 md:hidden">
+                  {/* Below lg: cards */}
+                  <div className="space-y-3 lg:hidden">
                     {historyFiltered.map((p) => (
                       <HistoryCard key={p.id} payment={p} />
                     ))}
                   </div>
-                  {/* md+: table */}
-                  <Card className="hidden overflow-hidden md:block">
+                  {/* lg+: table */}
+                  <Card className="hidden overflow-hidden lg:block">
                     <table className="w-full text-left text-sm">
+                      <caption className="sr-only">Payment history</caption>
                       <thead className="border-b border-border bg-canvas text-ink-muted">
                         <tr>
                           <th scope="col" className="px-4 py-3 font-medium">Library</th>
@@ -158,9 +188,9 @@ export default function Payments() {
                           <tr key={p.id} className="align-top">
                             <td className="px-4 py-3 font-medium">{p.libraryName}</td>
                             <td className="px-4 py-3 text-ink-muted">{p.ownerName}</td>
-                            <td className="px-4 py-3 tabular-nums">{formatRupees(p.amountPaise)}</td>
-                            <td className="px-4 py-3 font-mono tabular-nums">{p.utr}</td>
-                            <td className="px-4 py-3 tabular-nums text-ink-muted">
+                            <td className="whitespace-nowrap px-4 py-3 tabular-nums">{formatRupees(p.amountPaise)}</td>
+                            <td className="whitespace-nowrap px-4 py-3 font-mono tabular-nums">{p.utr}</td>
+                            <td className="whitespace-nowrap px-4 py-3 tabular-nums text-ink-muted">
                               {p.status === 'verified' && p.verifiedAt
                                 ? `Verified ${formatDate(p.verifiedAt.slice(0, 10))}`
                                 : p.verifiedAt
@@ -196,67 +226,108 @@ export default function Payments() {
   )
 }
 
-function PendingCard({
-  payment,
-  now,
-  ownerPhone,
-  onVerify,
-  onFail,
-}: {
+type PendingActionProps = {
   payment: AdminPaymentRow
   now: Date
   ownerPhone: string | null
   onVerify: () => void
   onFail: () => void
-}) {
+}
+
+/** Phone card. Keeps the UTR front and centre — it's what you match in the bank app. */
+function PendingCard({ payment, now, ownerPhone, onVerify, onFail }: PendingActionProps) {
   return (
-    <GridCard>
-      <CardBody className="space-y-4">
-        {/* UTR is the thing to match against the bank app: make it the hero. */}
-        <div className="rounded-control bg-accent-soft px-3 py-3 text-accent-ink">
-          <p className="text-xs">Check your bank app for this UTR</p>
-          <div className="mt-1.5 flex items-center gap-2">
-            <span className="min-w-0 flex-1 break-all font-mono text-xl font-semibold tabular-nums">
-              {payment.utr}
-            </span>
-            <CopyButton value={payment.utr} toastText="UTR copied" />
-          </div>
+    <Card className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="min-w-0 break-words font-semibold text-ink">{payment.libraryName}</h3>
+        <p className="whitespace-nowrap font-semibold tabular-nums text-ink">
+          {formatRupees(payment.amountPaise)}
+        </p>
+      </div>
+
+      <div className="mt-1 text-sm">
+        <p className="text-ink">{payment.ownerName}</p>
+        {ownerPhone && <TelLink phone={ownerPhone} className="whitespace-nowrap text-ink-muted" />}
+      </div>
+
+      <p className="mt-1 text-xs text-ink-muted">
+        <RelativeTime iso={payment.submittedAt} now={now} prefix="Submitted " />
+      </p>
+
+      <div className="mt-3 rounded-control bg-accent-soft px-3 py-2.5 text-accent-ink">
+        <p className="text-xs">Check your bank app for this UTR</p>
+        <div className="mt-1.5 flex items-center gap-2">
+          <span className="min-w-0 flex-1 break-all font-mono text-lg font-semibold tabular-nums">
+            {payment.utr}
+          </span>
+          <CopyButton value={payment.utr} toastText="UTR copied" />
         </div>
+      </div>
 
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <div>
-            <dt className="text-ink-muted">Amount</dt>
-            <dd className="text-lg font-semibold tabular-nums">{formatRupees(payment.amountPaise)}</dd>
-          </div>
-          <div className="text-right">
-            <dt className="text-ink-muted">Submitted</dt>
-            <dd className="text-ink">
-              <RelativeTime iso={payment.submittedAt} now={now} />
-            </dd>
-          </div>
-          <div className="col-span-2">
-            <dt className="text-ink-muted">Library</dt>
-            <dd className="break-words font-medium text-ink">{payment.libraryName}</dd>
-          </div>
-          <div className="col-span-2">
-            <dt className="text-ink-muted">Owner</dt>
-            <dd className="flex flex-wrap items-center gap-x-2 text-ink">
-              {payment.ownerName}
-              {ownerPhone && <TelLink phone={ownerPhone} />}
-            </dd>
-          </div>
-        </dl>
-      </CardBody>
-
-      <CardFooter>
-        <Button variant="primary" className="flex-1 px-3" onClick={onVerify}>
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+        <Button
+          variant="primary"
+          className="flex-1 px-3"
+          aria-label={`Verify payment for ${payment.libraryName}`}
+          onClick={onVerify}
+        >
           Verify
         </Button>
-        <Button variant="secondary" className="flex-1 px-3" onClick={onFail}>
+        <Button
+          variant="secondary"
+          className="flex-1 px-3"
+          aria-label={`Mark payment failed for ${payment.libraryName}`}
+          onClick={onFail}
+        >
           Mark failed
         </Button>
-      </CardFooter>
-    </GridCard>
+      </div>
+    </Card>
+  )
+}
+
+/** One table row per pending payment, from lg up. Buttons repeat, so labels name the library. */
+function PendingRow({ payment, now, ownerPhone, onVerify, onFail }: PendingActionProps) {
+  return (
+    <tr className="align-top">
+      <td className="px-4 py-3">
+        <p className="break-words font-medium text-ink">{payment.libraryName}</p>
+      </td>
+      <td className="px-4 py-3">
+        <p className="text-ink">{payment.ownerName}</p>
+        {ownerPhone && <TelLink phone={ownerPhone} className="whitespace-nowrap text-ink-muted" />}
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 tabular-nums">{formatRupees(payment.amountPaise)}</td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="whitespace-nowrap font-mono tabular-nums">{payment.utr}</span>
+          <CopyButton value={payment.utr} toastText="UTR copied" />
+        </div>
+      </td>
+      <td className="hidden whitespace-nowrap px-4 py-3 text-ink-muted xl:table-cell">
+        <RelativeTime iso={payment.submittedAt} now={now} />
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex flex-wrap items-center justify-end gap-2 xl:flex-nowrap">
+          <Button
+            variant="primary"
+            className="px-3"
+            aria-label={`Verify payment for ${payment.libraryName}`}
+            onClick={onVerify}
+          >
+            Verify
+          </Button>
+          <Button
+            variant="secondary"
+            className="px-3"
+            aria-label={`Mark payment failed for ${payment.libraryName}`}
+            onClick={onFail}
+          >
+            Mark failed
+          </Button>
+        </div>
+      </td>
+    </tr>
   )
 }
 

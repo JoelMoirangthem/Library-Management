@@ -63,7 +63,7 @@ export function LibraryCard({ library }: { library: PublicLibrary }) {
   const empty = Math.max(0, 3 - rows.length)
 
   return (
-    <GridCard className="group relative transition-colors hover:border-border-strong">
+    <GridCard className="group relative transition-[border-color,box-shadow,transform] duration-200 hover:border-border-strong hover:shadow-lift motion-safe:hover:-translate-y-0.5">
       <div className="flex flex-1 flex-col gap-3 p-4 pb-2">
         <div className="flex items-center gap-3">
           <Tile name={library.name} photo={library.photos[0]} />

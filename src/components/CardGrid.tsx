@@ -1,5 +1,6 @@
 import type { HTMLAttributes, ReactNode } from 'react'
 import { Card } from '@/components/Card'
+import { cardColumnsFor } from '@/domain/presentation'
 import { cx } from '@/lib/cx'
 
 /**
@@ -22,6 +23,12 @@ type Layout = 'one' | 'two' | 'three' | 'many' | 'four'
 
 /** Which layout leaves no lonely card: 4 cards are 2 x 2 (never 3 + 1), 3 cards stay in one row or stack. */
 export function layoutFor(count: number, max: 2 | 3 | 4 = 3): Layout {
+  if (max === 3) {
+    const columns = cardColumnsFor(count)
+    if (columns === 1) return 'one'
+    if (columns === 2) return 'two'
+    return count === 3 ? 'three' : 'many'
+  }
   if (count <= 1) return 'one'
   if (count === 2 || count === 4) return 'two'
   if (count === 3) return 'three'

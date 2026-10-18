@@ -30,3 +30,10 @@ dist-ssr
 
 # Local backups
 *.bak
+
+# Visual brainstorming mockups (local companion artifacts)
+.superpowers/
+
+
+# Isolated feature worktrees
+.worktrees/
