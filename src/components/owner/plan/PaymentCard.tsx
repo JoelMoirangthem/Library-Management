@@ -8,15 +8,20 @@ import { Steps, type StepState } from '@/components/Steps'
 import { useToast } from '@/components/Toast'
 import { formatDate, formatDateTime } from '@/domain/dates'
 import { formatRupees } from '@/domain/money'
-import { ADMIN_UPI_ID, PLAN_DAYS, PLAN_PRICE_PAISE } from '@/domain/plan'
+import { PLAN_DAYS, PLAN_PRICE_PAISE } from '@/domain/plan'
 import { isValidUtr } from '@/domain/constants'
 import type { PlanPayment } from '@/domain/types'
 import { cx } from '@/lib/cx'
 
 const RUPEES = (PLAN_PRICE_PAISE / 100).toFixed(2)
-const UPI_LINK = `upi://pay?pa=${encodeURIComponent(ADMIN_UPI_ID)}&pn=StudySeat&am=${RUPEES}&cu=INR&tn=${encodeURIComponent('StudySeat plan')}`
+/** The pay link for the UPI app; upiId comes from the VITE_UPI_ID setting. */
+function upiLink(upiId: string): string {
+  return `upi://pay?pa=${encodeURIComponent(upiId)}&pn=StudySeat&am=${RUPEES}&cu=INR&tn=${encodeURIComponent('StudySeat plan')}`
+}
 
 type Props = {
+  /** The UPI ID owners pay to (from the VITE_UPI_ID setting). */
+  upiId: string
   /** The payment that is currently awaiting admin review, if any. */
   pending: PlanPayment | null
   /** Date the plan will run until after this payment is verified, or null when the plan has already ended (the 30 days then start the day it is activated). */
@@ -28,15 +33,16 @@ type Props = {
 /** The id students' "Submit again" link focuses. */
 export const UTR_INPUT_ID = 'plan-utr-input'
 
-export function PaymentCard({ pending, runsUntil, onSubmit, submitting }: Props) {
+export function PaymentCard({ upiId, pending, runsUntil, onSubmit, submitting }: Props) {
   // A pending payment: show the progress timeline instead of the form.
   if (pending) {
     return <PendingTimeline pending={pending} />
   }
-  return <PayFlow runsUntil={runsUntil} onSubmit={onSubmit} submitting={submitting} />
+  return <PayFlow upiId={upiId} runsUntil={runsUntil} onSubmit={onSubmit} submitting={submitting} />
 }
 
 function PayFlow({
+  upiId,
   runsUntil,
   onSubmit,
   submitting,
@@ -53,11 +59,12 @@ function PayFlow({
     'todo',
   ]
 
-  const qrSvg = useMemo(() => renderSVG(UPI_LINK, { border: 1 }), [])
+  const link = upiLink(upiId)
+  const qrSvg = useMemo(() => renderSVG(link, { border: 1 }), [link])
 
   async function copyUpi() {
     try {
-      await navigator.clipboard.writeText(ADMIN_UPI_ID)
+      await navigator.clipboard.writeText(upiId)
       toast.show('UPI ID copied', 'success')
     } catch {
       toast.show('Could not copy. Note the UPI ID manually.', 'error')
@@ -101,7 +108,7 @@ function PayFlow({
         <h3 className="text-sm font-semibold">1. Pay ₹199</h3>
 
         {/* Mobile: big UPI button first. */}
-        <a href={UPI_LINK} className={buttonStyles('primary', 'mt-3 w-full sm:hidden')}>
+        <a href={link} className={buttonStyles('primary', 'mt-3 w-full sm:hidden')}>
           <ExternalLink aria-hidden className="size-4" />
           Pay ₹199 with a UPI app
         </a>
@@ -110,7 +117,7 @@ function PayFlow({
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 rounded-card border border-border-strong bg-canvas p-3">
             <div className="min-w-0">
               <p className="text-xs text-ink-muted">UPI ID</p>
-              <p className="truncate font-medium tabular-nums">{ADMIN_UPI_ID}</p>
+              <p className="truncate font-medium tabular-nums">{upiId}</p>
             </div>
             <Button variant="secondary" onClick={copyUpi} className="ml-auto min-h-11 px-3">
               <Copy aria-hidden className="size-4" />

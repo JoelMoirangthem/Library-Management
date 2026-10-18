@@ -5,7 +5,6 @@ export const TRIAL_DAYS = 14
 export const PLAN_DAYS = 30
 export const PLAN_PRICE_PAISE = 19900
 /** Shown on the Plan page. Dummy value in mock mode. */
-export const ADMIN_UPI_ID = 'studyseat@upi'
 
 export type PlanState = 'pending' | 'rejected' | 'trial' | 'paid' | 'expired'
 

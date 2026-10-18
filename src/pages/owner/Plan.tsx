@@ -17,6 +17,7 @@ import { useMutation } from '@/hooks/useMutation'
 import { useOwnerLibrary } from '@/hooks/useOwnerLibrary'
 import { useTitle } from '@/hooks/useTitle'
 import { services } from '@/lib/container'
+import { getUpiId } from '@/lib/env'
 import { useNow } from '@/lib/devState'
 
 function dayWord(n: number) {
@@ -59,6 +60,15 @@ function focusUtrForm() {
   const el = document.getElementById(UTR_INPUT_ID)
   el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   el?.querySelector<HTMLInputElement>('input')?.focus()
+}
+
+/** Reads the UPI ID setting once per render. A bad or missing value becomes a message, not a crash. */
+function readUpiSetting(): { upiId: string; error?: undefined } | { upiId?: undefined; error: string } {
+  try {
+    return { upiId: getUpiId() }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) }
+  }
 }
 
 export default function Plan() {
@@ -111,6 +121,7 @@ export default function Plan() {
     )
   }
 
+  const upi = readUpiSetting()
   const activeUntilDate = subscription ? dateOfInstant(subscription.activeUntil) : null
   const canPay = state === 'trial' || state === 'paid' || state === 'expired'
   const pending = (payments.data ?? []).find((p: PlanPayment) => p.status === 'pending') ?? null
@@ -167,8 +178,20 @@ export default function Plan() {
               <LoadingState layout="list" count={1} label="Loading payment details" />
             ) : payments.error ? (
               <ErrorState onRetry={payments.reload} />
+            ) : !pending && upi.error ? (
+              // The UPI ID comes only from the VITE_UPI_ID setting. Never show a guessed payment address.
+              <ErrorState
+                title="Payments aren't set up yet"
+                description={import.meta.env.DEV ? upi.error : 'Please contact StudySeat support to activate your plan.'}
+              />
             ) : (
-              <PaymentCard pending={pending} runsUntil={runsUntil} onSubmit={submit.run} submitting={submit.loading} />
+              <PaymentCard
+                upiId={upi.upiId ?? ''}
+                pending={pending}
+                runsUntil={runsUntil}
+                onSubmit={submit.run}
+                submitting={submit.loading}
+              />
             ))}
         </div>
 
