@@ -101,3 +101,24 @@ export function hasSupabaseConfig(raw: Record<string, string | undefined>): bool
     return false
   }
 }
+
+/** The address users write to for help when VITE_SUPPORT_EMAIL is not set. A real inbox, not a placeholder. */
+export const DEFAULT_SUPPORT_EMAIL = 'joelmoirang@gmail.com'
+
+/** A plain email check: something@something.tld. Good enough to reject obvious non-addresses. */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/**
+ * The support email shown in the footer, legal pages and the account page. It may be overridden with
+ * VITE_SUPPORT_EMAIL; an invalid or missing value falls back to DEFAULT_SUPPORT_EMAIL so the app always
+ * shows a working address. Pure so it can be tested without Vite.
+ */
+export function parseSupportEmail(raw: Record<string, string | undefined>): string {
+  const value = raw.VITE_SUPPORT_EMAIL?.trim().toLowerCase()
+  return value && EMAIL_PATTERN.test(value) ? value : DEFAULT_SUPPORT_EMAIL
+}
+
+/** Reads the real Vite env for the support email. */
+export function getSupportEmail(): string {
+  return parseSupportEmail(import.meta.env)
+}

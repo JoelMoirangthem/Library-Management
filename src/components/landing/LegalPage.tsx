@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { getSupportEmail } from '@/lib/env'
 
 /**
  * Shared layout for the three legal pages (Privacy, Terms, Refund). Clean prose column,
@@ -18,6 +19,7 @@ export function LegalPage({
   intro: ReactNode
   children: ReactNode
 }) {
+  const supportEmail = getSupportEmail()
   return (
     <div className="mx-auto max-w-prose px-4 py-10 sm:px-6">
       <Link
@@ -46,10 +48,10 @@ export function LegalPage({
           <p>
             Questions about this page? Write to{' '}
             <a
-              href="mailto:support@studyseat.app"
+              href={`mailto:${supportEmail}`}
               className="inline-flex min-h-11 items-center font-medium text-primary hover:text-primary-hover"
             >
-              support@studyseat.app
+              {supportEmail}
             </a>
             .
           </p>

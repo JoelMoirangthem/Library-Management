@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEMO_UPI_ID, EnvError, hasSupabaseConfig, isConfigError, parseEnv, parseUpiId, resolveDataMode, UpiConfigError } from '@/lib/env'
+import { DEFAULT_SUPPORT_EMAIL, DEMO_UPI_ID, EnvError, hasSupabaseConfig, isConfigError, parseEnv, parseSupportEmail, parseUpiId, resolveDataMode, UpiConfigError } from '@/lib/env'
 
 describe('isConfigError (a missing Supabase URL/key must be shown, not swallowed as "logged out")', () => {
   it('is true for an EnvError', () => {
@@ -102,5 +102,22 @@ describe('hasSupabaseConfig (startup code must not touch Supabase when it is not
     expect(hasSupabaseConfig({})).toBe(false)
     expect(hasSupabaseConfig({ VITE_SUPABASE_URL: 'https://x.supabase.co' })).toBe(false)
     expect(hasSupabaseConfig({ VITE_SUPABASE_URL: ' ', VITE_SUPABASE_ANON_KEY: ' ' })).toBe(false)
+  })
+})
+
+describe('parseSupportEmail (the address users write to for help)', () => {
+  it('uses VITE_SUPPORT_EMAIL when it is a valid address, trimmed and lower-cased', () => {
+    expect(parseSupportEmail({ VITE_SUPPORT_EMAIL: '  Help@Example.COM ' })).toBe('help@example.com')
+  })
+
+  it('falls back to the default when the value is missing, blank or not an email', () => {
+    expect(parseSupportEmail({})).toBe(DEFAULT_SUPPORT_EMAIL)
+    expect(parseSupportEmail({ VITE_SUPPORT_EMAIL: '   ' })).toBe(DEFAULT_SUPPORT_EMAIL)
+    expect(parseSupportEmail({ VITE_SUPPORT_EMAIL: 'not-an-email' })).toBe(DEFAULT_SUPPORT_EMAIL)
+    expect(parseSupportEmail({ VITE_SUPPORT_EMAIL: 'a@b' })).toBe(DEFAULT_SUPPORT_EMAIL)
+  })
+
+  it('has a real default address, not a placeholder domain', () => {
+    expect(DEFAULT_SUPPORT_EMAIL).toBe('joelmoirang@gmail.com')
   })
 })

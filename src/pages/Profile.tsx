@@ -8,6 +8,7 @@ import { TextField } from '@/components/Fields'
 import { PageHeader } from '@/components/PageParts'
 import { LoadingState } from '@/components/states/LoadingState'
 import { formatPhone, isValidPhone, normalizePhone } from '@/domain/constants'
+import { getSupportEmail } from '@/lib/env'
 import type { Role } from '@/domain/types'
 import { homePathFor, useAuth } from '@/hooks/useAuth'
 import { useMutation } from '@/hooks/useMutation'
@@ -19,7 +20,7 @@ const ROLE_LABEL: Record<Role, { label: string; tone: BadgeTone }> = {
   admin: { label: 'Admin', tone: 'accent' },
 }
 
-const SUPPORT_EMAIL = 'support@studyseat.app'
+const SUPPORT_EMAIL = getSupportEmail()
 
 export default function Profile() {
   useTitle('Your account')
