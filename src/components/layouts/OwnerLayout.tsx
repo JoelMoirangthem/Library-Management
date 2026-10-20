@@ -1,4 +1,4 @@
-import { Suspense } from 'react'
+import { Suspense, useState } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { Armchair, Building2, ClipboardList, LayoutDashboard, LogOut, UserRound, Users, Wallet } from 'lucide-react'
 import { Button } from '@/components/Button'
@@ -27,7 +27,13 @@ function Shell() {
   )
   const pending = (requests.data ?? []).filter((r) => r.status === 'pending').length
 
-  if (loading) {
+  // Block the screen with a spinner only on the FIRST load. A later reload (after any save) must keep the page
+  // mounted: swapping it for a spinner threw away the page's own state, e.g. the "Submitted for review" screen
+  // right after a first-time listing, and every save of a library still in review.
+  const [ready, setReady] = useState(false)
+  if (!loading && !ready) setReady(true)
+
+  if (loading && !ready) {
     return (
       <div className="mx-auto max-w-3xl p-6">
         <LoadingState label="Loading your library" />
