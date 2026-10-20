@@ -2,7 +2,7 @@
 
 Library owners manage their study library (seats, students, fees, expiry). Students find a library by city and area and request a seat. Owners get 14 days free, then ₹199/month.
 
-Stack: React + Vite + TypeScript + Tailwind on Vercel, Supabase (Auth, Postgres with RLS, Storage). No custom backend, no Docker.
+Stack: React + Vite + TypeScript + Tailwind on Render (static site), Supabase (Auth, Postgres with RLS, Storage). No custom backend, no Docker.
 
 ## Setup
 
@@ -28,4 +28,4 @@ For the real backend (Supabase), copy `.env.example` to `.env`, set `VITE_DATA_M
 
 ## Docs
 
-See `docs/`: `REQUIREMENTS.md`, `DATABASE.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `DECISIONS.md`, `DEPLOYMENT.md` (going live on Vercel and Supabase).
+See `docs/`: `REQUIREMENTS.md`, `DATABASE.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `DECISIONS.md`, `DEPLOYMENT.md` (going live on Render and Supabase).

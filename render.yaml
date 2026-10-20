@@ -1,0 +1,44 @@
+# Render Blueprint for StudySeat: a static site (Vite build) served from Render's CDN.
+# Everything the app needs at build time is a VITE_ variable; Vite reads them as it builds, so changing one means a redeploy.
+# Values marked sync: false are asked for in the Render dashboard when the Blueprint is created; they are never stored in git.
+services:
+  - type: web
+    runtime: static
+    name: studyseat
+    branch: main
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_DATA_MODE
+        value: supabase
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_UPI_ID
+        sync: false
+    routes:
+      # Single-page app: any path that is not a real file serves index.html, so refreshing /owner/plan works.
+      # Render never rewrites a path where a real file exists, so the hashed files in /assets are unaffected.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: "camera=(), microphone=(), geolocation=(), payment=()"
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable

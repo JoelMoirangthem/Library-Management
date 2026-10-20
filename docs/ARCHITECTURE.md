@@ -1,7 +1,7 @@
 # StudySeat — Architecture
 
 ```
-Browser (React + Vite + TypeScript + Tailwind)  — hosted on Vercel
+Browser (React + Vite + TypeScript + Tailwind)  — hosted on Render (static site)
    │  Pages → Hooks → Services → Repositories
    ▼
 Supabase: Auth (Google) · Postgres (tables + RLS + functions) · Storage (photos)
