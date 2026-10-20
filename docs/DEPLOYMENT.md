@@ -17,7 +17,9 @@ so changing one means a redeploy (Render does this when you save the variable).
 | `VITE_SUPPORT_EMAIL` | no | The address shown in the footer, legal pages and account page. If blank, the app uses its built-in default. |
 | `VITE_DATA_MODE` | no | `render.yaml` sets it to `supabase`. A production build also defaults to the real backend when it is missing; only an explicit `mock` gives dummy data. |
 
-These are not secrets (every visitor's browser receives them), but the UPI ID and keys are still kept out of git:
+The database **password** is different: it is a real secret. It lives only in your local `.env` as `SUPABASE_DB_PASSWORD` (used by `npm run db:push` / `db:query`) and must never be added to Render or `render.yaml`; the website does not need it.
+
+The variables above are not secrets (every visitor's browser receives them), but the UPI ID and keys are still kept out of git:
 `render.yaml` marks them `sync: false`, so Render asks for the values in the dashboard.
 
 Node: `package.json` requests `24.x` (`engines`), and Render's current default is 24.x as well.
@@ -42,7 +44,7 @@ The current project is the one used for building and testing. For launch, create
 
 1. Create the project (choose the region closest to your users) and put it on a **paid plan before real owners arrive**:
    free projects are paused after about a week of low activity, and paid projects are not.
-2. Apply the schema: link the CLI to the new project and run `supabase db push`. The 11 files in `supabase/migrations`
+2. Apply the schema: set `VITE_SUPABASE_URL` and `SUPABASE_DB_PASSWORD` in your local `.env` (and `SUPABASE_DB_HOST` if the project is not in Sydney), then run `npm run db:push`. The 11 files in `supabase/migrations`
    create the tables, security rules, functions, places, photo storage rules and hardening. Run them in order; do not edit applied files.
 3. Storage: migration 0010 creates the public `LibraryImages` bucket (5 MB, JPEG and PNG) if it does not exist.
 4. Authentication, URL configuration: set **Site URL** to the live address (your `onrender.com` address or your own domain)
