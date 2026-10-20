@@ -2,7 +2,7 @@
 
 Finish and test each step, commit, then move on. "Done when" is the test script.
 
-Status (19 Oct 2026): Steps 1–11 are **built in code** (owner, admin and student flows, plan billing, discovery, requests, polish) and Step 12 is **prepared** (`render.yaml`, `docs/DEPLOYMENT.md`). `[~]` below means "implemented but its full *Done when* is not yet signed off" — in particular the real-Postgres RLS "must fail / must hold" pass (Step 1) and the live pilot (Step 12) are still outstanding, so no step is marked fully `[x]` yet.
+Status (19 Oct 2026): Steps 1–11 are **built in code** (owner, admin and student flows, plan billing, discovery, requests, polish) and Step 12 is **prepared** (CI runs on GitHub) (`render.yaml`, `docs/DEPLOYMENT.md`). `[~]` below means "implemented but its full *Done when* is not yet signed off" — in particular the real-Postgres RLS "must fail / must hold" pass (Step 1) and the live pilot (Step 12) are still outstanding, so no step is marked fully `[x]` yet.
 
 - [~] **Step 0 — Setup.** (scaffold, env loader, tests done; design foundation pending approval; Supabase project and Render account are yours to create) Node.js, Git, Supabase project, Render account. Vite + React + TypeScript + Tailwind + Vitest. `.env` with Supabase URL and anon key (git-ignored). Folder structure from `ARCHITECTURE.md`.
   *Done when:* app runs locally with a blank homepage; `.env` is not tracked.

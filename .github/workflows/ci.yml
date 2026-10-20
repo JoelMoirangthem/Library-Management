@@ -1,0 +1,55 @@
+# Runs on every pull request and every push to main. Same checks that were run by hand before each merge.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same branch cancels the older run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Type check, lint, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install (exactly what the lockfile says)
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc -p tsconfig.app.json --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      # The values are fake on purpose: this only proves the code builds. Real values live in Render, never in git.
+      - name: Build (as Render builds it)
+        run: npm run build
+        env:
+          VITE_DATA_MODE: supabase
+          VITE_SUPABASE_URL: https://abcdefghijklmnopqrst.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-placeholder-key
+          VITE_UPI_ID: ci@placeholder
+
+      - name: The build must not contain a database password setting
+        run: |
+          if grep -rIl "SUPABASE_DB_" dist; then
+            echo "dist must never mention SUPABASE_DB_ (admin-tool variables)"; exit 1
+          fi

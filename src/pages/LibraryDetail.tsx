@@ -12,6 +12,7 @@ import { LoadingState } from '@/components/states/LoadingState'
 import { NotFoundState } from '@/components/states/NotFoundState'
 import { formatPhone, isValidPhone, mapsLink } from '@/domain/constants'
 import { formatRupees } from '@/domain/money'
+import { requestActionKind } from '@/domain/requestAction'
 import { formatShiftRange } from '@/domain/shifts'
 import type { PublicLibrary, PublicShift } from '@/domain/types'
 import { services } from '@/lib/container'
@@ -80,6 +81,7 @@ function RequestAction({
   })
 
   const full = shift.seatsLeft === 0
+  const kind = requestActionKind(user)
 
   // Signed out.
   if (!user) {
@@ -97,8 +99,24 @@ function RequestAction({
     )
   }
 
+  // Signed in but has not chosen Student or Owner yet (for example straight after the first Google login).
+  if (kind === 'choose-role') {
+    return (
+      <div className="space-y-3">
+        <p className="text-ink-muted">Choose how you&rsquo;ll use StudySeat to request a seat at this library.</p>
+        <Link
+          to="/choose-role"
+          state={{ from: location.pathname + location.search }}
+          className={buttonStyles('primary', 'w-full')}
+        >
+          Choose how you&rsquo;ll use StudySeat
+        </Link>
+      </div>
+    )
+  }
+
   // Owner or admin.
-  if (user.role !== 'student') {
+  if (kind === 'students-only') {
     return (
       <p className="text-ink-muted">
         Only students can request a seat. Sign in with a student account to request one.

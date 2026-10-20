@@ -67,6 +67,8 @@ export interface LibraryRepository {
   getPublic(id: string): Promise<PublicLibrary | null>
   /** Admin. */
   listForAdmin(): Promise<AdminLibraryRow[]>
+  /** Admin. How many libraries wait for review: a cheap count for the menu badge, without loading the list. */
+  countPendingForAdmin(): Promise<number>
   approve(id: string): Promise<void>
   reject(id: string, reason: string): Promise<void>
 }
@@ -90,6 +92,8 @@ export interface PlanPaymentRepository {
   submit(libraryId: string, utr: string): Promise<PlanPayment>
   /** Admin. */
   listAll(): Promise<AdminPaymentRow[]>
+  /** Admin. How many plan payments wait for a check: a cheap count for the menu badge, without loading the list. */
+  countPendingForAdmin(): Promise<number>
   verify(paymentId: string): Promise<void>
   fail(paymentId: string, reason: string): Promise<void>
 }

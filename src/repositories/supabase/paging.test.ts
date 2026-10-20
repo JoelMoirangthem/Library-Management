@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AppError } from '@/domain/errors'
-import { chunk, fetchAll, MAX_TOTAL_ROWS, PAGE_SIZE } from '@/repositories/supabase/paging'
+import { chunk, fetchAll, fetchByIds, MAX_TOTAL_ROWS, PAGE_SIZE } from '@/repositories/supabase/paging'
 
 /** A fake table of `total` rows that, like the real API, never returns more than `cap` rows per request. */
 function fakeTable(total: number, cap = PAGE_SIZE) {
@@ -67,5 +67,44 @@ describe('chunk (a long list of ids in a web address is too long for the server,
 
   it('rejects a group size that would loop forever', () => {
     expect(() => chunk([1], 0)).toThrow()
+  })
+})
+
+describe('fetchByIds (look up only the rows a page refers to, not the whole table)', () => {
+  const load = (calls: string[][]) => async (group: string[]) => {
+    calls.push(group)
+    return { data: group.map((id) => ({ id })), error: null }
+  }
+
+  it('does not ask at all when there is nothing to look up', async () => {
+    const calls: string[][] = []
+    expect(await fetchByIds([], load(calls))).toEqual([])
+    expect(calls).toHaveLength(0)
+  })
+
+  it('asks once for each id, even when the same id appears many times', async () => {
+    const calls: string[][] = []
+    const rows = await fetchByIds(['a', 'b', 'a', 'c', 'b', 'a'], load(calls))
+    expect(calls).toEqual([['a', 'b', 'c']])
+    expect(rows.map((r) => r.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('asks in groups of 100 so the web address stays short', async () => {
+    const calls: string[][] = []
+    const ids = Array.from({ length: 250 }, (_, i) => `id${i}`)
+    const rows = await fetchByIds(ids, load(calls))
+    expect(calls.map((g) => g.length)).toEqual([100, 100, 50])
+    expect(rows).toHaveLength(250)
+  })
+
+  it('ignores blank ids', async () => {
+    const calls: string[][] = []
+    await fetchByIds(['a', '', 'b'], load(calls))
+    expect(calls).toEqual([['a', 'b']])
+  })
+
+  it('turns a database error into an app error instead of a partial list', async () => {
+    const bad = async () => ({ data: null, error: { code: '42501', message: 'nope' } })
+    await expect(fetchByIds(['a'], bad)).rejects.toBeInstanceOf(AppError)
   })
 })
