@@ -57,8 +57,10 @@ In the Google Cloud project that holds the OAuth client:
 
 - Authorised JavaScript origins: add the live site address.
 - Authorised redirect URIs: add `https://<production-project-ref>.supabase.co/auth/v1/callback`.
-- **Publish the consent screen.** While it is in "Testing" only the test users you list can sign in, so a new owner would be refused.
-  Check what Google asks for at that point (a privacy-policy link, the app name and the contact email).
+- **Publish the consent screen** (Google Auth Platform, Audience, Publish app), so the app is "In production" and open to any Google account.
+  Google's documentation says an app that asks only for name, email and profile (which is all StudySeat asks for) is not limited to the listed
+  test users and its sign-ins do not expire after 7 days even in "Testing"; publishing is still the safe setting for real users and for
+  showing your app name. **Prove it, don't assume it:** after publishing, sign in with a Google account that is not yours and not on the test-user list.
 
 Changes on Google's side can take a few minutes to apply.
 
