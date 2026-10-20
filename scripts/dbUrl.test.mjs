@@ -90,5 +90,6 @@ describe('the database password stays out of the hosting config', () => {
   it('.env.example lists the password name with no value filled in', () => {
     const example = readFileSync(new URL('../.env.example', import.meta.url), 'utf8')
     expect(example).toMatch(/^SUPABASE_DB_PASSWORD=\s*$/m)
+    expect(example).toMatch(/^SUPABASE_DB_HOST=\s*$/m)
   })
 })
