@@ -2,9 +2,9 @@
 
 Finish and test each step, commit, then move on. "Done when" is the test script.
 
-Status (19 Oct 2026): Steps 1–11 are **built in code** (owner, admin and student flows, plan billing, discovery, requests, polish) and Step 12 is **prepared** (`vercel.json`, `docs/DEPLOYMENT.md`). `[~]` below means "implemented but its full *Done when* is not yet signed off" — in particular the real-Postgres RLS "must fail / must hold" pass (Step 1) and the live pilot (Step 12) are still outstanding, so no step is marked fully `[x]` yet.
+Status (19 Oct 2026): Steps 1–11 are **built in code** (owner, admin and student flows, plan billing, discovery, requests, polish) and Step 12 is **prepared** (`render.yaml`, `docs/DEPLOYMENT.md`). `[~]` below means "implemented but its full *Done when* is not yet signed off" — in particular the real-Postgres RLS "must fail / must hold" pass (Step 1) and the live pilot (Step 12) are still outstanding, so no step is marked fully `[x]` yet.
 
-- [~] **Step 0 — Setup.** (scaffold, env loader, tests done; design foundation pending approval; Supabase project and Vercel account are yours to create) Node.js, Git, Supabase project, Vercel account. Vite + React + TypeScript + Tailwind + Vitest. `.env` with Supabase URL and anon key (git-ignored). Folder structure from `ARCHITECTURE.md`.
+- [~] **Step 0 — Setup.** (scaffold, env loader, tests done; design foundation pending approval; Supabase project and Render account are yours to create) Node.js, Git, Supabase project, Render account. Vite + React + TypeScript + Tailwind + Vitest. `.env` with Supabase URL and anon key (git-ignored). Folder structure from `ARCHITECTURE.md`.
   *Done when:* app runs locally with a blank homepage; `.env` is not tracked.
 
 - [~] **Step 1 — Database and security.** Migrations for all tables, constraints, RLS, column grants, functions, storage policies (`DATABASE.md`). Seed cities and areas.
@@ -40,7 +40,7 @@ Status (19 Oct 2026): Steps 1–11 are **built in code** (owner, admin and stude
 - [~] **Step 11 — Polish and safety.** Loading/empty/error states everywhere; mobile-first; owner bottom tab bar; reminder banners.
   *Done when:* every screen works on a phone with no blank or broken states.
 
-- [ ] **Step 12 — Deploy and pilot.** GitHub → Vercel, env vars, Google redirect URLs for the live domain, Supabase Pro before first paying owner. Onboard 10–20 libraries in one city.
+- [ ] **Step 12 — Deploy and pilot.** GitHub → Render, env vars, Google redirect URLs for the live domain, Supabase Pro before first paying owner. Onboard 10–20 libraries in one city.
   *Done when:* a real owner uses it for a week and gives feedback.
 
 ## Later (not v1)

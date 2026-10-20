@@ -1,33 +1,42 @@
-# StudySeat: deploying to Vercel + Supabase
+# StudySeat: deploying to Render + Supabase
 
-This is the checklist for the first live deploy. Items marked **Check on first deploy** could not be proven on a
-laptop (they need the real host); everything else was tested against the production build.
+StudySeat is a static site (a Vite build) on Render, talking to Supabase for the database, login and photos.
+Items marked **Check on first deploy** cannot be proven on a laptop (they need the real host); everything else was
+tested against a clean production build, including the headers and rules in `render.yaml`.
 
-## 1. What the app needs at build time
+## 1. What the build needs
 
-Vercel runs `npm run build` and serves `dist/`. Vite reads these as it builds, so changing one means a **redeploy**.
+Render runs `npm ci && npm run build` and serves `dist/` from its CDN. Vite reads these variables **while building**,
+so changing one means a redeploy (Render does this when you save the variable).
 
 | Variable | Required | What it is |
 |---|---|---|
 | `VITE_SUPABASE_URL` | yes | Project URL, from Supabase: Project Settings, API. |
 | `VITE_SUPABASE_ANON_KEY` | yes | The public anon key, same page. **Never the `service_role` key.** |
 | `VITE_UPI_ID` | yes | The UPI ID that receives the ₹199 plan payments (`name@bank`). Without it the Plan page shows "Payments aren't set up yet" and no payment form. |
-| `VITE_DATA_MODE` | no | Leave it unset or set `supabase`. A production build defaults to the real backend when it is missing; only an explicit `mock` gives dummy data. |
+| `VITE_SUPPORT_EMAIL` | no | The address shown in the footer, legal pages and account page. If blank, the app uses its built-in default. |
+| `VITE_DATA_MODE` | no | `render.yaml` sets it to `supabase`. A production build also defaults to the real backend when it is missing; only an explicit `mock` gives dummy data. |
 
-Set them for the **Production** environment (and for **Preview** too if you want preview links to work).
-Node 24 is requested by `package.json` (`engines`), which is Vercel's default.
+The database **password** is different: it is a real secret. It lives only in your local `.env` as `SUPABASE_DB_PASSWORD` (used by `npm run db:push` / `db:query`) and must never be added to Render or `render.yaml`; the website does not need it.
+
+The variables above are not secrets (every visitor's browser receives them), but the UPI ID and keys are still kept out of git:
+`render.yaml` marks them `sync: false`, so Render asks for the values in the dashboard.
+
+Node: `package.json` requests `24.x` (`engines`), and Render's current default is 24.x as well.
 
 ## 2. Files in the repo that configure the host
 
-- `vercel.json`: sends every path to `index.html` so refreshing `/owner/plan` works, adds security headers
-  (Content-Security-Policy, nosniff, no framing, Referrer-Policy, Permissions-Policy, HSTS) and caches the
-  hashed files in `/assets` for a year.
+- `render.yaml` (a Render Blueprint, checked against Render's published schema):
+  - the static site: build command, publish folder `./dist`, the variables above;
+  - a rewrite rule `/*` to `/index.html`, so refreshing `/owner/plan` works. Render serves a real file when one exists at
+    the path, so the hashed files in `/assets` are never rewritten;
+  - security headers (Content-Security-Policy, nosniff, Referrer-Policy, Permissions-Policy, HSTS) and a one-year cache for `/assets/*`.
 - `public/robots.txt`: asks search engines to skip the owner, admin, student, profile and login pages.
 - `index.html`: description, theme colour and social-preview text.
 
 The Content-Security-Policy allows scripts from the site itself only, and images, API calls and websockets to
-`https://*.supabase.co`. It was tested against the production build on every role's screens with 0 violations.
-If you later add analytics, a Supabase custom domain, or any other outside host, add it to the policy first.
+`https://*.supabase.co`. It produced 0 violations across the owner, student and admin screens. If you later add
+analytics, a Supabase custom domain, or any other outside host, add it to the policy in `render.yaml` first.
 
 ## 3. Supabase (use a separate production project)
 
@@ -35,10 +44,11 @@ The current project is the one used for building and testing. For launch, create
 
 1. Create the project (choose the region closest to your users) and put it on a **paid plan before real owners arrive**:
    free projects are paused after about a week of low activity, and paid projects are not.
-2. Apply the schema: link the CLI to the new project and run `supabase db push`. The 11 files in `supabase/migrations`
-   create the tables, security rules, functions, places, and the photo storage rules. Run them in order; do not edit applied files.
+2. Apply the schema: set `VITE_SUPABASE_URL` and `SUPABASE_DB_PASSWORD` in your local `.env` (and `SUPABASE_DB_HOST` if the project is not in Sydney), then run `npm run db:push`. The 11 files in `supabase/migrations`
+   create the tables, security rules, functions, places, photo storage rules and hardening. Run them in order; do not edit applied files.
 3. Storage: migration 0010 creates the public `LibraryImages` bucket (5 MB, JPEG and PNG) if it does not exist.
-4. Authentication, URL configuration: set **Site URL** to the live address and add it (and any preview address you use) to **Redirect URLs**.
+4. Authentication, URL configuration: set **Site URL** to the live address (your `onrender.com` address or your own domain)
+   and add it, plus any preview address you use, to **Redirect URLs**.
 5. Authentication, Providers, Google: paste the Google client ID and secret (section 4).
 6. Make yourself the admin (section 5).
 7. **Reset the database password**, and keep it out of chat and files.
@@ -47,10 +57,12 @@ The current project is the one used for building and testing. For launch, create
 
 In the Google Cloud project that holds the OAuth client:
 
-- Authorised JavaScript origins: add the live site address (for example `https://your-domain`).
+- Authorised JavaScript origins: add the live site address.
 - Authorised redirect URIs: add `https://<production-project-ref>.supabase.co/auth/v1/callback`.
-- **Publish the consent screen.** While it is in "Testing" only the test users you list can sign in, so a new owner would be refused.
-  Check what Google asks for at that point (a privacy-policy link, the app name and the contact email).
+- **Publish the consent screen** (Google Auth Platform, Audience, Publish app), so the app is "In production" and open to any Google account.
+  Google's documentation says an app that asks only for name, email and profile (which is all StudySeat asks for) is not limited to the listed
+  test users and its sign-ins do not expire after 7 days even in "Testing"; publishing is still the safe setting for real users and for
+  showing your app name. **Prove it, don't assume it:** after publishing, sign in with a Google account that is not yours and not on the test-user list.
 
 Changes on Google's side can take a few minutes to apply.
 
@@ -64,25 +76,26 @@ update profiles set role = 'admin' where email = 'admin@example.com';
 
 Use a different Google account from any owner account: an admin must not also run a library.
 
-## 6. Vercel
+## 6. Render
 
-1. Import the GitHub repository. The framework is detected as Vite; build command `npm run build`, output `dist`.
-2. Add the variables from section 1.
-3. Add your domain and follow Vercel's DNS instructions.
-4. Deploy, then run the smoke test below.
+1. Push the branch you want to deploy to GitHub (`render.yaml` sets `branch: main`, so merge into `main` first).
+2. In the Render dashboard choose **New**, then **Blueprint**, connect the repository, and let Render read `render.yaml`.
+3. Enter the three required values when asked (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_UPI_ID`).
+4. Wait for the first deploy, open the `onrender.com` address, then add your own domain under Settings, Custom Domains and follow the DNS instructions.
+   Render redirects HTTP to HTTPS and issues the certificate itself.
 
 ## 7. Smoke test after the first deploy
 
-1. Open a deep link such as `/discover` in a fresh tab and press refresh. **Check on first deploy:** it must load, not show a 404.
-2. Open the site with the browser's developer console. There should be no red errors and no "Content Security Policy" messages.
+1. **Check on first deploy:** open `/discover` in a fresh tab and press refresh. It must load, not show a 404. (This is the rewrite rule.)
+2. **Check on first deploy:** in the browser's developer tools, Network tab, open the first request and confirm the response has
+   `content-security-policy` and `x-content-type-options`. The console should show no red errors.
 3. Sign in with Google as a new person: the role chooser appears, then the right home screen.
 4. As an owner: list a library with a photo. As admin: approve it. The owner sees "Free trial: 14 days left".
-5. On the Plan page, the UPI ID and QR show **your** UPI ID. Submit a real small payment's UTR, verify it as admin, check the new date.
+5. On the Plan page the UPI ID and QR show **your** UPI ID. Submit the UTR of a real small payment, verify it as admin, check the new date.
 6. As a student on a phone: find the library, request a seat; the owner approves; the student sees the seat.
 
 ## 8. Still open before a public launch
 
-- A real support email: the footer and Profile page currently use `support@studyseat.app`.
 - The Privacy, Terms and Refund pages are marked as pilot drafts; they need your business details and a read-through.
 - No notifications yet: owners and students learn about approvals only when they open the app (the roadmap lists WhatsApp/email as later).
 - A social-preview image and a sitemap need the final domain, so they are not added yet.
