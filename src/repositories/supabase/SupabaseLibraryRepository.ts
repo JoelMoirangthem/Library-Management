@@ -112,14 +112,19 @@ export class SupabaseLibraryRepository implements LibraryRepository {
   }
 
   async searchPublic(filter: PublicSearchFilter): Promise<PublicLibrary[]> {
-    const { data, error } = await getSupabase().rpc('public_libraries', {
+    const supabase = getSupabase()
+    const args = {
       p_city: filter.cityId ?? null,
       p_area: filter.areaId ?? null,
       p_max_fee_paise: filter.maxFeePaise ?? null,
       p_amenities: filter.amenities?.length ? filter.amenities : null,
+    }
+    // One request returns at most 1000 rows, so read the list page by page, in a fixed order.
+    const rows = await fetchAll(async (from, to) => {
+      const r = await supabase.rpc('public_libraries', args).order('id').range(from, to)
+      return { data: r.data as PublicLibraryRow[] | null, error: r.error }
     })
-    if (error) throw toAppErrorFromSupabase(error)
-    return ((data ?? []) as PublicLibraryRow[]).map(toPublicLibrary)
+    return rows.map(toPublicLibrary)
   }
 
   async getPublic(id: string): Promise<PublicLibrary | null> {
