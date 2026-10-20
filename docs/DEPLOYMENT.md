@@ -86,6 +86,8 @@ Use a different Google account from any owner account: an admin must not also ru
 
 ## 7. Smoke test after the first deploy
 
+GitHub already runs the type check, lint, tests and a build on every pull request (`.github/workflows/ci.yml`); the steps below are for the things only the real host can show.
+
 1. **Check on first deploy:** open `/discover` in a fresh tab and press refresh. It must load, not show a 404. (This is the rewrite rule.)
 2. **Check on first deploy:** in the browser's developer tools, Network tab, open the first request and confirm the response has
    `content-security-policy` and `x-content-type-options`. The console should show no red errors.
