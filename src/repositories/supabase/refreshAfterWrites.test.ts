@@ -12,6 +12,9 @@ class FakeRepo {
   async searchAll() {
     return []
   }
+  async countPending() {
+    return 3
+  }
   async approve(id: string) {
     return `approved ${id} with ${this.value}`
   }
@@ -28,12 +31,13 @@ describe('refreshAfterWrites', () => {
     expect(notify).toHaveBeenCalledTimes(1)
   })
 
-  it('does not reload for reads (get, list, search)', async () => {
+  it('does not reload for reads (get, list, search, count): a count that reloaded the screen would loop forever', async () => {
     const notify = vi.fn()
     const repo = refreshAfterWrites(new FakeRepo(), notify)
     await repo.listThings()
     await repo.getOne()
     await repo.searchAll()
+    expect(await repo.countPending()).toBe(3)
     expect(notify).not.toHaveBeenCalled()
   })
 

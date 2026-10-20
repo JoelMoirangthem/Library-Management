@@ -36,3 +36,20 @@ export function chunk<T>(items: T[], size: number): T[][] {
   for (let i = 0; i < items.length; i += size) groups.push(items.slice(i, i + size))
   return groups
 }
+
+/**
+ * Looks up just the rows an on-screen list refers to (for example the owners of the libraries shown), instead of
+ * downloading a whole table. Each id is asked for once, in groups of 100 so the web address stays short.
+ * `load(group)` must run `.in('<column>', group)`; a group of 100 can never reach the 1000-row cap.
+ */
+export async function fetchByIds<T>(ids: string[], load: (group: string[]) => PromiseLike<Page<T>>): Promise<T[]> {
+  const unique = [...new Set(ids.filter((id) => id))]
+  const groups = await Promise.all(
+    chunk(unique, 100).map(async (group) => {
+      const { data, error } = await load(group)
+      if (error) throw toAppErrorFromSupabase(error)
+      return data ?? []
+    }),
+  )
+  return groups.flat()
+}

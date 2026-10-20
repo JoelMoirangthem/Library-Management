@@ -6,7 +6,7 @@ import type {
   SeatRequestRepository,
 } from '@/repositories/interfaces'
 import { toAppErrorFromSupabase, unwrap } from '@/repositories/supabase/errors'
-import { chunk, fetchAll } from '@/repositories/supabase/paging'
+import { chunk, fetchAll, fetchByIds } from '@/repositories/supabase/paging'
 import {
   currentUserId,
   PLAN_PAYMENT_COLUMNS,
@@ -45,17 +45,16 @@ export class SupabasePlanPaymentRepository implements PlanPaymentRepository {
 
   async listAll(): Promise<AdminPaymentRow[]> {
     const supabase = getSupabase()
-    const [pays, libs, owners] = await Promise.all([
-      fetchAll((from, to) =>
-        supabase.from('plan_payments').select(PLAN_PAYMENT_COLUMNS).order('submitted_at', { ascending: false }).order('id', { ascending: false }).range(from, to).returns<PlanPaymentRow[]>(),
-      ),
-      fetchAll((from, to) =>
-        supabase.from('libraries').select('id, name, owner_id').order('id').range(from, to).returns<{ id: string; name: string; owner_id: string }[]>(),
-      ),
-      fetchAll((from, to) =>
-        supabase.from('profiles').select('id, name').order('id').range(from, to).returns<{ id: string; name: string }[]>(),
-      ),
-    ])
+    const pays = await fetchAll((from, to) =>
+      supabase.from('plan_payments').select(PLAN_PAYMENT_COLUMNS).order('submitted_at', { ascending: false }).order('id', { ascending: false }).range(from, to).returns<PlanPaymentRow[]>(),
+    )
+    // Only the libraries these payments belong to, and only those libraries' owners.
+    const libs = await fetchByIds(pays.map((p) => p.library_id), (group) =>
+      supabase.from('libraries').select('id, name, owner_id').in('id', group).returns<{ id: string; name: string; owner_id: string }[]>(),
+    )
+    const owners = await fetchByIds(libs.map((l) => l.owner_id), (group) =>
+      supabase.from('profiles').select('id, name').in('id', group).returns<{ id: string; name: string }[]>(),
+    )
     const libById = new Map(libs.map((l) => [l.id, l]))
     const ownerById = new Map(owners.map((o) => [o.id, o.name]))
     return pays.map((row) => {
@@ -66,6 +65,15 @@ export class SupabasePlanPaymentRepository implements PlanPaymentRepository {
         ownerName: (lib && ownerById.get(lib.owner_id)) || 'Unknown',
       }
     })
+  }
+
+  async countPendingForAdmin(): Promise<number> {
+    const { count, error } = await getSupabase()
+      .from('plan_payments')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+    if (error) throw toAppErrorFromSupabase(error)
+    return count ?? 0
   }
 
   async verify(paymentId: string): Promise<void> {

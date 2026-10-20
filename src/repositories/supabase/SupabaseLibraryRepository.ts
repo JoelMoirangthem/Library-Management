@@ -10,7 +10,7 @@ import type {
 import { getSupabase } from '@/lib/supabase'
 import type { LibraryRepository } from '@/repositories/interfaces'
 import { toAppErrorFromSupabase } from '@/repositories/supabase/errors'
-import { fetchAll } from '@/repositories/supabase/paging'
+import { fetchAll, fetchByIds } from '@/repositories/supabase/paging'
 import {
   currentUserId,
   LIBRARY_COLUMNS,
@@ -137,12 +137,9 @@ export class SupabaseLibraryRepository implements LibraryRepository {
   async listForAdmin(): Promise<AdminLibraryRow[]> {
     const supabase = getSupabase()
     // Each list is read page by page (the API caps one request at 1000 rows) with a unique sort order.
-    const [libs, owners, cities, areas, subs, shiftRows] = await Promise.all([
+    const [libs, cities, areas, subs, shiftRows] = await Promise.all([
       fetchAll((from, to) =>
         supabase.from('libraries').select(LIBRARY_COLUMNS).order('created_at').order('id').range(from, to).returns<LibraryRow[]>(),
-      ),
-      fetchAll((from, to) =>
-        supabase.from('profiles').select('id, name, phone').order('id').range(from, to).returns<{ id: string; name: string; phone: string }[]>(),
       ),
       fetchAll((from, to) =>
         supabase.from('cities').select('id, name').order('id').range(from, to).returns<{ id: string; name: string }[]>(),
@@ -155,6 +152,10 @@ export class SupabaseLibraryRepository implements LibraryRepository {
       ),
       fetchAll((from, to) => supabase.from('shifts').select(SHIFT_COLUMNS).order('id').range(from, to).returns<ShiftRow[]>()),
     ])
+    // Only the owners of the libraries listed, not every user in the system.
+    const owners = await fetchByIds(libs.map((l) => l.owner_id), (group) =>
+      supabase.from('profiles').select('id, name, phone').in('id', group).returns<{ id: string; name: string; phone: string }[]>(),
+    )
     const ownerById = new Map(owners.map((o) => [o.id, o]))
     const cityById = new Map(cities.map((c) => [c.id, c.name]))
     const areaById = new Map(areas.map((a) => [a.id, a.name]))
@@ -173,6 +174,15 @@ export class SupabaseLibraryRepository implements LibraryRepository {
         shifts: shiftRows.filter((s) => s.library_id === row.id).map(toShift),
       }
     })
+  }
+
+  async countPendingForAdmin(): Promise<number> {
+    const { count, error } = await getSupabase()
+      .from('libraries')
+      .select('id', { count: 'exact', head: true })
+      .eq('approval_status', 'pending')
+    if (error) throw toAppErrorFromSupabase(error)
+    return count ?? 0
   }
 
   async approve(id: string): Promise<void> {

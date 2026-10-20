@@ -299,3 +299,26 @@ describe('shifts', () => {
     expect(await code(shiftRepo.add('lib_scholars', { name: 'Evening', startTime: '18:00', endTime: '21:00', monthlyFeePaise: 50000 }))).toBe('forbidden')
   })
 })
+
+describe('admin badge counts (the menu badges must not need the full lists)', () => {
+  it('counts the libraries waiting for review, and agrees with the full list', async () => {
+    await login.signInAs('u_admin')
+    const n = await libs.countPendingForAdmin()
+    const listed = (await libs.listForAdmin()).filter((r) => r.library.approvalStatus === 'pending').length
+    expect(n).toBe(listed)
+  })
+
+  it('counts the plan payments waiting for a check, and agrees with the full list', async () => {
+    await login.signInAs('u_admin')
+    const n = await payments.countPendingForAdmin()
+    const listed = (await payments.listAll()).filter((p) => p.status === 'pending').length
+    expect(n).toBe(listed)
+    expect(n).toBeGreaterThan(0)
+  })
+
+  it('only an admin may ask', async () => {
+    await login.signInAs('u_manoj')
+    await expect(libs.countPendingForAdmin()).rejects.toBeInstanceOf(AppError)
+    await expect(payments.countPendingForAdmin()).rejects.toBeInstanceOf(AppError)
+  })
+})

@@ -72,6 +72,7 @@ export function createServices(r: Repositories) {
 
     // admin: libraries
     listLibrariesForAdmin: () => r.libraries.listForAdmin(),
+    countPendingLibraries: () => r.libraries.countPendingForAdmin(),
     approveLibrary: (id: string) => r.libraries.approve(id),
     rejectLibrary: (id: string, reason: string) => r.libraries.reject(id, reason),
 
@@ -79,6 +80,7 @@ export function createServices(r: Repositories) {
     listMyPlanPayments: (libraryId: string) => r.planPayments.listByLibrary(libraryId),
     submitPlanPayment: (libraryId: string, utr: string) => r.planPayments.submit(libraryId, utr),
     listAllPlanPayments: () => r.planPayments.listAll(),
+    countPendingPlanPayments: () => r.planPayments.countPendingForAdmin(),
     verifyPlanPayment: (id: string) => r.planPayments.verify(id),
     failPlanPayment: (id: string, reason: string) => r.planPayments.fail(id, reason),
 

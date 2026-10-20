@@ -79,7 +79,7 @@ export function PublicLayout() {
               <>
                 {!isStudent && (
                   <Link to={homePathFor(user)} className={buttonStyles('secondary')}>
-                    Open dashboard
+                    {user.role === null ? 'Finish setting up' : 'Open dashboard'}
                   </Link>
                 )}
                 <button

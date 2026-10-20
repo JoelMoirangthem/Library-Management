@@ -419,6 +419,13 @@ export class MockLibraryRepository implements LibraryRepository {
       return lib && isLibraryActive(lib) ? toPublic(lib) : null
     })
   }
+  countPendingForAdmin() {
+    return run((): number => {
+      requireRole('admin')
+      return getDb().libraries.filter((l) => l.approvalStatus === 'pending').length
+    })
+  }
+
   listForAdmin() {
     return run((): AdminLibraryRow[] => {
       requireRole('admin')
@@ -571,6 +578,13 @@ export class MockPlanPaymentRepository implements PlanPaymentRepository {
       return payment
     })
   }
+  countPendingForAdmin() {
+    return run((): number => {
+      requireRole('admin')
+      return getDb().planPayments.filter((p) => p.status === 'pending').length
+    })
+  }
+
   listAll() {
     return run((): AdminPaymentRow[] => {
       requireRole('admin')

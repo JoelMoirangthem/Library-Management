@@ -11,11 +11,12 @@ import { services } from '@/lib/container'
 
 export function AdminLayout() {
   const { user, signOut } = useAuth()
-  const libs = useAsync(() => services.listLibrariesForAdmin(), [])
-  const pays = useAsync(() => services.listAllPlanPayments(), [])
+  // The menu badges only need two numbers, so ask for counts instead of downloading the full lists.
+  const libs = useAsync(() => services.countPendingLibraries(), [])
+  const pays = useAsync(() => services.countPendingPlanPayments(), [])
 
-  const pendingLibs = (libs.data ?? []).filter((r) => r.library.approvalStatus === 'pending').length
-  const pendingPays = (pays.data ?? []).filter((p) => p.status === 'pending').length
+  const pendingLibs = libs.data ?? 0
+  const pendingPays = pays.data ?? 0
 
   const items: NavItemDef[] = [
     { to: '/admin', label: 'Libraries', icon: <Building2 />, end: true, badge: pendingLibs },
