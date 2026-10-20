@@ -179,3 +179,7 @@ Helper, trigger and constraint functions (`touch_updated_at`, `forbid_delete`, `
 ## Closed by default (migration 0012)
 
 `alter default privileges` removes the automatic grants to `anon` and `authenticated` on new tables and sequences created by the migration role. A new table therefore starts with no access for the web roles; a migration must grant what it needs and enable row-level security. Functions still need `revoke all on function ... from public, anon, authenticated` (PUBLIC cannot be closed by default). `npm run security:check` verifies all of this on the live database.
+
+## No email sign-ups (migration 0013)
+
+`refuse_unapproved_email_users()` is a `before insert` trigger on `auth.users`. It raises `insufficient_privilege` for any user whose `raw_app_meta_data->>'provider'` is `email`, unless the transaction has set `studyseat.allow_email_user = 'on'` (only the admin tool does). Google users and users without a provider are unaffected. This lets the Email provider stay on for the one administrator login without opening registration. Test seeds that insert email users into `auth.users` must set that setting first (`select set_config('studyseat.allow_email_user','on',true)`). `npm run security:check` verifies the trigger exists and is enabled, and that no email account exists outside `@admin.studyseat.invalid`.

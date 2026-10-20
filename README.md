@@ -25,6 +25,9 @@ For the real backend (Supabase), copy `.env.example` to `.env`, set `VITE_DATA_M
 | `npm run build` | Type-check and build for production |
 | `npm test` | Run unit tests (Vitest) |
 | `npm run lint` | Lint with oxlint |
+| `npm run db:push` | Apply new database migrations (needs `SUPABASE_DB_PASSWORD` in `.env`) |
+| `npm run security:check` | Check the live database against the 12 safety rules |
+| `npm run admin:set-password` | Create the administrator or change their password (asks in the terminal, never in chat) |
 | `npm run db:push` | Apply new files from `supabase/migrations` to the database named in `.env` |
 | `npm run db:query -- "select 1"` | Run one SQL statement against that database |
 | `npm run security:check` | Check the live database against the safety rules (read-only). Run it before every deploy. |

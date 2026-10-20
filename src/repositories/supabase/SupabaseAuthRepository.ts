@@ -1,3 +1,4 @@
+import { adminLoginEmail } from '@/domain/adminLogin'
 import { AppError } from '@/domain/errors'
 import { isValidPhone, normalizePhone } from '@/domain/constants'
 import type { Profile } from '@/domain/types'
@@ -39,6 +40,37 @@ export class SupabaseAuthRepository implements AuthRepository {
       options: { redirectTo: `${window.location.origin}/login`, queryParams: { prompt: 'select_account' } },
     })
     if (error) throw toAppErrorFromSupabase(error)
+  }
+
+  async signInAdmin(userId: string, password: string): Promise<Profile> {
+    // One message for every failure (unknown ID, wrong password, not an admin) so the page never reveals which part was wrong.
+    const wrong = new AppError('forbidden', 'Wrong user ID or password.')
+    const email = adminLoginEmail(userId)
+    if (!email || !password) throw wrong
+    const supabase = getSupabase()
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error || !data.session) {
+      if (error && /rate|too many|over_/i.test(`${error.code ?? ''} ${error.message}`)) {
+        throw new AppError('forbidden', 'Too many attempts. Wait a few minutes and try again.')
+      }
+      if (error && /email_provider_disabled|disabled/i.test(`${error.code ?? ''} ${error.message}`)) {
+        throw new AppError('forbidden', 'Password sign-in is switched off for this project.')
+      }
+      throw wrong
+    }
+    let profile: Profile
+    try {
+      profile = await loadProfile(data.session.user.id)
+    } catch {
+      await supabase.auth.signOut()
+      throw wrong
+    }
+    if (profile.role !== 'admin') {
+      // A correct password for an account that is not an administrator must not leave a session behind.
+      await supabase.auth.signOut()
+      throw wrong
+    }
+    return profile
   }
 
   async signOut(): Promise<void> {

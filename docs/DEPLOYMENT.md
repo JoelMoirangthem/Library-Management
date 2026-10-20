@@ -68,13 +68,15 @@ Changes on Google's side can take a few minutes to apply.
 
 ## 5. First admin
 
-An admin can only be created with SQL (the app cannot grant it). After that person has signed in once with Google:
+The administrator does not use Google. They sign in at `/admin-login` (not linked from the public site) with a **user ID and a password**. The account is created on your own computer, never through the website:
 
-```sql
-update profiles set role = 'admin' where email = 'admin@example.com';
-```
+1. In the Supabase dashboard open Authentication, Sign In / Providers, **Email**, and switch it **on**. Keep **Confirm email** on. Do **not** switch off "Allow new users to sign up" (that would also stop Google sign-ins). Migration 0013 stops strangers from creating email accounts, so turning the provider on does not open registration.
+2. Run `npm run admin:set-password`. It asks for a user ID, then the password twice (typing is hidden), then a display name. It refuses weak passwords and says why (at least 14 characters, small and capital letters, a digit, a symbol, no easy words or years, not containing the user ID). Nothing is printed or stored in a file.
+3. Open `/admin-login` on the site and sign in.
 
-Use a different Google account from any owner account: an admin must not also run a library.
+Run the same command again to change the password. The user ID is turned into an internal address `<id>@admin.studyseat.invalid`; that domain cannot receive mail and cannot belong to a Google account, so a Google user can never take the account over. A correct password for an account that is not an administrator is signed out again at once, and the page shows the same message for every failure.
+
+Do not reuse a password that has ever been typed into a chat or a document. Write the user ID and password in a password manager, not in the repository.
 
 ## 6. Render
 
@@ -86,11 +88,11 @@ Use a different Google account from any owner account: an admin must not also ru
 
 ## 6b. Security checks (before the first deploy, and before every later one)
 
-1. **`npm run security:check`** reads the live database and asserts 10 rules: every table has row-level security; strangers can read only cities and areas; users cannot write sensitive columns (role, ownership, approval, money, expiry) directly; strangers can run only an approved list of functions; every privileged function pins its search path; new tables are closed by default; the photo bucket accepts only small JPEG/PNG files; storage never serves strangers or allows overwriting; and the live API returns no private table to a stranger. It prints the failing rule and what to fix. It needs `SUPABASE_DB_PASSWORD` in `.env`, and is read-only.
-2. **Turn off the Email sign-in provider** (Supabase dashboard, Authentication, Sign In / Providers, Email). StudySeat only has a Google button, but the project also accepts email-and-password sign-ups through the API: this was tested, and Supabase's built-in mail limit throttled the attempt (it was not blocked). Disable only the **Email provider**. Do **not** switch off "Allow new users to sign up": that setting applies to every login method, so it would also stop brand-new people signing in with Google. Anonymous sign-ins are already off (tested).
-3. Keep **Confirm email** on while the Email provider exists, so an address must be proven before a session is issued.
+1. **`npm run security:check`** reads the live database and asserts 12 rules: every table has row-level security; strangers can read only cities and areas; users cannot write sensitive columns (role, ownership, approval, money, expiry) directly; strangers can run only an approved list of functions; every privileged function pins its search path; new tables are closed by default; the photo bucket accepts only small JPEG/PNG files; storage never serves strangers or allows overwriting; the live API returns no private table to a stranger; the guard that refuses email sign-ups is installed; and the only email accounts are administrator accounts. It prints the failing rule and what to fix. It needs `SUPABASE_DB_PASSWORD` in `.env`, and is read-only.
+2. **Email sign-in is ON, for the administrator only.** The Email provider must be on for the password login to work. Strangers are kept out by the database, not by the setting: migration 0013 installs a trigger on `auth.users` that refuses to create any email account unless the statement itself says it is the administrator tool. Tested on the live project: a stranger's email sign-up is refused with "Sign up with Google. Email accounts are not open for registration.", Google sign-in still works, and `npm run security:check` fails if the trigger is removed or if any email account outside `@admin.studyseat.invalid` exists. Keep **Confirm email** on, and do **not** switch off "Allow new users to sign up". Anonymous sign-ins stay off.
+3. **Sign-in attempts are rate limited by Supabase** (Authentication, Rate Limits). Leave the defaults on; they slow down guessing against `/admin-login`. Consider adding two-step verification (TOTP) for the administrator later.
 
-Note: scripted tests that log in with a password (like the ones used to check this project) need the Email provider switched back on temporarily.
+Note: scripted tests that create email test users must run `select set_config('studyseat.allow_email_user','on',true)` in the same transaction, or the trigger refuses them.
 ## 7. Smoke test after the first deploy
 
 GitHub already runs the type check, lint, tests and a build on every pull request (`.github/workflows/ci.yml`); the steps below are for the things only the real host can show.

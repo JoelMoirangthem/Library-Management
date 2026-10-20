@@ -19,7 +19,11 @@ export function RequireRole({ roles }: { roles: Role[] }) {
       </div>
     )
   }
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  if (!user) {
+    // The admin area has its own sign-in page; everything else uses the public Google login.
+    const adminOnly = roles.length === 1 && roles[0] === 'admin'
+    return <Navigate to={adminOnly ? '/admin-login' : '/login'} replace state={{ from: location.pathname }} />
+  }
   if (!user.role) return <Navigate to="/choose-role" replace />
   // Owners and students need a mobile number so libraries and students can reach each other.
   if (user.role !== 'admin' && !isValidPhone(user.phone)) return <Navigate to="/choose-role" replace />

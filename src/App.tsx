@@ -31,6 +31,7 @@ const OwnerRequests = lazy(() => import('@/pages/owner/Requests'))
 const OwnerPlan = lazy(() => import('@/pages/owner/Plan'))
 const OwnerLibraryProfile = lazy(() => import('@/pages/owner/LibraryProfile'))
 
+const AdminLogin = lazy(() => import('@/pages/admin/AdminLogin'))
 const AdminLibraries = lazy(() => import('@/pages/admin/Libraries'))
 const AdminPayments = lazy(() => import('@/pages/admin/Payments'))
 const AdminPlaces = lazy(() => import('@/pages/admin/Places'))
@@ -47,6 +48,7 @@ export default function App() {
             <Route element={<PublicLayout />}>
               <Route index element={<Home />} />
               <Route path="login" element={<Login />} />
+          <Route path="admin-login" element={<AdminLogin />} />
               <Route path="discover" element={<Discover />} />
               <Route path="library/:id" element={<LibraryDetail />} />
               <Route path="privacy" element={<Privacy />} />

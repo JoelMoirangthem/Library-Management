@@ -56,5 +56,12 @@ export function evaluateFacts(f) {
 
   rule('the live API returns no private table to a stranger', f.anonCanReadTables.length === 0, `a stranger could read rows of: ${names(f.anonCanReadTables)}`)
 
+  // Email + password is switched on only for the administrator. The database refuses any other email account at creation;
+  // this proves the refusal is still installed, and that no other email account slipped in some other way.
+  const g = f.emailSignupGuard
+  rule('strangers cannot register an email account', Boolean(g && g.exists && g.enabled), 'the trigger that refuses email sign-ups is missing or disabled (migration 0013)')
+
+  rule('the only email accounts are administrator accounts', f.emailAccountsOutsideAdminDomain.length === 0, `${f.emailAccountsOutsideAdminDomain.length} email account(s) exist that are not on the administrator domain`)
+
   return out
 }
