@@ -175,3 +175,7 @@ Must hold:
 ## Hardening (migration 0011)
 
 Helper, trigger and constraint functions (`touch_updated_at`, `forbid_delete`, `freeze_fee_payment`, `enforce_shift_rules`, `shift_overlaps`, `photos_are_valid`) have `search_path = public` pinned. Their EXECUTE grants are intentionally left in place: the shift trigger and the photos check constraint run with the signed-in owner's rights. `libraries_update_owner` requires `is_library_editable(id)` in both USING and WITH CHECK.
+
+## Closed by default (migration 0012)
+
+`alter default privileges` removes the automatic grants to `anon` and `authenticated` on new tables and sequences created by the migration role. A new table therefore starts with no access for the web roles; a migration must grant what it needs and enable row-level security. Functions still need `revoke all on function ... from public, anon, authenticated` (PUBLIC cannot be closed by default). `npm run security:check` verifies all of this on the live database.
