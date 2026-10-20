@@ -84,6 +84,13 @@ Use a different Google account from any owner account: an admin must not also ru
 4. Wait for the first deploy, open the `onrender.com` address, then add your own domain under Settings, Custom Domains and follow the DNS instructions.
    Render redirects HTTP to HTTPS and issues the certificate itself.
 
+## 6b. Security checks (before the first deploy, and before every later one)
+
+1. **`npm run security:check`** reads the live database and asserts 10 rules: every table has row-level security; strangers can read only cities and areas; users cannot write sensitive columns (role, ownership, approval, money, expiry) directly; strangers can run only an approved list of functions; every privileged function pins its search path; new tables are closed by default; the photo bucket accepts only small JPEG/PNG files; storage never serves strangers or allows overwriting; and the live API returns no private table to a stranger. It prints the failing rule and what to fix. It needs `SUPABASE_DB_PASSWORD` in `.env`, and is read-only.
+2. **Turn off the Email sign-in provider** (Supabase dashboard, Authentication, Sign In / Providers, Email). StudySeat only has a Google button, but the project also accepts email-and-password sign-ups through the API: this was tested, and Supabase's built-in mail limit throttled the attempt (it was not blocked). Disable only the **Email provider**. Do **not** switch off "Allow new users to sign up": that setting applies to every login method, so it would also stop brand-new people signing in with Google. Anonymous sign-ins are already off (tested).
+3. Keep **Confirm email** on while the Email provider exists, so an address must be proven before a session is issued.
+
+Note: scripted tests that log in with a password (like the ones used to check this project) need the Email provider switched back on temporarily.
 ## 7. Smoke test after the first deploy
 
 GitHub already runs the type check, lint, tests and a build on every pull request (`.github/workflows/ci.yml`); the steps below are for the things only the real host can show.

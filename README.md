@@ -27,6 +27,7 @@ For the real backend (Supabase), copy `.env.example` to `.env`, set `VITE_DATA_M
 | `npm run lint` | Lint with oxlint |
 | `npm run db:push` | Apply new files from `supabase/migrations` to the database named in `.env` |
 | `npm run db:query -- "select 1"` | Run one SQL statement against that database |
+| `npm run security:check` | Check the live database against the safety rules (read-only). Run it before every deploy. |
 
 ## Docs
 
