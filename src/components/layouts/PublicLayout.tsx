@@ -52,7 +52,7 @@ export function PublicLayout() {
       </a>
 
       <header className="sticky top-0 z-30 border-b border-border bg-canvas/90 backdrop-blur">
-        <div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 sm:px-6">
+        <div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 sm:gap-x-4 sm:px-6">
           <Logo />
           <nav aria-label="Main" className="ml-4 hidden items-center gap-1 md:flex">
             <NavLink to="/discover" className={topLink}>
@@ -98,10 +98,10 @@ export function PublicLayout() {
               </>
             ) : (
               <>
-                <Link to="/login" className={buttonStyles('ghost', 'whitespace-nowrap px-3 max-[359px]:hidden')}>
+                <Link to="/login" className={buttonStyles('ghost', 'whitespace-nowrap px-2.5 sm:px-3 max-[359px]:hidden')}>
                   Log in
                 </Link>
-                <Link to="/login?as=owner" className={buttonStyles('primary', 'whitespace-nowrap px-3 sm:px-4')}>
+                <Link to="/login?as=owner" className={buttonStyles('primary', 'whitespace-nowrap px-2.5 sm:px-4')}>
                   <span className="sm:hidden">List library</span>
                   <span className="hidden sm:inline">List your library</span>
                 </Link>

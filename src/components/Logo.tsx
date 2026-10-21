@@ -23,7 +23,7 @@ export function Logo({ to = '/', className }: { to?: string; className?: string 
     <Link
       to={to}
       aria-label={`${BRAND.name} home`}
-      className={cx('inline-flex min-h-11 items-center gap-2 rounded-control text-lg font-semibold tracking-tight', className)}
+      className={cx('inline-flex min-h-11 items-center gap-2 rounded-control text-base font-semibold tracking-tight max-[379px]:text-sm sm:text-lg', className)}
     >
       <LogoMark />
       {BRAND.name}
