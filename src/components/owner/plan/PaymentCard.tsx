@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Check, ChevronDown, Copy, ExternalLink } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, ChevronDown, Copy, ExternalLink, TriangleAlert } from 'lucide-react'
 import { renderSVG } from 'uqr'
 import { Button, buttonStyles } from '@/components/Button'
 import { Card } from '@/components/Card'
@@ -12,6 +12,7 @@ import { PLAN_DAYS, PLAN_PRICE_PAISE } from '@/domain/plan'
 import { isValidUtr } from '@/domain/constants'
 import type { PlanPayment } from '@/domain/types'
 import { buildUpiLink } from '@/domain/upi'
+import { watchForAppLaunch } from '@/lib/appLaunch'
 import { cx } from '@/lib/cx'
 import { BRAND } from '@/lib/brand'
 
@@ -52,6 +53,16 @@ function PayFlow({
   const [utr, setUtr] = useState('')
   const [fieldError, setFieldError] = useState<string | undefined>()
   const [showQrOnMobile, setShowQrOnMobile] = useState(false)
+  // Set when the page is still in front a moment after the Pay button was tapped, i.e. no UPI app opened.
+  const [appDidNotOpen, setAppDidNotOpen] = useState(false)
+  const stopWatching = useRef<() => void>(() => {})
+  useEffect(() => () => stopWatching.current(), [])
+
+  function onPayTap() {
+    setAppDidNotOpen(false)
+    stopWatching.current()
+    stopWatching.current = watchForAppLaunch(document, () => setAppDidNotOpen(true))
+  }
 
   const digits = utr.replace(/\D/g, '')
   const stepStates: StepState[] = [
@@ -109,13 +120,22 @@ function PayFlow({
         <h3 className="text-sm font-semibold">1. Pay ₹199</h3>
 
         {/* Mobile: big UPI button first. */}
-        <a href={link} className={buttonStyles('primary', 'mt-3 w-full sm:hidden')}>
+        <a href={link} onClick={onPayTap} className={buttonStyles('primary', 'mt-3 w-full sm:hidden')}>
           <ExternalLink aria-hidden className="size-4" />
           Pay ₹199 with a UPI app
         </a>
-        <p className="mt-2 text-sm text-ink-muted sm:hidden">
-          If your UPI app does not open or shows an error, pay to the UPI ID below (type ₹199 yourself) or scan the QR from another phone. Then enter the UTR.
-        </p>
+        {appDidNotOpen ? (
+          <div role="alert" className="mt-3 flex gap-2 rounded-control bg-warning-soft p-3 text-sm text-warning-ink sm:hidden">
+            <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+            <p>
+              No UPI app opened. Open your UPI app yourself, pay <strong>₹199</strong> to the UPI ID below (tap Copy), or scan the QR from another phone. Then enter the UTR.
+            </p>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-ink-muted sm:hidden">
+            If your UPI app shows an error, pay to the UPI ID below (type ₹199 yourself) or scan the QR from another phone. Then enter the UTR.
+          </p>
+        )}
 
         <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 rounded-card border border-border-strong bg-canvas p-3">
