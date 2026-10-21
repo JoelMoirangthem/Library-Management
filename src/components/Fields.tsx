@@ -154,3 +154,30 @@ export function ChipCheckbox({
     </label>
   )
 }
+
+/** A pill that selects ONE option out of a group (same look as ChipCheckbox, but a round radio, so it reads as "choose one"). */
+export function ChipRadio({
+  label,
+  name,
+  checked,
+  onSelect,
+}: {
+  label: string
+  name: string
+  checked: boolean
+  onSelect: () => void
+}) {
+  return (
+    <label
+      className={cx(
+        'inline-flex min-h-11 pointer-fine:min-h-9 cursor-pointer select-none items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
+        checked
+          ? 'border-primary bg-primary-soft text-primary-ink'
+          : 'border-border-strong bg-surface text-ink hover:bg-canvas',
+      )}
+    >
+      <input type="radio" name={name} className="size-4 accent-primary" checked={checked} onChange={onSelect} />
+      {label}
+    </label>
+  )
+}

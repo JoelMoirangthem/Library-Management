@@ -11,13 +11,13 @@ import { formatRupees } from '@/domain/money'
 import { PLAN_DAYS, PLAN_PRICE_PAISE } from '@/domain/plan'
 import { isValidUtr } from '@/domain/constants'
 import type { PlanPayment } from '@/domain/types'
+import { buildUpiLink } from '@/domain/upi'
 import { cx } from '@/lib/cx'
 import { BRAND } from '@/lib/brand'
 
-const RUPEES = (PLAN_PRICE_PAISE / 100).toFixed(2)
-/** The pay link for the UPI app; upiId comes from the VITE_UPI_ID setting. */
+/** The pay link for the UPI app and the QR code; upiId comes from the VITE_UPI_ID setting. */
 function upiLink(upiId: string): string {
-  return `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(BRAND.upiPayeeName)}&am=${RUPEES}&cu=INR&tn=${encodeURIComponent(` plan`)}`
+  return buildUpiLink({ upiId, payeeName: BRAND.upiPayeeName, amountPaise: PLAN_PRICE_PAISE, note: `${BRAND.name} plan` })
 }
 
 type Props = {
@@ -113,6 +113,9 @@ function PayFlow({
           <ExternalLink aria-hidden className="size-4" />
           Pay ₹199 with a UPI app
         </a>
+        <p className="mt-2 text-sm text-ink-muted sm:hidden">
+          If your UPI app does not open or shows an error, pay to the UPI ID below (type ₹199 yourself) or scan the QR from another phone. Then enter the UTR.
+        </p>
 
         <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 rounded-card border border-border-strong bg-canvas p-3">

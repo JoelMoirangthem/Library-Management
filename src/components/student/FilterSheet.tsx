@@ -1,5 +1,5 @@
 import { Button } from '@/components/Button'
-import { ChipCheckbox } from '@/components/Fields'
+import { ChipCheckbox, ChipRadio } from '@/components/Fields'
 import { Modal } from '@/components/Modal'
 import { AMENITIES } from '@/domain/constants'
 import type { FeeOption } from '@/components/student/discoverOptions'
@@ -54,18 +54,9 @@ export function FilterSheet({
         <fieldset>
           <legend className="mb-2 text-sm font-medium">Max monthly fee</legend>
           <div className="flex flex-wrap gap-2">
-            <ChipCheckbox
-              label="Any"
-              checked={!maxFee}
-              onChange={() => onChangeMaxFee('')}
-            />
+            <ChipRadio label="Any" name="max-fee" checked={!maxFee} onSelect={() => onChangeMaxFee('')} />
             {feeOptions.map((f) => (
-              <ChipCheckbox
-                key={f.value}
-                label={f.label}
-                checked={maxFee === f.value}
-                onChange={(on) => onChangeMaxFee(on ? f.value : '')}
-              />
+              <ChipRadio key={f.value} label={f.label} name="max-fee" checked={maxFee === f.value} onSelect={() => onChangeMaxFee(f.value)} />
             ))}
           </div>
         </fieldset>

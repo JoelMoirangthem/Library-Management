@@ -10,6 +10,7 @@ import { LibraryCard, LibraryCardSkeleton } from '@/components/student/LibraryCa
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { FEE_OPTIONS, feeOptionLabel } from '@/components/student/discoverOptions'
+import { matchesLibrarySearch } from '@/domain/librarySearch'
 import type { PublicLibrary } from '@/domain/types'
 import { services } from '@/lib/container'
 import { useAsync } from '@/hooks/useAsync'
@@ -103,15 +104,10 @@ export default function Discover() {
       onRemove: () => update({ amenities: amenities.filter((x) => x !== a) }),
     })
 
-  // Server returns the city/area/fee/amenity matches; name/area/landmark search is applied here.
+  // The server returns the city/area/fee/amenity matches; the typed words are matched here (name, area, city, landmark, address, pincode).
   const searched = useMemo(() => {
     const list = results.data ?? []
-    const needle = q.trim().toLowerCase()
-    const filtered = needle
-      ? list.filter((lib) =>
-          [lib.name, lib.areaName, lib.landmark].some((f) => f.toLowerCase().includes(needle)),
-        )
-      : list
+    const filtered = list.filter((lib) => matchesLibrarySearch(lib, q))
     const sorted = [...filtered].sort((a, b) =>
       sort === 'fee' ? a.fromFeePaise - b.fromFeePaise : totalSeatsFree(b) - totalSeatsFree(a),
     )
@@ -128,26 +124,45 @@ export default function Discover() {
         description="Search, then pick your city and area to see libraries with a free seat near you."
       />
 
-      <section aria-label="Search and filters" className="mb-6 space-y-4">
-        <div className="relative">
-          <Search
-            aria-hidden
-            className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-ink-muted"
-          />
-          <label htmlFor="library-search" className="sr-only">
-            Search by library name
-          </label>
-          <input
-            id="library-search"
-            type="search"
-            value={q}
-            onChange={(e) => update({ q: e.target.value })}
-            placeholder="Search by library name"
-            className="block w-full min-h-11 pointer-fine:min-h-9 rounded-control border border-border-strong bg-surface py-2 pl-10 pr-3 text-base pointer-fine:text-sm text-ink placeholder:text-ink-muted/70"
-          />
+      <section aria-label="Search and filters" className="mb-6 space-y-3">
+        {/* Search and Filters share one row so the results start higher on a phone. */}
+        <div className="flex items-stretch gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search
+              aria-hidden
+              className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-ink-muted"
+            />
+            <label htmlFor="library-search" className="sr-only">
+              Search libraries by name, area, city or pincode
+            </label>
+            <input
+              id="library-search"
+              type="search"
+              value={q}
+              onChange={(e) => update({ q: e.target.value })}
+              placeholder="Name, area or city"
+              autoComplete="off"
+              enterKeyHint="search"
+              className="block w-full min-h-11 pointer-fine:min-h-9 rounded-control border border-border-strong bg-surface py-2 pl-10 pr-3 text-base pointer-fine:text-sm text-ink placeholder:text-ink-muted/70"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => update({ filters: true })}
+            className={buttonStyles('secondary', 'shrink-0 px-3 sm:px-4')}
+            aria-haspopup="dialog"
+          >
+            <ListFilter aria-hidden className="size-4" />
+            Filters
+            {sheetFilterCount > 0 && (
+              <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold tabular-nums text-white">
+                {sheetFilterCount}
+              </span>
+            )}
+          </button>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
+        <div className="grid grid-cols-2 gap-3">
           <SelectField label="City" value={cityId} onChange={(e) => update({ city: e.target.value })}>
             <option value="">All cities</option>
             {cities.data?.map((c) => (
@@ -157,39 +172,15 @@ export default function Discover() {
             ))}
           </SelectField>
 
-          <SelectField
-            label="Area"
-            value={areaId}
-            disabled={!cityId}
-            hint={!cityId ? 'Choose a city first' : undefined}
-            onChange={(e) => update({ area: e.target.value })}
-          >
-            <option value="">All areas</option>
+          <SelectField label="Area" value={areaId} disabled={!cityId} onChange={(e) => update({ area: e.target.value })}>
+            <option value="">{cityId ? 'All areas' : 'Pick a city first'}</option>
             {areas.data?.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
               </option>
             ))}
           </SelectField>
-
-          <div className="flex items-end">
-            <button
-              type="button"
-              onClick={() => update({ filters: true })}
-              className={buttonStyles('secondary', 'w-full sm:w-auto')}
-              aria-haspopup="dialog"
-            >
-              <ListFilter aria-hidden className="size-4" />
-              Filters
-              {sheetFilterCount > 0 && (
-                <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold tabular-nums text-white">
-                  {sheetFilterCount}
-                </span>
-              )}
-            </button>
-          </div>
         </div>
-
         {activeChips.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             {activeChips.map((chip) => (
