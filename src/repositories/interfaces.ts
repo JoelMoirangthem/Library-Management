@@ -33,6 +33,8 @@ export interface AuthRepository {
   getSession(): Promise<Profile | null>
   /** Real mode: sends the browser to Google. Mock mode uses DemoLogin instead and throws here. */
   signInWithGoogle(): Promise<void>
+  /** The administrator's sign-in (the /admin-login page). Resolves to the profile ONLY for an admin; anyone else is signed out again. */
+  signInAdmin(userId: string, password: string): Promise<Profile>
   signOut(): Promise<void>
   /** Once only: student or owner (BR-7). */
   setMyRole(role: 'student' | 'owner'): Promise<Profile>

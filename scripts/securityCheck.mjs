@@ -44,8 +44,12 @@ const facts = {
   defaultGrantsToWebRoles: rows(`select d.defaclobjtype as kind, d.defaclacl::text as acl from pg_default_acl d join pg_namespace n on n.oid = d.defaclnamespace where n.nspname = 'public' and d.defaclobjtype in ('r','S') and pg_get_userbyid(d.defaclrole) = 'postgres' and (d.defaclacl::text like '%anon=%' or d.defaclacl::text like '%authenticated=%')`),
   buckets: rows(`select id, public, file_size_limit as "fileSizeLimit", allowed_mime_types as "mimeTypes" from storage.buckets`),
   storagePolicies: rows(`select policyname as name, cmd, roles::text as roles from pg_policies where schemaname = 'storage' and tablename = 'objects'`).map((p) => ({ name: p.name, cmd: p.cmd, roles: String(p.roles).replace(/[{}]/g, '').split(',').filter(Boolean) })),
+  emailGuardRows: rows(`select t.tgenabled <> 'D' as enabled from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'auth' and c.relname = 'users' and t.tgname = 'refuse_unapproved_email_users' and not t.tgisinternal`),
+  emailAccountsOutsideAdminDomain: rows(`select email from auth.users where raw_app_meta_data->>'provider' = 'email' and email not like '%@admin.studyseat.invalid'`).map((r) => r.email),
   anonCanReadTables: [],
 }
+// The trigger must exist (one row) and not be disabled.
+facts.emailSignupGuard = { exists: facts.emailGuardRows.length === 1, enabled: facts.emailGuardRows.length === 1 && facts.emailGuardRows[0].enabled === true }
 facts.buckets = facts.buckets.map((b) => ({ ...b, mimeTypes: Array.isArray(b.mimeTypes) ? b.mimeTypes : String(b.mimeTypes ?? '').replace(/[{}]/g, '').split(',').filter(Boolean) }))
 
 // Ask the public API, as a stranger, for one row of every table: nothing private may come back.

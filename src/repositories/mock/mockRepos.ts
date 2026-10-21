@@ -201,6 +201,9 @@ export class MockAuthRepository implements AuthRepository {
   signInWithGoogle(): Promise<void> {
     return Promise.reject(new AppError('unknown', 'Google sign-in is only available with the real database. Use a demo account.'))
   }
+  signInAdmin(): Promise<Profile> {
+    return Promise.reject(new AppError('unknown', 'Password sign-in is only available with the real database. Use the demo admin account.'))
+  }
   signOut() {
     return run(() => {
       getDb().sessionUserId = null

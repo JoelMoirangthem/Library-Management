@@ -37,6 +37,7 @@ export function createServices(r: Repositories) {
     // auth
     getSession: () => r.auth.getSession(),
     signInWithGoogle: () => r.auth.signInWithGoogle(),
+    signInAdmin: (userId: string, password: string) => r.auth.signInAdmin(userId, password),
     signOut: () => r.auth.signOut(),
     chooseRole: (role: 'student' | 'owner') => r.auth.setMyRole(role),
     updateProfile: (patch: { name: string; phone: string }) => r.auth.updateProfile(patch),

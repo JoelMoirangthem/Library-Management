@@ -17,6 +17,7 @@ type AuthApi = {
   signUpNew: (name: string, email: string) => Promise<Profile>
   /** Real mode: sends the browser to Google. */
   signInWithGoogle: () => Promise<void>
+  signInAdmin: (userId: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   chooseRole: (role: 'student' | 'owner') => Promise<Profile>
   updateProfile: (patch: { name: string; phone: string }) => Promise<Profile>
@@ -85,6 +86,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await services.signInWithGoogle()
   }, [])
 
+  const signInAdmin = useCallback(async (userId: string, password: string) => {
+    setUser(await services.signInAdmin(userId, password))
+  }, [])
+
   const signOut = useCallback(async () => {
     await services.signOut()
     setUser(null)
@@ -103,8 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const api = useMemo<AuthApi>(
-    () => ({ user, loading, signInAs, signUpNew, signInWithGoogle, signOut, chooseRole, updateProfile }),
-    [user, loading, signInAs, signUpNew, signInWithGoogle, signOut, chooseRole, updateProfile],
+    () => ({ user, loading, signInAs, signUpNew, signInWithGoogle, signInAdmin, signOut, chooseRole, updateProfile }),
+    [user, loading, signInAs, signUpNew, signInWithGoogle, signInAdmin, signOut, chooseRole, updateProfile],
   )
 
   if (configError) {

@@ -20,6 +20,8 @@ const good = () => ({
     { name: 'owners delete their own photos', cmd: 'DELETE', roles: ['authenticated'] },
   ],
   anonCanReadTables: [],
+  emailSignupGuard: { exists: true, enabled: true },
+  emailAccountsOutsideAdminDomain: [],
 })
 
 const failures = (facts) => evaluateFacts(facts).filter((r) => !r.ok).map((r) => r.rule)
@@ -84,6 +86,25 @@ describe('evaluateFacts (the safety rules the live database must satisfy)', () =
     expect(failures(f)).toContain('new tables are closed by default')
   })
 
+  it('fails when the guard that refuses email sign-ups is missing or switched off', () => {
+    const gone = good(); gone.emailSignupGuard = { exists: false, enabled: false }
+    expect(failures(gone)).toContain('strangers cannot register an email account')
+    const off = good(); off.emailSignupGuard = { exists: true, enabled: false }
+    expect(failures(off)).toContain('strangers cannot register an email account')
+  })
+
+  it('fails when an email account exists that is not on the administrator domain', () => {
+    const f = good(); f.emailAccountsOutsideAdminDomain = ['someone@gmail.com']
+    expect(failures(f)).toContain('the only email accounts are administrator accounts')
+  })
+
+  it('does not print the stranger email address in the failure detail more than needed', () => {
+    const f = good(); f.emailAccountsOutsideAdminDomain = ['a@b.com', 'c@d.com']
+    const r = evaluateFacts(f).find((x) => x.rule === 'the only email accounts are administrator accounts')
+    expect(r.detail).toMatch(/2/)
+    expect(r.detail).not.toContain('a@b.com')
+  })
+
   it('fails when the photo bucket allows other file types or is too large', () => {
     const f = good(); f.buckets[0].mimeTypes = ['image/jpeg', 'image/png', 'text/html']
     expect(failures(f)).toContain('the photo bucket accepts only small JPEG and PNG files')
@@ -115,6 +136,8 @@ describe('evaluateFacts (the safety rules the live database must satisfy)', () =
       'the photo bucket accepts only small JPEG and PNG files',
       'storage rules never serve strangers and never allow overwriting',
       'the live API returns no private table to a stranger',
+      'strangers cannot register an email account',
+      'the only email accounts are administrator accounts',
     ])
   })
 })
