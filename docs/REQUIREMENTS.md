@@ -1,4 +1,4 @@
-# StudySeat — Requirements (v1)
+# NearMe Library — Requirements (v1)
 
 Library owners manage their study library (seats, students, fees, expiry). Students find a library by city and area and request a seat. Owners get 14 days free, then ₹199/month to stay active and visible.
 

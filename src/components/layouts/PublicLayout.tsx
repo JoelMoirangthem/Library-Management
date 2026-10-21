@@ -9,6 +9,7 @@ import { UpdatesBanner } from '@/components/UpdatesBanner'
 import { BottomTabs, type NavItemDef } from '@/components/layouts/Nav'
 import { homePathFor, useAuth } from '@/hooks/useAuth'
 import { cx } from '@/lib/cx'
+import { BRAND } from '@/lib/brand'
 
 const studentTabs: NavItemDef[] = [
   { to: '/discover', label: 'Find', icon: <Search /> },
@@ -134,7 +135,7 @@ export function PublicLayout() {
           </nav>
         </div>
         <p className="border-t border-border px-4 py-4 text-center text-sm text-ink-muted">
-          © {new Date().getFullYear()} StudySeat.{dataMode === 'mock' && ' Demo data only.'}
+          © {new Date().getFullYear()} {BRAND.name}.{dataMode === 'mock' && ' Demo data only.'}
         </p>
       </footer>
 

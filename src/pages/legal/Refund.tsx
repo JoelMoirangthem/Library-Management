@@ -11,7 +11,7 @@ export default function Refund() {
         <p className="leading-relaxed">
           This page explains refunds for the owner plan. In short: the ₹199 monthly plan is
           generally non-refundable once verified, but we always refund a duplicate or
-          wrong-amount payment. Student fees are never handled by StudySeat.
+          wrong-amount payment. Student fees are never handled by NearMe Library.
         </p>
       }
     >
@@ -45,7 +45,7 @@ export default function Refund() {
       <section>
         <h2>Student fees</h2>
         <p>
-          Students pay their monthly fee directly to the library, not to StudySeat. We never
+          Students pay their monthly fee directly to the library, not to NearMe Library. We never
           hold that money, so we cannot refund it. Any question about a student fee is between
           the student and the library.
         </p>

@@ -314,11 +314,11 @@ const FAQS: { q: string; a: ReactNode }[] = [
   },
   {
     q: 'Is it free for students?',
-    a: 'Yes. Searching libraries and requesting a seat is completely free for students. Students pay their own fee directly to the library, not to StudySeat.',
+    a: 'Yes. Searching libraries and requesting a seat is completely free for students. Students pay their own fee directly to the library, not to NearMe Library.',
   },
   {
     q: 'Can I use it on my phone?',
-    a: 'Yes. StudySeat is built phone-first, so you can manage seats, students and fees one-handed between students. It works the same on a laptop.',
+    a: 'Yes. NearMe Library is built phone-first, so you can manage seats, students and fees one-handed between students. It works the same on a laptop.',
   },
   {
     q: 'How do I get approved?',

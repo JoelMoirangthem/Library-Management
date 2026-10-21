@@ -1,4 +1,4 @@
-# StudySeat — Architecture
+# NearMe Library — Architecture
 
 ```
 Browser (React + Vite + TypeScript + Tailwind)  — hosted on Render (static site)

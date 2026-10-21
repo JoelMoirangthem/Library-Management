@@ -1,6 +1,6 @@
-# StudySeat: deploying to Render + Supabase
+# NearMe Library: deploying to Render + Supabase
 
-StudySeat is a static site (a Vite build) on Render, talking to Supabase for the database, login and photos.
+NearMe Library is a static site (a Vite build) on Render, talking to Supabase for the database, login and photos.
 Items marked **Check on first deploy** cannot be proven on a laptop (they need the real host); everything else was
 tested against a clean production build, including the headers and rules in `render.yaml`.
 
@@ -60,7 +60,7 @@ In the Google Cloud project that holds the OAuth client:
 - Authorised JavaScript origins: add the live site address.
 - Authorised redirect URIs: add `https://<production-project-ref>.supabase.co/auth/v1/callback`.
 - **Publish the consent screen** (Google Auth Platform, Audience, Publish app), so the app is "In production" and open to any Google account.
-  Google's documentation says an app that asks only for name, email and profile (which is all StudySeat asks for) is not limited to the listed
+  Google's documentation says an app that asks only for name, email and profile (which is all NearMe Library asks for) is not limited to the listed
   test users and its sign-ins do not expire after 7 days even in "Testing"; publishing is still the safe setting for real users and for
   showing your app name. **Prove it, don't assume it:** after publishing, sign in with a Google account that is not yours and not on the test-user list.
 

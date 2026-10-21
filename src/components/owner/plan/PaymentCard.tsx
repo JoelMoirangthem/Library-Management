@@ -12,11 +12,12 @@ import { PLAN_DAYS, PLAN_PRICE_PAISE } from '@/domain/plan'
 import { isValidUtr } from '@/domain/constants'
 import type { PlanPayment } from '@/domain/types'
 import { cx } from '@/lib/cx'
+import { BRAND } from '@/lib/brand'
 
 const RUPEES = (PLAN_PRICE_PAISE / 100).toFixed(2)
 /** The pay link for the UPI app; upiId comes from the VITE_UPI_ID setting. */
 function upiLink(upiId: string): string {
-  return `upi://pay?pa=${encodeURIComponent(upiId)}&pn=StudySeat&am=${RUPEES}&cu=INR&tn=${encodeURIComponent('StudySeat plan')}`
+  return `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(BRAND.upiPayeeName)}&am=${RUPEES}&cu=INR&tn=${encodeURIComponent(` plan`)}`
 }
 
 type Props = {
@@ -189,7 +190,7 @@ function QrImage({ svg }: { svg: string }) {
   return (
     <div
       role="img"
-      aria-label="QR code to pay ₹199 to StudySeat over UPI"
+      aria-label={`QR code to pay ₹199 to ${BRAND.name} over UPI`}
       className="size-36 shrink-0 rounded-card border border-border bg-white p-3 [&>svg]:size-full"
       dangerouslySetInnerHTML={{ __html: svg }}
     />

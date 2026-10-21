@@ -1,4 +1,4 @@
-# StudySeat
+# NearMe Library
 
 Library owners manage their study library (seats, students, fees, expiry). Students find a library by city and area and request a seat. Owners get 14 days free, then ₹199/month.
 

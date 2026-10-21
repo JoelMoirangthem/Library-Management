@@ -103,13 +103,13 @@ function RequestAction({
   if (kind === 'choose-role') {
     return (
       <div className="space-y-3">
-        <p className="text-ink-muted">Choose how you&rsquo;ll use StudySeat to request a seat at this library.</p>
+        <p className="text-ink-muted">Choose how you&rsquo;ll use NearMe Library to request a seat at this library.</p>
         <Link
           to="/choose-role"
           state={{ from: location.pathname + location.search }}
           className={buttonStyles('primary', 'w-full')}
         >
-          Choose how you&rsquo;ll use StudySeat
+          Choose how you&rsquo;ll use NearMe Library
         </Link>
       </div>
     )
