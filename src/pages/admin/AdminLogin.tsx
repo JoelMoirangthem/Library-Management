@@ -4,7 +4,6 @@ import { ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/Button'
 import { Card } from '@/components/Card'
 import { TextField } from '@/components/Fields'
-import { Logo } from '@/components/Logo'
 import { homePathFor, useAuth } from '@/hooks/useAuth'
 import { useTitle } from '@/hooks/useTitle'
 import { dataMode } from '@/lib/container'
@@ -44,10 +43,7 @@ export default function AdminLogin() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-10">
-      <div className="mb-6 flex justify-center">
-        <Logo to="/" />
-      </div>
+    <div className="mx-auto flex max-w-md flex-col px-4 py-10">
       <Card className="p-6">
         <div className="mb-4 flex items-center gap-2">
           <ShieldCheck aria-hidden className="size-5 text-primary" />
@@ -101,6 +97,6 @@ export default function AdminLogin() {
       <p className="mt-4 text-center text-sm text-ink-muted">
         {user ? <a className="underline" href={homePathFor(user)}>Back to your account</a> : <a className="underline" href="/">Back to the site</a>}
       </p>
-    </main>
+    </div>
   )
 }
