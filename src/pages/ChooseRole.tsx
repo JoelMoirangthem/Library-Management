@@ -46,7 +46,7 @@ export default function ChooseRole() {
       <div className="text-center">
         <Logo />
         <h1 className="mt-6 text-2xl font-semibold sm:text-3xl">
-          {step === 1 ? 'How will you use StudySeat?' : 'Your details'}
+          {step === 1 ? 'How will you use NearMe Library?' : 'Your details'}
         </h1>
         <p className="mt-2 text-ink-muted">
           {step === 1

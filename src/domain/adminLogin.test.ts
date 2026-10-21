@@ -52,7 +52,7 @@ describe('adminPasswordProblem (a strong password for the account that approves 
   })
 
   it('refuses easy words and years, which are the first things guessed', () => {
-    for (const weak of ['Hello@Library!Xyz9', 'MyStudySeat#Pass99x', 'Password#Strong12ab', 'Admin#Secure2028xyz', 'Q7!w7!studyadmin2028Z']) {
+    for (const weak of ['Hello@Library!Xyz9', 'MyStudySeat#Pass99x', 'Password#Strong12ab', 'Admin#Secure2028xyz', 'Q7!w7!studyadmin2028Z', 'Zk8#NearMe!Qv4xLm7']) {
       expect(adminPasswordProblem(weak, 'studyadmin2028'), weak).not.toBeNull()
     }
   })

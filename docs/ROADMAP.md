@@ -1,4 +1,4 @@
-# StudySeat — Roadmap (v1)
+# NearMe Library — Roadmap (v1)
 
 Finish and test each step, commit, then move on. "Done when" is the test script.
 

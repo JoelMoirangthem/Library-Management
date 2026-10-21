@@ -9,7 +9,7 @@ export default function Terms() {
       lastUpdated="17 Oct 2026"
       intro={
         <p className="leading-relaxed">
-          These terms cover how you use StudySeat. By signing in you agree to them. StudySeat
+          These terms cover how you use NearMe Library. By signing in you agree to them. NearMe Library
           is a tool that lists study libraries and helps owners manage seats, students and
           fees. We are not a party to the arrangement between a student and a library.
         </p>
@@ -30,7 +30,7 @@ export default function Terms() {
           <li>You may list one library. The details you enter must be true and your own.</li>
           <li>A new library is reviewed by an admin, usually within 24 hours, before it goes live.</li>
           <li>You are responsible for the student names, phone numbers and fee records you enter, and for having the right to store them.</li>
-          <li>You set and collect your own monthly fee from students directly. StudySeat does not handle that money.</li>
+          <li>You set and collect your own monthly fee from students directly. NearMe Library does not handle that money.</li>
         </ul>
       </section>
 
@@ -56,7 +56,7 @@ export default function Terms() {
       <section>
         <h2>What we don't promise</h2>
         <p>
-          StudySeat lists libraries but does not guarantee a seat, the accuracy of a library's
+          NearMe Library lists libraries but does not guarantee a seat, the accuracy of a library's
           details, or any outcome of studying there. We may remove a listing that breaks these
           terms or that we cannot verify. The service is provided as-is during this pilot.
         </p>
@@ -66,7 +66,7 @@ export default function Terms() {
         <h2>Changes</h2>
         <p>
           We may update these terms as the product grows. We will change the "last updated"
-          date above. Continuing to use StudySeat after a change means you accept it.
+          date above. Continuing to use NearMe Library after a change means you accept it.
         </p>
       </section>
     </LegalPage>

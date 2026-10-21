@@ -19,7 +19,7 @@ export function isAdminLoginEmail(email: string): boolean {
 }
 
 /** Words and number patterns that are tried first by anyone guessing. */
-const GUESSABLE = ['password', 'passw0rd', 'admin', 'hello', 'welcome', 'studyseat', 'study', 'library', 'qwerty', 'asdf', 'letmein', '123456', 'abcdef']
+const GUESSABLE = ['password', 'passw0rd', 'admin', 'hello', 'welcome', 'studyseat', 'nearme', 'study', 'library', 'qwerty', 'asdf', 'letmein', '123456', 'abcdef']
 
 /**
  * Why a password is not good enough for the administrator, or null when it is.

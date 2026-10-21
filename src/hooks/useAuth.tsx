@@ -6,6 +6,7 @@ import { demoLogin, services } from '@/lib/container'
 import { dataVersion } from '@/lib/devState'
 import { isConfigError } from '@/lib/env'
 import { useStore } from '@/lib/store'
+import { BRAND } from '@/lib/brand'
 
 type AuthApi = {
   user: Profile | null
@@ -119,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         tone="danger"
         heading="h1"
         icon={<Wrench className="size-6" />}
-        title="StudySeat isn't set up yet"
+        title={`${BRAND.name} isn't set up yet`}
         description={configError.message}
       />
     )

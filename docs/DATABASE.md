@@ -1,4 +1,4 @@
-# StudySeat — Database
+# NearMe Library — Database
 
 Supabase Postgres. All tables have Row Level Security (RLS) enabled. Business logic that changes plan dates, payment status, roles, or multiple rows at once lives in SQL functions.
 

@@ -173,7 +173,7 @@ function AccountCard({ onLogOut }: { onLogOut: () => Promise<void> }) {
         <div className="flex flex-wrap items-center justify-between gap-3 p-5">
           <div className="min-w-0">
             <p className="font-medium text-ink">Log out</p>
-            <p className="mt-0.5 text-sm text-ink-muted">Sign out of StudySeat on this device.</p>
+            <p className="mt-0.5 text-sm text-ink-muted">Sign out of NearMe Library on this device.</p>
           </div>
           <Button variant="secondary" loading={loading} onClick={() => void run()}>
             <LogOut aria-hidden className="size-4" />
@@ -188,7 +188,7 @@ function AccountCard({ onLogOut }: { onLogOut: () => Promise<void> }) {
             handle it by hand. Some fee and membership records may be kept for accounting.
           </p>
           <a
-            href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Delete my StudySeat account')}`}
+            href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Delete my NearMe Library account')}`}
             className="mt-3 inline-flex min-h-11 max-w-full items-center gap-1.5 break-all rounded-control text-sm font-medium text-primary hover:text-primary-hover"
           >
             <Mail aria-hidden className="size-4" />

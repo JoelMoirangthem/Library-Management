@@ -182,7 +182,7 @@ export default function Plan() {
               // The UPI ID comes only from the VITE_UPI_ID setting. Never show a guessed payment address.
               <ErrorState
                 title="Payments aren't set up yet"
-                description={import.meta.env.DEV ? upi.error : 'Please contact StudySeat support to activate your plan.'}
+                description={import.meta.env.DEV ? upi.error : 'Please contact NearMe Library support to activate your plan.'}
               />
             ) : (
               <PaymentCard

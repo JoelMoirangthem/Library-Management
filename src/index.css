@@ -2,7 +2,7 @@
 @import "@fontsource-variable/inter";
 
 /*
- * StudySeat design tokens (light mode only in v1).
+ * NearMe Library design tokens (light mode only in v1).
  *
  * Components use these semantic names (bg-surface, text-ink-muted ...), never raw hex.
  * The default Tailwind palette is switched off below so a stray `bg-gray-100` fails loudly

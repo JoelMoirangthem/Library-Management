@@ -9,7 +9,7 @@ export default function Privacy() {
       lastUpdated="17 Oct 2026"
       intro={
         <p className="leading-relaxed">
-          StudySeat is a marketplace that connects students with study libraries in India.
+          NearMe Library is a marketplace that connects students with study libraries in India.
           This page explains what we collect, who can see it, and how long we keep it. We ask
           for only what the service needs to work.
         </p>
@@ -17,7 +17,7 @@ export default function Privacy() {
     >
       <section>
         <h2>What we collect</h2>
-        <p>Depending on how you use StudySeat, we store:</p>
+        <p>Depending on how you use NearMe Library, we store:</p>
         <ul>
           <li>Your name, email and phone number when you sign in.</li>
           <li>For owners: your library's details — name, address, pincode, landmark, timings, monthly fee, seat count, amenities and photos.</li>
@@ -51,7 +51,7 @@ export default function Privacy() {
           whether it was verified or failed; we do not store card numbers or bank login details.
         </p>
         <p>
-          Students pay their monthly fee directly to the library, in person. StudySeat does not
+          Students pay their monthly fee directly to the library, in person. NearMe Library does not
           process student fees and never holds that money.
         </p>
       </section>
