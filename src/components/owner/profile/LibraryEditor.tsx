@@ -263,7 +263,7 @@ export function LibraryEditor({
   }
 
   return (
-    <form ref={formRef} noValidate onSubmit={handleSave} className="space-y-6 pb-24">
+    <form ref={formRef} noValidate onSubmit={handleSave} className="space-y-6 pb-28">
       {/* About + Where students find you: side by side on desktop, equal height. */}
       <div className="grid items-stretch gap-6 lg:grid-cols-2">
         {/* About */}
@@ -535,22 +535,30 @@ export function LibraryEditor({
         </div>
       </Card>
 
-      {/* Sticky save bar: appears only when something changed. */}
-      {dirty && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
-          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-medium text-ink-muted">Unsaved changes</p>
-            <div className="flex gap-3">
+      {/*
+        Save bar: always visible so owners can see how to save. On phones it sits just above the bottom tab bar
+        (56px tall + 1px border), which would otherwise cover it; on desktop it starts after the 16rem sidebar.
+      */}
+      <div
+        data-testid="library-save-bar"
+        className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-40 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur md:bottom-0 md:left-64 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      >
+        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-medium text-ink-muted" aria-live="polite">
+            {dirty ? 'You have unsaved changes' : 'All changes saved'}
+          </p>
+          <div className="flex gap-3">
+            {dirty && (
               <Button variant="secondary" onClick={discard} disabled={saving} className="min-h-11">
                 Discard
               </Button>
-              <Button type="submit" loading={saving} className="min-h-11">
-                {isRejected ? 'Save and resubmit' : 'Save changes'}
-              </Button>
-            </div>
+            )}
+            <Button type="submit" loading={saving} disabled={!dirty} className="min-h-11">
+              {isRejected ? 'Save and resubmit' : 'Save changes'}
+            </Button>
           </div>
         </div>
-      )}
+      </div>
     </form>
   )
 }
