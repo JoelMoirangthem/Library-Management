@@ -4,7 +4,8 @@ import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
 import { Card } from '@/components/Card'
 import { CardBody, CardGrid, GridCard, GridItem } from '@/components/CardGrid'
-import { ChipCheckbox, SelectField, TextAreaField, TextField } from '@/components/Fields'
+import { ChipCheckbox, TextAreaField, TextField } from '@/components/Fields'
+import { PlaceFields } from '@/components/PlaceFields'
 import { useToast } from '@/components/Toast'
 import { PhotoPicker } from '@/components/owner/profile/PhotoPicker'
 import { draftFeePaise, type ShiftDraft } from '@/components/owner/profile/shiftDrafts'
@@ -16,13 +17,17 @@ import {
   sortShifts,
   validateShiftSet,
 } from '@/domain/shifts'
-import type { Area, City, Library, LibraryInput, Shift, ShiftInput } from '@/domain/types'
+import type { Library, LibraryInput, Shift, ShiftInput } from '@/domain/types'
 import { validateLibraryInput, type FieldErrors } from '@/domain/validation'
+import { usePlaceOptions } from '@/hooks/usePlaceOptions'
 import { cx } from '@/lib/cx'
 
 type Draft = {
   name: string
+  stateId: string
+  districtId: string
   cityId: string
+  /** '' = no area. */
   areaId: string
   address: string
   landmark: string
@@ -37,8 +42,10 @@ type Draft = {
 function toDraft(lib: Library): Draft {
   return {
     name: lib.name,
+    stateId: lib.stateId,
+    districtId: lib.districtId,
     cityId: lib.cityId,
-    areaId: lib.areaId,
+    areaId: lib.areaId ?? '',
     address: lib.address,
     landmark: lib.landmark,
     pincode: lib.pincode,
@@ -54,8 +61,10 @@ function toInput(d: Draft): LibraryInput {
   const capacity = Number(d.capacity)
   return {
     name: d.name.trim(),
+    stateId: d.stateId,
+    districtId: d.districtId,
     cityId: d.cityId,
-    areaId: d.areaId,
+    areaId: d.areaId || null,
     address: d.address.trim(),
     landmark: d.landmark.trim(),
     pincode: d.pincode.trim(),
@@ -93,6 +102,8 @@ function rowToInput(r: ShiftRow): ShiftInput {
 
 const FIELD_ORDER: (keyof LibraryInput)[] = [
   'name',
+  'stateId',
+  'districtId',
   'cityId',
   'areaId',
   'address',
@@ -105,11 +116,6 @@ const FIELD_ORDER: (keyof LibraryInput)[] = [
 type Props = {
   library: Library
   shifts: Shift[]
-  cities: City[]
-  areas: Area[]
-  /** True until cities/areas have loaded; show skeletons so values never flash "Choose a city". */
-  catalogLoading: boolean
-  onCityChange: (cityId: string) => void
   /** Persist library + edited/new shifts together. Returns true on success. */
   onSave: (input: LibraryInput, changed: { id: string; input: ShiftInput }[], added: ShiftInput[]) => Promise<boolean>
   /** Immediate switch on/off of one shift. Returns true on success. */
@@ -122,10 +128,6 @@ type Props = {
 export function LibraryEditor({
   library,
   shifts,
-  cities,
-  areas,
-  catalogLoading,
-  onCityChange,
   onSave,
   onToggleShift,
   saving,
@@ -134,6 +136,7 @@ export function LibraryEditor({
   const toast = useToast()
   const initialDraft = useMemo(() => toDraft(library), [library])
   const [draft, setDraft] = useState<Draft>(initialDraft)
+  const places = usePlaceOptions(draft)
   const [errors, setErrors] = useState<FieldErrors<keyof LibraryInput>>({})
 
   const sorted = useMemo(() => sortShifts(shifts), [shifts])
@@ -286,51 +289,16 @@ export function LibraryEditor({
         <Card className="flex min-h-full flex-1 flex-col p-5 sm:p-6 lg:col-start-2 lg:row-start-1 lg:row-span-3">
         <h2 className="text-lg font-semibold">Where students find you</h2>
         <div className="mt-5 space-y-5">
-          {catalogLoading ? (
-            <div className="grid gap-5 sm:grid-cols-2">
-              <SkeletonField />
-              <SkeletonField />
-            </div>
-          ) : (
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div data-field="cityId">
-                <SelectField
-                  label="City"
-                  value={draft.cityId}
-                  error={errors.cityId}
-                  onChange={(e) => {
-                    const cityId = e.target.value
-                    setDraft((d) => ({ ...d, cityId, areaId: '' }))
-                    onCityChange(cityId)
-                  }}
-                >
-                  <option value="">Choose a city</option>
-                  {cities.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </SelectField>
-              </div>
-              <div data-field="areaId">
-                <SelectField
-                  label="Area"
-                  value={draft.areaId}
-                  error={errors.areaId}
-                  disabled={!draft.cityId}
-                  hint={!draft.cityId ? 'Choose a city first.' : undefined}
-                  onChange={(e) => set('areaId', e.target.value)}
-                >
-                  <option value="">Choose an area</option>
-                  {areas.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </SelectField>
-              </div>
-            </div>
-          )}
+          <PlaceFields
+            mode="form"
+            value={draft}
+            options={places}
+            errors={errors}
+            onChange={(p) => {
+              setDraft((d) => ({ ...d, ...p }))
+              setErrors((e) => ({ ...e, stateId: undefined, districtId: undefined, cityId: undefined, areaId: undefined }))
+            }}
+          />
           <div data-field="address">
             <TextAreaField
               label="Address"
@@ -560,14 +528,5 @@ export function LibraryEditor({
         </div>
       </div>
     </form>
-  )
-}
-
-function SkeletonField() {
-  return (
-    <div>
-      <div className="mb-1.5 h-4 w-20 rounded bg-border" />
-      <div className="h-11 w-full rounded-control bg-canvas" />
-    </div>
   )
 }

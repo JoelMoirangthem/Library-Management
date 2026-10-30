@@ -3,6 +3,7 @@ import type {
   AdminPaymentRow,
   Area,
   City,
+  District,
   FeeMode,
   FeePayment,
   Library,
@@ -19,6 +20,7 @@ import type {
   SeatRequest,
   Shift,
   ShiftInput,
+  State,
   Subscription,
 } from '@/domain/types'
 
@@ -48,10 +50,17 @@ export interface DemoLogin {
   signUpNewUser(name: string, email: string): Promise<Profile>
 }
 
+/**
+ * States, districts, towns and areas. Everyone can read them; only an admin can add a town or area or switch one off.
+ * Towns are always listed for one district (a state has hundreds), never all at once.
+ */
 export interface CatalogRepository {
-  listCities(opts?: { includeInactive?: boolean }): Promise<City[]>
+  listStates(): Promise<State[]>
+  listDistricts(stateId: string): Promise<District[]>
+  listCities(opts: { districtId: string; includeInactive?: boolean }): Promise<City[]>
   listAreas(opts?: { cityId?: string; includeInactive?: boolean }): Promise<Area[]>
-  addCity(name: string): Promise<City>
+  /** Admin. Adds a town that the official list is missing, in one district. */
+  addCity(districtId: string, name: string): Promise<City>
   addArea(cityId: string, name: string): Promise<Area>
   setCityActive(id: string, isActive: boolean): Promise<void>
   setAreaActive(id: string, isActive: boolean): Promise<void>

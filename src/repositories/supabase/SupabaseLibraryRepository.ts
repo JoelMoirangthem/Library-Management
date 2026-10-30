@@ -27,8 +27,10 @@ import {
 
 const toDbInput = (i: LibraryInput) => ({
   name: i.name,
+  state_id: i.stateId,
+  district_id: i.districtId,
   city_id: i.cityId,
-  area_id: i.areaId,
+  area_id: i.areaId || null,
   address: i.address,
   landmark: i.landmark,
   pincode: i.pincode,
@@ -114,6 +116,8 @@ export class SupabaseLibraryRepository implements LibraryRepository {
   async searchPublic(filter: PublicSearchFilter): Promise<PublicLibrary[]> {
     const supabase = getSupabase()
     const args = {
+      p_state: filter.stateId ?? null,
+      p_district: filter.districtId ?? null,
       p_city: filter.cityId ?? null,
       p_area: filter.areaId ?? null,
       p_max_fee_paise: filter.maxFeePaise ?? null,
@@ -137,28 +141,34 @@ export class SupabaseLibraryRepository implements LibraryRepository {
   async listForAdmin(): Promise<AdminLibraryRow[]> {
     const supabase = getSupabase()
     // Each list is read page by page (the API caps one request at 1000 rows) with a unique sort order.
-    const [libs, cities, areas, subs, shiftRows] = await Promise.all([
+    const [libs, subs, shiftRows] = await Promise.all([
       fetchAll((from, to) =>
         supabase.from('libraries').select(LIBRARY_COLUMNS).order('created_at').order('id').range(from, to).returns<LibraryRow[]>(),
-      ),
-      fetchAll((from, to) =>
-        supabase.from('cities').select('id, name').order('id').range(from, to).returns<{ id: string; name: string }[]>(),
-      ),
-      fetchAll((from, to) =>
-        supabase.from('areas').select('id, name').order('id').range(from, to).returns<{ id: string; name: string }[]>(),
       ),
       fetchAll((from, to) =>
         supabase.from('subscriptions').select('library_id, trial_ends_at, active_until').order('library_id').range(from, to).returns<SubscriptionRow[]>(),
       ),
       fetchAll((from, to) => supabase.from('shifts').select(SHIFT_COLUMNS).order('id').range(from, to).returns<ShiftRow[]>()),
     ])
-    // Only the owners of the libraries listed, not every user in the system.
-    const owners = await fetchByIds(libs.map((l) => l.owner_id), (group) =>
-      supabase.from('profiles').select('id, name, phone').in('id', group).returns<{ id: string; name: string; phone: string }[]>(),
-    )
+    // Only the owners and places of the libraries listed, not every user or all 5,000 towns.
+    type Named = { id: string; name: string }
+    const names = (table: string, ids: string[]) =>
+      fetchByIds(ids, (group) => supabase.from(table).select('id, name').in('id', group).returns<Named[]>())
+    const [owners, states, districts, cities, areas] = await Promise.all([
+      fetchByIds(libs.map((l) => l.owner_id), (group) =>
+        supabase.from('profiles').select('id, name, phone').in('id', group).returns<{ id: string; name: string; phone: string }[]>(),
+      ),
+      names('states', libs.map((l) => l.state_id)),
+      names('districts', libs.map((l) => l.district_id)),
+      names('cities', libs.map((l) => l.city_id)),
+      names('areas', libs.map((l) => l.area_id ?? '')),
+    ])
     const ownerById = new Map(owners.map((o) => [o.id, o]))
-    const cityById = new Map(cities.map((c) => [c.id, c.name]))
-    const areaById = new Map(areas.map((a) => [a.id, a.name]))
+    const nameOf = (rows: Named[]) => {
+      const m = new Map(rows.map((r) => [r.id, r.name]))
+      return (id: string | null) => (id ? m.get(id) ?? '' : '')
+    }
+    const [stateName, districtName, cityName, areaName] = [nameOf(states), nameOf(districts), nameOf(cities), nameOf(areas)]
     const subByLib = new Map(subs.map((s) => [s.library_id, toSubscription(s)]))
 
     return libs.map((row) => {
@@ -168,8 +178,10 @@ export class SupabaseLibraryRepository implements LibraryRepository {
         library,
         ownerName: owner?.name || 'Unknown',
         ownerPhone: owner?.phone ?? '',
-        cityName: cityById.get(row.city_id) ?? '',
-        areaName: areaById.get(row.area_id) ?? '',
+        stateName: stateName(row.state_id),
+        districtName: districtName(row.district_id),
+        cityName: cityName(row.city_id),
+        areaName: areaName(row.area_id),
         subscription: subByLib.get(row.id) ?? null,
         shifts: shiftRows.filter((s) => s.library_id === row.id).map(toShift),
       }

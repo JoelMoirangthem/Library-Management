@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChipCheckbox, SelectField, TextAreaField, TextField } from '@/components/Fields'
+import { ChipCheckbox, TextAreaField, TextField } from '@/components/Fields'
+import { PlaceFields } from '@/components/PlaceFields'
 import { Button } from '@/components/Button'
 import { Card } from '@/components/Card'
 import { Steps, type StepState } from '@/components/Steps'
@@ -13,11 +14,14 @@ import {
 import { AMENITIES, formatPhone, normalizePhone } from '@/domain/constants'
 import { formatRupees } from '@/domain/money'
 import { validateShiftFields, validateShiftSet } from '@/domain/shifts'
-import type { Area, City, LibraryInput, ShiftInput } from '@/domain/types'
+import type { LibraryInput, ShiftInput } from '@/domain/types'
 import { validateLibraryInput, type FieldErrors } from '@/domain/validation'
+import { chosenPlaceLine, usePlaceOptions } from '@/hooks/usePlaceOptions'
 
 type Draft = {
   name: string
+  stateId: string
+  districtId: string
   cityId: string
   areaId: string
   address: string
@@ -32,6 +36,8 @@ type Draft = {
 
 const EMPTY: Draft = {
   name: '',
+  stateId: '',
+  districtId: '',
   cityId: '',
   areaId: '',
   address: '',
@@ -48,8 +54,10 @@ function toInput(d: Draft): LibraryInput {
   const capacity = Number(d.capacity)
   return {
     name: d.name.trim(),
+    stateId: d.stateId,
+    districtId: d.districtId,
     cityId: d.cityId,
-    areaId: d.areaId,
+    areaId: d.areaId || null,
     address: d.address.trim(),
     landmark: d.landmark.trim(),
     pincode: d.pincode.trim(),
@@ -65,22 +73,19 @@ const STEP_LABELS = ['Library', 'Shifts', 'Extras']
 const STEP_TITLES = ['Your library', 'Seats and shifts', 'Photos and extras']
 // Which LibraryInput fields each step owns, in focus order.
 const STEP_FIELDS: (keyof LibraryInput)[][] = [
-  ['name', 'cityId', 'areaId', 'address', 'pincode', 'phone'],
+  ['name', 'stateId', 'districtId', 'cityId', 'areaId', 'address', 'pincode', 'phone'],
   ['capacity', 'timings'],
   [],
 ]
 
 type Props = {
-  cities: City[]
-  areas: Area[]
-  onCityChange: (cityId: string) => void
   onSubmit: (input: LibraryInput, shifts: ShiftInput[]) => void
   submitting: boolean
   error?: string | null
 }
 
 /** First-time owner onboarding: a 3-step wizard with a sticky action bar on phones. */
-export function OnboardingWizard({ cities, areas, onCityChange, onSubmit, submitting, error }: Props) {
+export function OnboardingWizard({ onSubmit, submitting, error }: Props) {
   const [step, setStep] = useState(0)
   const [draft, setDraft] = useState<Draft>(EMPTY)
   const [errors, setErrors] = useState<FieldErrors<keyof LibraryInput>>({})
@@ -176,8 +181,7 @@ export function OnboardingWizard({ cities, areas, onCityChange, onSubmit, submit
     i < step ? 'done' : i === step ? 'current' : 'todo',
   )
 
-  const cityById = useMemo(() => new Map(cities.map((c) => [c.id, c.name])), [cities])
-  const areaById = useMemo(() => new Map(areas.map((a) => [a.id, a.name])), [areas])
+  const places = usePlaceOptions(draft)
 
   return (
     <form ref={formRef} noValidate onSubmit={handleSubmit}>
@@ -208,44 +212,16 @@ export function OnboardingWizard({ cities, areas, onCityChange, onSubmit, submit
               autoComplete="organization"
             />
           </div>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div data-field="cityId">
-              <SelectField
-                label="City"
-                value={draft.cityId}
-                error={errors.cityId}
-                onChange={(e) => {
-                  const cityId = e.target.value
-                  setDraft((d) => ({ ...d, cityId, areaId: '' }))
-                  onCityChange(cityId)
-                }}
-              >
-                <option value="">Choose a city</option>
-                {cities.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </SelectField>
-            </div>
-            <div data-field="areaId">
-              <SelectField
-                label="Area"
-                value={draft.areaId}
-                error={errors.areaId}
-                disabled={!draft.cityId}
-                hint={!draft.cityId ? 'Choose a city first.' : undefined}
-                onChange={(e) => set('areaId', e.target.value)}
-              >
-                <option value="">Choose an area</option>
-                {areas.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </SelectField>
-            </div>
-          </div>
+          <PlaceFields
+            mode="form"
+            value={draft}
+            options={places}
+            errors={errors}
+            onChange={(p) => {
+              setDraft((d) => ({ ...d, ...p }))
+              setErrors((e) => ({ ...e, stateId: undefined, districtId: undefined, cityId: undefined, areaId: undefined }))
+            }}
+          />
           <div data-field="address">
             <TextAreaField
               label="Address"
@@ -362,7 +338,7 @@ export function OnboardingWizard({ cities, areas, onCityChange, onSubmit, submit
               <Row label="Library" value={draft.name || '—'} />
               <Row
                 label="Where"
-                value={[areaById.get(draft.areaId), cityById.get(draft.cityId)].filter(Boolean).join(', ') || '—'}
+                value={chosenPlaceLine(draft, places) || '—'}
               />
               <Row label="Seats" value={draft.capacity || '—'} />
               <Row label="Phone" value={draft.phone ? formatPhone(draft.phone) : '—'} />

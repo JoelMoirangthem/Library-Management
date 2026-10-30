@@ -3,8 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { ListFilter, Search, X } from 'lucide-react'
 import { buttonStyles } from '@/components/Button'
 import { CardGrid, GridItem } from '@/components/CardGrid'
-import { SelectField } from '@/components/Fields'
 import { PageHeader } from '@/components/PageParts'
+import { PlaceFields } from '@/components/PlaceFields'
 import { FilterSheet } from '@/components/student/FilterSheet'
 import { LibraryCard, LibraryCardSkeleton } from '@/components/student/LibraryCard'
 import { EmptyState } from '@/components/states/EmptyState'
@@ -14,6 +14,7 @@ import { matchesLibrarySearch } from '@/domain/librarySearch'
 import type { PublicLibrary } from '@/domain/types'
 import { services } from '@/lib/container'
 import { useAsync } from '@/hooks/useAsync'
+import { changePlace, chosenPlaceNames, usePlaceOptions, type PlaceValue } from '@/hooks/usePlaceOptions'
 import { useTitle } from '@/hooks/useTitle'
 
 type SortKey = 'seats' | 'fee'
@@ -27,48 +28,46 @@ export default function Discover() {
   useTitle('Find a library')
   const [params, setParams] = useSearchParams()
 
-  const cityId = params.get('city') ?? ''
-  const areaId = params.get('area') ?? ''
+  const place: PlaceValue = {
+    stateId: params.get('state') ?? '',
+    districtId: params.get('district') ?? '',
+    cityId: params.get('city') ?? '',
+    areaId: params.get('area') ?? '',
+  }
   const maxFee = params.get('maxFee') ?? ''
   const q = params.get('q') ?? ''
   const sort = (params.get('sort') as SortKey) || 'seats'
   const sheetOpen = params.get('filters') === '1'
   const amenities = useMemo(() => params.getAll('amenity'), [params])
 
-  const cities = useAsync(() => services.listCities(), [])
-  // Areas depend on the chosen city; skip the call entirely when no city is picked.
-  const areas = useAsync(
-    () => (cityId ? services.listAreas({ cityId }) : Promise.resolve([])),
-    [cityId],
-  )
+  // Each list loads only after its parent is picked: a state's districts, then a district's towns, then areas.
+  const places = usePlaceOptions(place)
 
   const results = useAsync(
     () =>
       services.searchLibraries({
-        cityId: cityId || undefined,
-        areaId: areaId || undefined,
+        stateId: place.stateId || undefined,
+        districtId: place.districtId || undefined,
+        cityId: place.cityId || undefined,
+        areaId: place.areaId || undefined,
         maxFeePaise: maxFee ? Number(maxFee) : undefined,
         amenities: amenities.length ? amenities : undefined,
       }),
-    [cityId, areaId, maxFee, amenities.join(',')],
+    [place.stateId, place.districtId, place.cityId, place.areaId, maxFee, amenities.join(',')],
   )
 
-  const cityName = cities.data?.find((c) => c.id === cityId)?.name
-  const areaName = areas.data?.find((a) => a.id === areaId)?.name
+  const names = chosenPlaceNames(place, places)
 
   /** Write the whole next query string at once so related changes stay in sync. */
   function update(next: {
-    city?: string
-    area?: string
+    place?: PlaceValue
     maxFee?: string
     amenities?: string[]
     q?: string
     sort?: SortKey
     filters?: boolean
   }) {
-    const nextCity = next.city ?? cityId
-    // Changing city clears the area selection.
-    const nextArea = next.city !== undefined ? '' : (next.area ?? areaId)
+    const nextPlace = next.place ?? place
     const nextFee = next.maxFee ?? maxFee
     const nextAmenities = next.amenities ?? amenities
     const nextQ = next.q ?? q
@@ -77,8 +76,10 @@ export default function Discover() {
 
     const sp = new URLSearchParams()
     if (nextQ) sp.set('q', nextQ)
-    if (nextCity) sp.set('city', nextCity)
-    if (nextArea) sp.set('area', nextArea)
+    if (nextPlace.stateId) sp.set('state', nextPlace.stateId)
+    if (nextPlace.districtId) sp.set('district', nextPlace.districtId)
+    if (nextPlace.cityId) sp.set('city', nextPlace.cityId)
+    if (nextPlace.areaId) sp.set('area', nextPlace.areaId)
     if (nextFee) sp.set('maxFee', nextFee)
     for (const a of nextAmenities) sp.append('amenity', a)
     if (nextSort !== 'seats') sp.set('sort', nextSort)
@@ -90,11 +91,19 @@ export default function Discover() {
     setParams(new URLSearchParams(), { replace: true })
   }
 
-  // Filters the sheet counts and the chips below the search (city/area live in the top row).
+  // Filters the sheet counts and the chips below the search (places live in the top row).
   const sheetFilterCount = (maxFee ? 1 : 0) + amenities.length
   const activeChips: { key: string; label: string; onRemove: () => void }[] = []
-  if (cityName) activeChips.push({ key: 'city', label: cityName, onRemove: () => update({ city: '' }) })
-  if (areaName) activeChips.push({ key: 'area', label: areaName, onRemove: () => update({ area: '' }) })
+  const placeChips: [keyof PlaceValue, string][] = [
+    ['stateId', names.stateName],
+    ['districtId', names.districtName],
+    ['cityId', names.cityName],
+    ['areaId', names.areaName],
+  ]
+  for (const [key, label] of placeChips) {
+    // Removing a place also removes the smaller places inside it.
+    if (label) activeChips.push({ key, label, onRemove: () => update({ place: changePlace(place, key, '') }) })
+  }
   if (maxFee)
     activeChips.push({ key: 'maxFee', label: feeOptionLabel(maxFee), onRemove: () => update({ maxFee: '' }) })
   for (const a of amenities)
@@ -104,7 +113,7 @@ export default function Discover() {
       onRemove: () => update({ amenities: amenities.filter((x) => x !== a) }),
     })
 
-  // The server returns the city/area/fee/amenity matches; the typed words are matched here (name, area, city, landmark, address, pincode).
+  // The server returns the place/fee/amenity matches; the typed words are matched here (name, places, landmark, address, pincode).
   const searched = useMemo(() => {
     const list = results.data ?? []
     const filtered = list.filter((lib) => matchesLibrarySearch(lib, q))
@@ -115,13 +124,13 @@ export default function Discover() {
   }, [results.data, q, sort])
 
   const count = searched.length
-  const hasAnyFilter = Boolean(cityId || areaId || maxFee || q || amenities.length)
+  const hasAnyFilter = Boolean(place.stateId || maxFee || q || amenities.length)
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <PageHeader
         title="Find a study library"
-        description="Search, then pick your city and area to see libraries with a free seat near you."
+        description="Search, then pick your state, district and town to see libraries with a free seat near you."
       />
 
       <section aria-label="Search and filters" className="mb-6 space-y-3">
@@ -162,25 +171,13 @@ export default function Discover() {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <SelectField label="City" value={cityId} onChange={(e) => update({ city: e.target.value })}>
-            <option value="">All cities</option>
-            {cities.data?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </SelectField>
-
-          <SelectField label="Area" value={areaId} disabled={!cityId} onChange={(e) => update({ area: e.target.value })}>
-            <option value="">{cityId ? 'All areas' : 'Pick a city first'}</option>
-            {areas.data?.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </SelectField>
-        </div>
+        <PlaceFields
+          mode="filter"
+          value={place}
+          options={places}
+          onChange={(p) => update({ place: p })}
+          className="grid-cols-2 lg:grid-cols-4"
+        />
         {activeChips.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             {activeChips.map((chip) => (
@@ -220,7 +217,7 @@ export default function Discover() {
         ) : count === 0 ? (
           <EmptyState
             title="No libraries match"
-            description="Try a different city or area, or relax your filters."
+            description="Try a different place, or relax your filters."
             action={
               hasAnyFilter ? (
                 <button type="button" onClick={clearAll} className={buttonStyles('secondary')}>

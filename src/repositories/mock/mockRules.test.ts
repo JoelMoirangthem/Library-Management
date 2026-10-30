@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { AppError } from '@/domain/errors'
 import { devFlags, setClockOffsetDays } from '@/lib/devState'
 import { getDb, resetMockData } from '@/repositories/mock/db'
+import type { LibraryInput } from '@/domain/types'
 import {
+  MockCatalogRepository,
   MockDemoLogin,
   MockLibraryRepository,
   MockMemberRepository,
@@ -320,5 +322,63 @@ describe('admin badge counts (the menu badges must not need the full lists)', ()
     await login.signInAs('u_manoj')
     await expect(libs.countPendingForAdmin()).rejects.toBeInstanceOf(AppError)
     await expect(payments.countPendingForAdmin()).rejects.toBeInstanceOf(AppError)
+  })
+})
+
+describe('places: state, district, town and area', () => {
+  const catalog = new MockCatalogRepository()
+  const shifts = [{ name: 'Day', startTime: '09:00', endTime: '17:00', monthlyFeePaise: 50000 }]
+  const input = (p: Partial<LibraryInput>): LibraryInput => ({
+    name: 'New Lib', stateId: 'S9', districtId: 'D157', cityId: 'C249286', areaId: null, address: 'Mall Road',
+    landmark: '', pincode: '208001', phone: '9415000011', capacity: 10, timings: '9 to 9', amenities: [], photos: [], ...p,
+  })
+
+  it('lists every state, the districts of a state, and the towns of a district', async () => {
+    expect(await catalog.listStates()).toHaveLength(36)
+    expect((await catalog.listDistricts('S9')).map((d) => d.name)).toContain('Lucknow')
+    const towns = await catalog.listCities({ districtId: 'D162' })
+    expect(towns.map((t) => t.name)).toEqual(expect.arrayContaining(['Lucknow', 'Kakori', 'Malihabad']))
+    // Imphal lies in two districts and is listed under both.
+    expect((await catalog.listCities({ districtId: 'D255' })).map((t) => t.name)).toContain('Imphal')
+    expect((await catalog.listCities({ districtId: 'D256' })).map((t) => t.name)).toContain('Imphal')
+  })
+
+  it('a new owner lists a library with no area; a town outside the district is refused', async () => {
+    await login.signUpNewUser('New Owner', 'new.owner@gmail.com')
+    await auth.setMyRole('owner')
+    expect(await code(libs.create(input({ districtId: 'D162' }), shifts))).toBe('invalid') // Kanpur is not in Lucknow district
+    expect(await code(libs.create(input({ stateId: 'S14' }), shifts))).toBe('invalid') // Kanpur Nagar is not in Manipur
+    expect(await code(libs.create(input({ areaId: 'area_ali' }), shifts))).toBe('invalid') // Aliganj is in Lucknow, not Kanpur
+    const lib = await libs.create(input({}), shifts)
+    expect(lib.areaId).toBe(null)
+  })
+
+  it('search narrows by state and by district', async () => {
+    const all = await libs.searchPublic({})
+    const up = await libs.searchPublic({ stateId: 'S9' })
+    const lucknow = await libs.searchPublic({ districtId: 'D162' })
+    const manipur = await libs.searchPublic({ stateId: 'S14' })
+    expect(lucknow.length).toBeGreaterThan(0)
+    expect(lucknow.every((l) => l.districtName === 'Lucknow' && l.stateName === 'Uttar Pradesh')).toBe(true)
+    expect(manipur.map((l) => l.cityName)).toEqual(['Imphal'])
+    expect(up.length + manipur.length).toBe(all.length)
+  })
+
+  it('only an admin adds a town, and not one that already exists in the state', async () => {
+    await login.signInAs('u_anil')
+    expect(await code(catalog.addCity('D162', 'Chinhat'))).toBe('forbidden')
+    await login.signInAs('u_admin')
+    const town = await catalog.addCity('D162', '  Chinhat  ')
+    expect(town).toMatchObject({ name: 'Chinhat', stateId: 'S9', isActive: true })
+    expect((await catalog.listCities({ districtId: 'D162' })).map((t) => t.name)).toContain('Chinhat')
+    expect(await code(catalog.addCity('D157', 'lucknow'))).toBe('conflict')
+  })
+
+  it('switching a town off hides it from owners and its libraries from search', async () => {
+    await login.signInAs('u_admin')
+    await catalog.setCityActive('C276547', false) // Imphal
+    expect((await catalog.listCities({ districtId: 'D256' })).map((t) => t.name)).not.toContain('Imphal')
+    expect((await catalog.listCities({ districtId: 'D256', includeInactive: true })).map((t) => t.name)).toContain('Imphal')
+    expect(await libs.searchPublic({ stateId: 'S14' })).toEqual([])
   })
 })

@@ -6,9 +6,10 @@ const good = () => ({
   tables: [
     { name: 'profiles', rls: true }, { name: 'libraries', rls: true }, { name: 'members', rls: true },
     { name: 'cities', rls: true }, { name: 'areas', rls: true },
+    { name: 'states', rls: true }, { name: 'districts', rls: true }, { name: 'city_districts', rls: true },
   ],
-  anonTablePrivileges: [{ table: 'cities', privilege: 'SELECT' }, { table: 'areas', privilege: 'SELECT' }],
-  authenticatedWritePrivileges: [{ table: 'cities', privilege: 'INSERT' }, { table: 'cities', privilege: 'UPDATE' }, { table: 'areas', privilege: 'INSERT' }, { table: 'areas', privilege: 'UPDATE' }],
+  anonTablePrivileges: ['states', 'districts', 'cities', 'city_districts', 'areas'].map((table) => ({ table, privilege: 'SELECT' })),
+  authenticatedWritePrivileges: [{ table: 'cities', privilege: 'UPDATE' }, { table: 'areas', privilege: 'INSERT' }, { table: 'areas', privilege: 'UPDATE' }],
   sensitiveColumnWrites: [],
   anonFunctions: [...APPROVED_PUBLIC_FUNCTIONS],
   definerWithoutSearchPath: [],
@@ -38,12 +39,17 @@ describe('evaluateFacts (the safety rules the live database must satisfy)', () =
 
   it('fails when the public can read a private table', () => {
     const f = good(); f.anonTablePrivileges.push({ table: 'profiles', privilege: 'SELECT' })
-    expect(failures(f)).toContain('strangers can read only cities and areas')
+    expect(failures(f)).toContain('strangers can read only the place lists')
   })
 
   it('fails when the public can write anything', () => {
     const f = good(); f.anonTablePrivileges.push({ table: 'cities', privilege: 'INSERT' })
-    expect(failures(f)).toContain('strangers can read only cities and areas')
+    expect(failures(f)).toContain('strangers can read only the place lists')
+  })
+
+  it('fails when a logged-in user can write the state or district lists', () => {
+    const f = good(); f.authenticatedWritePrivileges.push({ table: 'districts', privilege: 'INSERT' })
+    expect(failures(f)).toContain('logged-in users write directly only to cities and areas')
   })
 
   it('fails when a logged-in user can write a table directly that should only change through functions', () => {
@@ -127,7 +133,7 @@ describe('evaluateFacts (the safety rules the live database must satisfy)', () =
   it('names every rule it checked, so a silent skip is visible', () => {
     expect(evaluateFacts(good()).map((r) => r.rule)).toEqual([
       'every table has row level security',
-      'strangers can read only cities and areas',
+      'strangers can read only the place lists',
       'logged-in users write directly only to cities and areas',
       'no sensitive column can be changed directly',
       'strangers can run only the approved functions',

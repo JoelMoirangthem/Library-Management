@@ -17,8 +17,9 @@ export const APPROVED_PUBLIC_FUNCTIONS = [
   'public_libraries', 'public_library', 'shift_overlaps', 'touch_updated_at',
 ]
 
-const READ_ONLY_PUBLIC_TABLES = ['cities', 'areas']
-const WRITE_ALLOWED_TABLES = ['cities', 'areas'] // admin-only through row-level security
+/** Place lists anyone may read (they hold no personal data). Exported so securityCheck.mjs skips them too. */
+export const READ_ONLY_PUBLIC_TABLES = ['states', 'districts', 'cities', 'city_districts', 'areas']
+const WRITE_ALLOWED_TABLES = ['cities', 'areas'] // admin-only through row-level security; towns are added through admin_add_city
 // A new library is inserted directly and needs an owner; its row rule pins owner_id to the caller. It must never be UPDATE-able.
 const INSERT_ONLY_OK = [{ table: 'libraries', column: 'owner_id', privilege: 'INSERT' }]
 
@@ -32,7 +33,7 @@ export function evaluateFacts(f) {
   rule('every table has row level security', noRls.length === 0, `no row level security on: ${names(noRls)}`)
 
   const badAnon = f.anonTablePrivileges.filter((p) => !(p.privilege === 'SELECT' && READ_ONLY_PUBLIC_TABLES.includes(p.table)))
-  rule('strangers can read only cities and areas', badAnon.length === 0, `strangers hold: ${names(badAnon.map((p) => `${p.privilege} on ${p.table}`))}`)
+  rule('strangers can read only the place lists', badAnon.length === 0, `strangers hold: ${names(badAnon.map((p) => `${p.privilege} on ${p.table}`))}`)
 
   const badWrite = f.authenticatedWritePrivileges.filter((p) => !WRITE_ALLOWED_TABLES.includes(p.table))
   rule('logged-in users write directly only to cities and areas', badWrite.length === 0, `direct writes allowed on: ${names(badWrite.map((p) => `${p.privilege} ${p.table}`))}`)

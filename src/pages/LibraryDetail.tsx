@@ -12,6 +12,7 @@ import { LoadingState } from '@/components/states/LoadingState'
 import { NotFoundState } from '@/components/states/NotFoundState'
 import { formatPhone, isValidPhone, mapsLink } from '@/domain/constants'
 import { formatRupees } from '@/domain/money'
+import { fullPlace, shortPlace } from '@/domain/places'
 import { requestActionKind } from '@/domain/requestAction'
 import { formatShiftRange } from '@/domain/shifts'
 import type { PublicLibrary, PublicShift } from '@/domain/types'
@@ -333,7 +334,7 @@ export default function LibraryDetail() {
   }
 
   const lib = library.data
-  const maps = mapsLink([lib.address, lib.landmark, lib.areaName, lib.cityName, lib.pincode])
+  const maps = mapsLink([lib.address, lib.landmark, fullPlace(lib), lib.pincode])
   const requestsReady = !myRequests.loading
   const membershipsReady = !myMemberships.loading
 
@@ -402,8 +403,7 @@ export default function LibraryDetail() {
             <PageHeader title={lib.name} />
             <p className="-mt-4 flex items-center gap-1.5 break-words text-ink-muted">
               <MapPin aria-hidden className="size-4 shrink-0" />
-              {lib.areaName}, {lib.cityName}
-            </p>
+              {shortPlace(lib)}            </p>
           </div>
 
           <Card className="p-4 sm:p-5">
@@ -444,7 +444,7 @@ export default function LibraryDetail() {
                 </>
               )}
               <br />
-              {lib.areaName}, {lib.cityName} <span className="tabular-nums">{lib.pincode}</span>
+              {fullPlace(lib)} <span className="tabular-nums">{lib.pincode}</span>
             </address>
             <div className="mt-3 flex flex-wrap gap-3">
               <a

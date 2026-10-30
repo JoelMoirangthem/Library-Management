@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
 import { formatDateTime } from '@/domain/dates'
+import { placeLine } from '@/domain/places'
 import type { MySeatRequest, RequestStatus } from '@/domain/types'
 import { services } from '@/lib/container'
 import { useAsync } from '@/hooks/useAsync'
@@ -49,15 +50,14 @@ function ProgressLine({ status }: { status: RequestStatus }) {
 
 function RequestCard({
   r,
-  cityId,
   onCancel,
 }: {
   r: MySeatRequest
-  /** Resolved from the city name so the declined action can pre-select it in Discover. */
-  cityId?: string
   onCancel: (r: MySeatRequest) => void
 }) {
   const s = STATUS[r.status]
+  // A declined request opens search in the same town, so the student sees the other libraries there.
+  const searchHere = `/discover?${new URLSearchParams({ state: r.stateId, district: r.districtId, city: r.cityId })}`
   // The footer action differs by status; render a placeholder so footers stay the same height.
   const action =
     r.status === 'pending' ? (
@@ -69,10 +69,7 @@ function RequestCard({
         View my membership
       </Link>
     ) : r.status === 'rejected' ? (
-      <Link
-        to={cityId ? `/discover?city=${cityId}` : '/discover'}
-        className={buttonStyles('secondary')}
-      >
+      <Link to={r.cityId ? searchHere : '/discover'} className={buttonStyles('secondary')}>
         Find another library
       </Link>
     ) : (
@@ -93,7 +90,7 @@ function RequestCard({
               </Link>
             </h3>
             <p className="mt-0.5 break-words text-sm text-ink-muted">
-              {r.shiftName} · {r.areaName}, {r.cityName}
+              {r.shiftName} · {placeLine([r.areaName, r.cityName])}
             </p>
             <p className="mt-2 text-sm text-ink-muted tabular-nums">
               Requested {formatDateTime(r.createdAt)}
@@ -117,11 +114,7 @@ function RequestCard({
 export default function MyRequests() {
   useTitle('My requests')
   const requests = useAsync(() => services.listMySeatRequests(), [])
-  const cities = useAsync(() => services.listCities(), [])
   const [toCancel, setToCancel] = useState<MySeatRequest | null>(null)
-
-  // Map city name -> id so a declined request can pre-select its city in Discover.
-  const cityIdByName = new Map((cities.data ?? []).map((c) => [c.name, c.id] as const))
 
   const cancelRequest = useMutation((id: string) => services.cancelSeatRequest(id), {
     success: 'Request cancelled',
@@ -169,7 +162,7 @@ export default function MyRequests() {
               <CardGrid count={waiting.length} max={2}>
                 {waiting.map((r) => (
                   <GridItem key={r.id}>
-                    <RequestCard r={r} cityId={cityIdByName.get(r.cityName)} onCancel={setToCancel} />
+                    <RequestCard r={r} onCancel={setToCancel} />
                   </GridItem>
                 ))}
               </CardGrid>
@@ -184,7 +177,7 @@ export default function MyRequests() {
               <CardGrid count={decided.length} max={2}>
                 {decided.map((r) => (
                   <GridItem key={r.id}>
-                    <RequestCard r={r} cityId={cityIdByName.get(r.cityName)} onCancel={setToCancel} />
+                    <RequestCard r={r} onCancel={setToCancel} />
                   </GridItem>
                 ))}
               </CardGrid>

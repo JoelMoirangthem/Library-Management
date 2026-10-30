@@ -114,11 +114,13 @@ export class SupabaseSeatRequestRepository implements SeatRequestRepository {
     type Item = {
       id: string; library_id: string; library_name: string; area_name: string; city_name: string
       shift_id: string; shift_name: string; status: SeatRequest['status']; created_at: string; decided_at: string | null
+      state_id: string; district_id: string; city_id: string
     }
     return ((data ?? []) as Item[]).map((r) => ({
       id: r.id, studentId: uid, studentName: '', studentPhone: '', libraryId: r.library_id, shiftId: r.shift_id,
       status: r.status, createdAt: r.created_at, decidedAt: r.decided_at,
       libraryName: r.library_name, areaName: r.area_name, cityName: r.city_name, shiftName: r.shift_name,
+      stateId: r.state_id, districtId: r.district_id, cityId: r.city_id,
     }))
   }
 
