@@ -90,6 +90,13 @@ function Shell() {
                 <Building2 aria-hidden className="size-5" />
               </Link>
             )}
+            <Link
+              to="/profile"
+              aria-label="Your account"
+              className="flex size-11 items-center justify-center rounded-control text-ink-muted hover:bg-surface"
+            >
+              <UserRound aria-hidden className="size-5" />
+            </Link>
             <button
               type="button"
               aria-label="Log out"
