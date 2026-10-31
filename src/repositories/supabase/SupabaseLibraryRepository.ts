@@ -1,4 +1,5 @@
 import { AppError } from '@/domain/errors'
+import { cleanArea } from '@/domain/areas'
 import type {
   AdminLibraryRow,
   Library,
@@ -30,7 +31,8 @@ const toDbInput = (i: LibraryInput) => ({
   state_id: i.stateId,
   district_id: i.districtId,
   city_id: i.cityId,
-  area_id: i.areaId || null,
+  // The database also tidies and checks this (libraries_area_tidy, migration 0016).
+  area: cleanArea(i.area),
   address: i.address,
   landmark: i.landmark,
   pincode: i.pincode,
@@ -119,7 +121,7 @@ export class SupabaseLibraryRepository implements LibraryRepository {
       p_state: filter.stateId ?? null,
       p_district: filter.districtId ?? null,
       p_city: filter.cityId ?? null,
-      p_area: filter.areaId ?? null,
+      p_area: filter.area?.trim() ? cleanArea(filter.area) : null,
       p_max_fee_paise: filter.maxFeePaise ?? null,
       p_amenities: filter.amenities?.length ? filter.amenities : null,
     }
@@ -154,21 +156,20 @@ export class SupabaseLibraryRepository implements LibraryRepository {
     type Named = { id: string; name: string }
     const names = (table: string, ids: string[]) =>
       fetchByIds(ids, (group) => supabase.from(table).select('id, name').in('id', group).returns<Named[]>())
-    const [owners, states, districts, cities, areas] = await Promise.all([
+    const [owners, states, districts, cities] = await Promise.all([
       fetchByIds(libs.map((l) => l.owner_id), (group) =>
         supabase.from('profiles').select('id, name, phone').in('id', group).returns<{ id: string; name: string; phone: string }[]>(),
       ),
       names('states', libs.map((l) => l.state_id)),
       names('districts', libs.map((l) => l.district_id)),
       names('cities', libs.map((l) => l.city_id)),
-      names('areas', libs.map((l) => l.area_id ?? '')),
     ])
     const ownerById = new Map(owners.map((o) => [o.id, o]))
     const nameOf = (rows: Named[]) => {
       const m = new Map(rows.map((r) => [r.id, r.name]))
       return (id: string | null) => (id ? m.get(id) ?? '' : '')
     }
-    const [stateName, districtName, cityName, areaName] = [nameOf(states), nameOf(districts), nameOf(cities), nameOf(areas)]
+    const [stateName, districtName, cityName] = [nameOf(states), nameOf(districts), nameOf(cities)]
     const subByLib = new Map(subs.map((s) => [s.library_id, toSubscription(s)]))
 
     return libs.map((row) => {
@@ -181,7 +182,7 @@ export class SupabaseLibraryRepository implements LibraryRepository {
         stateName: stateName(row.state_id),
         districtName: districtName(row.district_id),
         cityName: cityName(row.city_id),
-        areaName: areaName(row.area_id),
+        areaName: row.area,
         subscription: subByLib.get(row.id) ?? null,
         shifts: shiftRows.filter((s) => s.library_id === row.id).map(toShift),
       }

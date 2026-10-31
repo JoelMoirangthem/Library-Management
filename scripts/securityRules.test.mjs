@@ -82,6 +82,10 @@ describe('evaluateFacts (the safety rules the live database must satisfy)', () =
     expect(failures(f)).toContain('strangers can run only the approved functions')
   })
 
+  it('lets strangers run area_names: it feeds the Discover area list and returns place names only', () => {
+    expect(APPROVED_PUBLIC_FUNCTIONS).toContain('area_names')
+  })
+
   it('fails when a security-definer function has no pinned search path', () => {
     const f = good(); f.definerWithoutSearchPath.push('some_fn')
     expect(failures(f)).toContain('every security-definer function pins its search path')

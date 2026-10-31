@@ -47,6 +47,7 @@ export function createServices(r: Repositories) {
     listDistricts: (stateId: string) => r.catalog.listDistricts(stateId),
     listCities: (opts: { districtId: string; includeInactive?: boolean }) => r.catalog.listCities(opts),
     listAreas: (opts?: { cityId?: string; includeInactive?: boolean }) => r.catalog.listAreas(opts),
+    listAreaNames: (cityId: string) => r.catalog.listAreaNames(cityId),
     addCity: (districtId: string, name: string) => r.catalog.addCity(districtId, name),
     addArea: (cityId: string, name: string) => r.catalog.addArea(cityId, name),
     setCityActive: (id: string, on: boolean) => r.catalog.setCityActive(id, on),

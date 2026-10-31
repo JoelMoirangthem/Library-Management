@@ -4,6 +4,7 @@
 /**
  * Functions a logged-out visitor may run. Each one is here on purpose:
  *  - public_libraries / public_library: the Discover pages for logged-out visitors.
+ *  - area_names: the area names in a town, for the area filter on Discover. Place names only, nothing about a person.
  *  - is_admin, is_library_*, current_user_role: helpers the row-level-security rules call; for a stranger auth.uid() is
  *    null so they only ever answer "no".
  *  - trigger and constraint helpers (enforce_shift_rules, forbid_delete, freeze_fee_payment, handle_new_user,
@@ -12,7 +13,7 @@
  * Anything not listed here (approve_library, verify_plan_payment, add_member ...) must NOT be runnable by a stranger.
  */
 export const APPROVED_PUBLIC_FUNCTIONS = [
-  'current_user_role', 'enforce_shift_rules', 'forbid_delete', 'freeze_fee_payment', 'handle_new_user',
+  'area_names', 'current_user_role', 'enforce_shift_rules', 'forbid_delete', 'freeze_fee_payment', 'handle_new_user',
   'is_admin', 'is_library_active', 'is_library_editable', 'is_library_owner', 'photos_are_valid',
   'public_libraries', 'public_library', 'shift_overlaps', 'touch_updated_at',
 ]

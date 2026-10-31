@@ -59,6 +59,11 @@ export interface CatalogRepository {
   listDistricts(stateId: string): Promise<District[]>
   listCities(opts: { districtId: string; includeInactive?: boolean }): Promise<City[]>
   listAreas(opts?: { cityId?: string; includeInactive?: boolean }): Promise<Area[]>
+  /**
+   * The area names to filter by on Discover: the admin's active areas for the town plus the areas typed by libraries
+   * students can find, without duplicates (case and extra spaces ignored), sorted A-Z. Names only. Open to everyone.
+   */
+  listAreaNames(cityId: string): Promise<string[]>
   /** Admin. Adds a town that the official list is missing, in one district. */
   addCity(districtId: string, name: string): Promise<City>
   addArea(cityId: string, name: string): Promise<Area>

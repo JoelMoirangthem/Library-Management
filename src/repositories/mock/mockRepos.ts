@@ -1,4 +1,5 @@
 import { AppError } from '@/domain/errors'
+import { cleanArea, MAX_AREA_LENGTH, mergeAreaNames, sameArea } from '@/domain/areas'
 import { todayIST } from '@/domain/dates'
 import { PLAN_PRICE_PAISE, canEditProfile, extendedActiveUntil, newTrial } from '@/domain/plan'
 import { MAX_ACTIVE_SHIFTS, sortShifts, validateShiftFields, validateShiftSet } from '@/domain/shifts'
@@ -93,7 +94,6 @@ function toPublic(lib: Library): PublicLibrary {
     stateId: lib.stateId,
     districtId: lib.districtId,
     cityId: lib.cityId,
-    areaId: lib.areaId,
     ...placeNames(lib),
     address: lib.address,
     pincode: lib.pincode,
@@ -107,19 +107,25 @@ function toPublic(lib: Library): PublicLibrary {
     shifts,
   }
 }
-/** Mirrors the database's foreign keys: district in the state, town in the district, area (if any) in the town. */
-function assertLibraryInput(input: LibraryInput) {
-  const db = getDb()
+/**
+ * Mirrors the database's foreign keys and checks: district in the state, town in the district, and a typed area of at
+ * most 60 characters. Returns the input with the area tidied, as the database stores it.
+ */
+function assertLibraryInput(input: LibraryInput): LibraryInput {
   const district = placeData().districtById.get(input.districtId)
   const town = townById(input.cityId)
-  const area = input.areaId ? db.areas.find((a) => a.id === input.areaId) : null
   if (!placeData().stateById.has(input.stateId) || !district || district.stateId !== input.stateId || !town ||
-    !town.districtIds.includes(input.districtId) || (input.areaId && area?.cityId !== input.cityId)) {
-    throw new AppError('invalid', 'Pick the district from the chosen state, the city from that district, and an area from that city.')
+    !town.districtIds.includes(input.districtId)) {
+    throw new AppError('invalid', 'Pick the district from the chosen state and the city from that district.')
+  }
+  const area = cleanArea(input.area ?? '')
+  if (area.length > MAX_AREA_LENGTH) {
+    throw new AppError('invalid', `Use ${MAX_AREA_LENGTH} characters or fewer for the area.`)
   }
   if (!Number.isInteger(input.capacity) || input.capacity < 1 || input.capacity > 500) {
     throw new AppError('invalid', 'Seats must be a whole number between 1 and 500.')
   }
+  return { ...input, area }
 }
 
 /** Mirrors the SQL `set_capacity`: add seats, or deactivate FREE seats only. Never deletes. */
@@ -297,6 +303,16 @@ export class MockCatalogRepository implements CatalogRepository {
         .sort((a, b) => a.name.localeCompare(b.name)),
     )
   }
+  /** Mirrors the SQL `area_names`: the admin's active areas plus areas typed by libraries students can find. */
+  listAreaNames(cityId: string) {
+    return run((): string[] => {
+      const db = getDb()
+      return mergeAreaNames([
+        ...db.areas.filter((a) => a.isActive && a.cityId === cityId).map((a) => a.name),
+        ...db.libraries.filter((l) => l.cityId === cityId && isLibraryActive(l)).map((l) => l.area),
+      ])
+    })
+  }
   addCity(districtId: string, name: string) {
     return run((): City => {
       requireRole('admin')
@@ -377,11 +393,11 @@ export class MockLibraryRepository implements LibraryRepository {
       if (db.libraries.some((l) => l.ownerId === user.id)) {
         throw new AppError('conflict', 'You already have a library.')
       }
-      assertLibraryInput(input)
+      const clean = assertLibraryInput(input)
       const shiftProblem = validateShiftSet(shiftInputs)
       if (shiftProblem) throw new AppError('invalid', shiftProblem)
       const lib: Library = {
-        ...input,
+        ...clean,
         id: uid('lib'),
         ownerId: user.id,
         approvalStatus: 'pending',
@@ -402,9 +418,9 @@ export class MockLibraryRepository implements LibraryRepository {
       if (lib.approvalStatus === 'approved' && !isLibraryActive(lib)) {
         throw new AppError('forbidden', 'Your plan has expired. Renew to make changes.')
       }
-      assertLibraryInput(input)
-      if (input.capacity !== lib.capacity) applyCapacity(lib, input.capacity)
-      Object.assign(lib, { ...input, capacity: lib.capacity })
+      const clean = assertLibraryInput(input)
+      if (clean.capacity !== lib.capacity) applyCapacity(lib, clean.capacity)
+      Object.assign(lib, { ...clean, capacity: lib.capacity })
       commit()
       return lib
     })
@@ -425,12 +441,10 @@ export class MockLibraryRepository implements LibraryRepository {
       return db.libraries
         .filter((l) => isLibraryActive(l))
         .filter((l) => isCityActive(l.cityId))
-        // A switched-off area still hides its libraries; a library with no area is not affected.
-        .filter((l) => !l.areaId || db.areas.find((a) => a.id === l.areaId)?.isActive)
         .filter((l) => !filter.stateId || l.stateId === filter.stateId)
         .filter((l) => !filter.districtId || l.districtId === filter.districtId)
         .filter((l) => !filter.cityId || l.cityId === filter.cityId)
-        .filter((l) => !filter.areaId || l.areaId === filter.areaId)
+        .filter((l) => !filter.area?.trim() || sameArea(l.area, filter.area))
         .filter(
           (l) =>
             !filter.maxFeePaise ||

@@ -9,6 +9,7 @@ import { PlaceFields } from '@/components/PlaceFields'
 import { useToast } from '@/components/Toast'
 import { PhotoPicker } from '@/components/owner/profile/PhotoPicker'
 import { draftFeePaise, type ShiftDraft } from '@/components/owner/profile/shiftDrafts'
+import { cleanArea } from '@/domain/areas'
 import { AMENITIES } from '@/domain/constants'
 import { formatRupees } from '@/domain/money'
 import {
@@ -27,8 +28,8 @@ type Draft = {
   stateId: string
   districtId: string
   cityId: string
-  /** '' = no area. */
-  areaId: string
+  /** Typed by the owner; '' = no area. */
+  area: string
   address: string
   landmark: string
   pincode: string
@@ -45,7 +46,7 @@ function toDraft(lib: Library): Draft {
     stateId: lib.stateId,
     districtId: lib.districtId,
     cityId: lib.cityId,
-    areaId: lib.areaId ?? '',
+    area: lib.area,
     address: lib.address,
     landmark: lib.landmark,
     pincode: lib.pincode,
@@ -64,7 +65,7 @@ function toInput(d: Draft): LibraryInput {
     stateId: d.stateId,
     districtId: d.districtId,
     cityId: d.cityId,
-    areaId: d.areaId || null,
+    area: cleanArea(d.area),
     address: d.address.trim(),
     landmark: d.landmark.trim(),
     pincode: d.pincode.trim(),
@@ -105,7 +106,7 @@ const FIELD_ORDER: (keyof LibraryInput)[] = [
   'stateId',
   'districtId',
   'cityId',
-  'areaId',
+  'area',
   'address',
   'pincode',
   'phone',
@@ -296,7 +297,7 @@ export function LibraryEditor({
             errors={errors}
             onChange={(p) => {
               setDraft((d) => ({ ...d, ...p }))
-              setErrors((e) => ({ ...e, stateId: undefined, districtId: undefined, cityId: undefined, areaId: undefined }))
+              setErrors((e) => ({ ...e, stateId: undefined, districtId: undefined, cityId: undefined, area: undefined }))
             }}
           />
           <div data-field="address">

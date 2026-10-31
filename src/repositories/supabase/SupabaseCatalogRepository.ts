@@ -54,6 +54,20 @@ export class SupabaseCatalogRepository implements CatalogRepository {
     return unwrap(await q.returns<AreaRow[]>()).map(toArea)
   }
 
+  /**
+   * Area names for the Discover filter. The database merges the admin's areas with the areas libraries typed.
+   * One request returns at most 1000 rows (D-032) and typed areas have no upper bound, so read page by page.
+   * The names are unique within a town, so ordering by name is the unique sort order paging needs.
+   */
+  async listAreaNames(cityId: string): Promise<string[]> {
+    const supabase = getSupabase()
+    const rows = await fetchAll(async (from, to) => {
+      const r = await supabase.rpc('area_names', { p_city: cityId }).order('name').range(from, to)
+      return { data: r.data as { name: string }[] | null, error: r.error }
+    })
+    return rows.sort(byName).map((r) => r.name)
+  }
+
   async addCity(districtId: string, name: string): Promise<City> {
     const n = name.trim()
     if (!n) throw new AppError('invalid', 'Enter a town name.')
