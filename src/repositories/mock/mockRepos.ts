@@ -120,7 +120,7 @@ function assertLibraryInput(input: LibraryInput): LibraryInput {
   }
   const area = cleanArea(input.area ?? '')
   if (area.length > MAX_AREA_LENGTH) {
-    throw new AppError('invalid', `Keep the area under ${MAX_AREA_LENGTH} characters.`)
+    throw new AppError('invalid', `Use ${MAX_AREA_LENGTH} characters or fewer for the area.`)
   }
   if (!Number.isInteger(input.capacity) || input.capacity < 1 || input.capacity > 500) {
     throw new AppError('invalid', 'Seats must be a whole number between 1 and 500.')

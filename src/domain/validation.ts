@@ -12,7 +12,7 @@ export function validateLibraryInput(i: LibraryInput): FieldErrors<keyof Library
   if (!i.districtId) e.districtId = 'Choose a district.'
   if (!i.cityId) e.cityId = 'Choose a city or town.'
   // The area is optional and typed by hand. Its length counts after tidying, as the database does.
-  if (cleanArea(i.area).length > MAX_AREA_LENGTH) e.area = `Keep the area under ${MAX_AREA_LENGTH} characters.`
+  if (cleanArea(i.area).length > MAX_AREA_LENGTH) e.area = `Use ${MAX_AREA_LENGTH} characters or fewer for the area.`
   if (!i.address.trim()) e.address = 'Enter the street address.'
   if (!isValidPincode(i.pincode)) e.pincode = 'Enter a 6-digit pincode.'
   if (!isValidPhone(i.phone)) e.phone = 'Enter a 10-digit mobile number.'
