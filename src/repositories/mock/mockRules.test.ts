@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { AppError } from '@/domain/errors'
 import { devFlags, setClockOffsetDays } from '@/lib/devState'
 import { getDb, resetMockData } from '@/repositories/mock/db'
-import type { LibraryInput } from '@/domain/types'
+import type { Library, LibraryInput } from '@/domain/types'
 import {
   MockCatalogRepository,
   MockDemoLogin,
@@ -329,7 +329,7 @@ describe('places: state, district, town and area', () => {
   const catalog = new MockCatalogRepository()
   const shifts = [{ name: 'Day', startTime: '09:00', endTime: '17:00', monthlyFeePaise: 50000 }]
   const input = (p: Partial<LibraryInput>): LibraryInput => ({
-    name: 'New Lib', stateId: 'S9', districtId: 'D157', cityId: 'C249286', areaId: null, address: 'Mall Road',
+    name: 'New Lib', stateId: 'S9', districtId: 'D157', cityId: 'C249286', area: '', address: 'Mall Road',
     landmark: '', pincode: '208001', phone: '9415000011', capacity: 10, timings: '9 to 9', amenities: [], photos: [], ...p,
   })
 
@@ -348,9 +348,8 @@ describe('places: state, district, town and area', () => {
     await auth.setMyRole('owner')
     expect(await code(libs.create(input({ districtId: 'D162' }), shifts))).toBe('invalid') // Kanpur is not in Lucknow district
     expect(await code(libs.create(input({ stateId: 'S14' }), shifts))).toBe('invalid') // Kanpur Nagar is not in Manipur
-    expect(await code(libs.create(input({ areaId: 'area_ali' }), shifts))).toBe('invalid') // Aliganj is in Lucknow, not Kanpur
     const lib = await libs.create(input({}), shifts)
-    expect(lib.areaId).toBe(null)
+    expect(lib.area).toBe('')
   })
 
   it('search narrows by state and by district', async () => {
@@ -380,5 +379,116 @@ describe('places: state, district, town and area', () => {
     expect((await catalog.listCities({ districtId: 'D256' })).map((t) => t.name)).not.toContain('Imphal')
     expect((await catalog.listCities({ districtId: 'D256', includeInactive: true })).map((t) => t.name)).toContain('Imphal')
     expect(await libs.searchPublic({ stateId: 'S14' })).toEqual([])
+  })
+})
+
+describe('typed area (D-045)', () => {
+  const catalog = new MockCatalogRepository()
+  const LUCKNOW = 'C249234'
+  const KANPUR = 'C249286'
+  const shifts = [{ name: 'Day', startTime: '09:00', endTime: '17:00', monthlyFeePaise: 50000 }]
+  const input = (over: Partial<LibraryInput> = {}): LibraryInput => ({
+    name: 'Hazrat Reading Room', stateId: 'S9', districtId: 'D162', cityId: LUCKNOW, area: '  Hazratganj   Market ',
+    address: '1 MG Road', landmark: '', pincode: '226001', phone: '9876543210', capacity: 10, timings: '9 to 9',
+    amenities: [], photos: [], ...over,
+  })
+  const asInput = (l: Library): LibraryInput => ({
+    name: l.name, stateId: l.stateId, districtId: l.districtId, cityId: l.cityId, area: l.area, address: l.address,
+    landmark: l.landmark, pincode: l.pincode, phone: l.phone, capacity: l.capacity, timings: l.timings,
+    amenities: l.amenities, photos: l.photos,
+  })
+
+  async function newOwner() {
+    await login.signUpNewUser('New Owner', 'new.owner@gmail.com')
+    await auth.setMyRole('owner')
+  }
+
+  it('an owner types any area, and it is saved tidied', async () => {
+    await newOwner()
+    const lib = await libs.create(input(), shifts)
+    expect(lib.area).toBe('Hazratganj Market')
+  })
+
+  it('the area stays optional', async () => {
+    await newOwner()
+    expect((await libs.create(input({ area: '   ' }), shifts)).area).toBe('')
+  })
+
+  it('an area longer than 60 characters is refused', async () => {
+    await newOwner()
+    expect(await code(libs.create(input({ area: 'a'.repeat(61) }), shifts))).toBe('invalid')
+  })
+
+  it('editing the library changes the typed area and tidies it', async () => {
+    await login.signInAs('u_anil')
+    const mine = (await libs.getMine())!
+    const saved = await libs.update(mine.id, { ...asInput(mine), area: ' Hazratganj   Market ' })
+    expect(saved.area).toBe('Hazratganj Market')
+    expect((await libs.getMine())!.area).toBe('Hazratganj Market')
+  })
+
+  it('students, admins and seat requests show the typed area', async () => {
+    await login.signInAs('u_aman')
+    expect((await libs.searchPublic({})).find((l) => l.id === 'lib_gyan')!.areaName).toBe('Faizabad Road')
+    expect((await requests.listMine()).find((r) => r.libraryId === 'lib_gyan')!.areaName).toBe('Faizabad Road')
+    await login.signInAs('u_admin')
+    expect((await libs.listForAdmin()).find((r) => r.library.id === 'lib_gyan')!.areaName).toBe('Faizabad Road')
+  })
+
+  it('search by area ignores case and extra spaces', async () => {
+    await login.signInAs('u_aman')
+    const ids = (await libs.searchPublic({ cityId: LUCKNOW, area: '  faizabad   ROAD' })).map((l) => l.id)
+    expect(ids).toEqual(['lib_gyan'])
+  })
+
+  it('a library with no area is still found by its town, but not by an area', async () => {
+    await login.signInAs('u_sunita')
+    const nalanda = (await libs.getMine())!
+    await libs.update(nalanda.id, { ...asInput(nalanda), area: '' })
+    await login.signInAs('u_aman')
+    expect((await libs.searchPublic({ cityId: LUCKNOW })).map((l) => l.id)).toContain('lib_nalanda')
+    expect((await libs.searchPublic({ area: 'Aliganj' })).map((l) => l.id)).not.toContain('lib_nalanda')
+  })
+
+  it('switching an admin area off no longer hides libraries', async () => {
+    await login.signInAs('u_admin')
+    await catalog.setAreaActive('area_faz', false)
+    await login.signInAs('u_aman')
+    expect((await libs.searchPublic({ area: 'Faizabad Road' })).map((l) => l.id)).toEqual(['lib_gyan'])
+  })
+
+  describe('the area list on Discover (listAreaNames)', () => {
+    it('lists the admin areas of the town plus areas libraries typed, once each', async () => {
+      await login.signInAs('u_anil')
+      const gyan = (await libs.getMine())!
+      await libs.update(gyan.id, { ...asInput(gyan), area: 'Hazratganj Market' })
+      await login.signInAs('u_sunita')
+      const nalanda = (await libs.getMine())!
+      await libs.update(nalanda.id, { ...asInput(nalanda), area: 'aliganj' }) // the admin list says "Aliganj"
+      const names = await catalog.listAreaNames(LUCKNOW)
+      expect(names.filter((n) => n.toLowerCase() === 'aliganj')).toEqual(['Aliganj'])
+      expect(names).toContain('Hazratganj Market')
+      expect(names).not.toContain('Swaroop Nagar') // that is Kanpur
+    })
+
+    it('adds a typed area only once students can find the library', async () => {
+      await newOwner()
+      const lib = await libs.create(input({ area: 'Brand New Colony' }), shifts) // waits for approval
+      expect(await catalog.listAreaNames(LUCKNOW)).not.toContain('Brand New Colony')
+      await login.signInAs('u_admin')
+      await libs.approve(lib.id)
+      expect(await catalog.listAreaNames(LUCKNOW)).toContain('Brand New Colony')
+    })
+
+    it('drops an admin area once it is switched off', async () => {
+      await login.signInAs('u_admin')
+      expect(await catalog.listAreaNames(KANPUR)).toContain('Kakadeo')
+      await catalog.setAreaActive('area_kak', false) // no library uses it
+      expect(await catalog.listAreaNames(KANPUR)).not.toContain('Kakadeo')
+    })
+
+    it('is empty for a town with no areas and no libraries', async () => {
+      expect(await catalog.listAreaNames('C000000')).toEqual([])
+    })
   })
 })

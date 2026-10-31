@@ -16,7 +16,7 @@ export type State = { id: string; name: string; isUnionTerritory: boolean }
 export type District = { id: string; stateId: string; name: string }
 /** A town (city) can lie in more than one district, e.g. Imphal is in Imphal West and Imphal East. */
 export type City = { id: string; stateId: string; name: string; isActive: boolean }
-/** Optional finer place inside a town, added by an admin. */
+/** Optional finer place inside a town, added by an admin. Owners do not pick from it: they type their own area (D-045). It only feeds the area list on Discover. */
 export type Area = { id: string; cityId: string; name: string; isActive: boolean }
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
@@ -28,8 +28,8 @@ export type Library = {
   stateId: string
   districtId: string
   cityId: string
-  /** Optional: null when the owner picked no area. */
-  areaId: string | null
+  /** Typed by the owner, tidied (trimmed, single spaces, at most 60 characters). Empty when the owner gave none. */
+  area: string
   address: string
   pincode: string
   landmark: string
@@ -172,7 +172,6 @@ export type PublicLibrary = {
   districtName: string
   cityId: string
   cityName: string
-  areaId: string | null
   /** Empty when the library has no area. */
   areaName: string
   address: string
@@ -194,7 +193,8 @@ export type PublicSearchFilter = {
   stateId?: string
   districtId?: string
   cityId?: string
-  areaId?: string
+  /** The area name as typed; matched ignoring case and extra spaces. */
+  area?: string
   /** Matches libraries with at least one active shift at or under this fee. */
   maxFeePaise?: number
   amenities?: string[]

@@ -113,7 +113,7 @@ export class SupabaseMemberRepository implements MemberRepository {
       const library: PublicLibrary = {
         id: m.library_id, name: m.library_name,
         stateId: '', stateName: m.state_name, districtId: '', districtName: m.district_name,
-        cityId: '', cityName: m.city_name, areaId: null, areaName: m.area_name,
+        cityId: '', cityName: m.city_name, areaName: m.area_name,
         address: m.address, pincode: '', landmark: '', phone: m.library_phone, fromFeePaise: 0, timings: '',
         amenities: [], photos: [], totalSeats: 0, shifts: [],
       }

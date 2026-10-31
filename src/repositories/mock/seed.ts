@@ -32,7 +32,7 @@ export type DB = {
   seatRequests: SeatRequest[]
 }
 
-export const DB_VERSION = 3
+export const DB_VERSION = 4
 
 const DAY = 86_400_000
 const FIRST = ['Aarav', 'Ishita', 'Kabir', 'Meera', 'Rohan', 'Ananya', 'Vivek', 'Priya', 'Arjun', 'Neha', 'Siddharth', 'Pooja', 'Harsh', 'Kavya', 'Nikhil', 'Shreya']
@@ -95,7 +95,7 @@ export function createSeed(now: Date): DB {
     stateId: string
     districtId: string
     cityId: string
-    areaId: string
+    area: string
     address: string
     pincode: string
     landmark: string
@@ -109,44 +109,44 @@ export function createSeed(now: Date): DB {
 
   const libs: LibSeed[] = [
     {
-      id: 'lib_gyan', ownerId: 'u_anil', name: 'Gyan Deep Study Hub', ...LKO, areaId: 'area_faz',
+      id: 'lib_gyan', ownerId: 'u_anil', name: 'Gyan Deep Study Hub', ...LKO, area: 'Faizabad Road',
       address: '2nd Floor, Shanti Complex, Faizabad Road', pincode: '226016', landmark: 'Opposite Axis Bank',
       phone: '9415000011', capacity: 39, timings: '8:30 am to 9:00 pm',
       amenities: ['AC', 'Wi-Fi', 'Power socket', 'Water purifier', 'Silent zone', 'CCTV'], status: 'approved',
     },
     {
-      id: 'lib_nalanda', ownerId: 'u_sunita', name: 'Nalanda Reading Room', ...LKO, areaId: 'area_ali',
+      id: 'lib_nalanda', ownerId: 'u_sunita', name: 'Nalanda Reading Room', ...LKO, area: 'Aliganj',
       address: '14, Sector J, Aliganj', pincode: '226024', landmark: 'Near Aliganj Hanuman Mandir',
       phone: '9415000012', capacity: 30, timings: '8:30 am to 9:00 pm',
       amenities: ['Wi-Fi', 'Power socket', 'Locker', 'Silent zone'], status: 'approved',
     },
     {
-      id: 'lib_quiet', ownerId: 'u_manoj', name: 'Quiet Hours Library', ...LKO, areaId: 'area_ind',
+      id: 'lib_quiet', ownerId: 'u_manoj', name: 'Quiet Hours Library', ...LKO, area: 'Indira Nagar',
       address: 'B-27, Sector 12, Indira Nagar', pincode: '226016', landmark: 'Behind Munshipulia Chauraha',
       phone: '9415000013', capacity: 24, timings: 'Open 24 hours',
       amenities: ['AC', 'Wi-Fi', 'Power socket', 'Open 24 hours', 'Tea & coffee'], status: 'approved',
     },
     {
-      id: 'lib_scholars', ownerId: 'u_farah', name: "Scholars' Den", ...LKO, areaId: 'area_kri',
+      id: 'lib_scholars', ownerId: 'u_farah', name: "Scholars' Den", ...LKO, area: 'Krishna Nagar',
       address: '41, Krishna Nagar Main Road', pincode: '226023', landmark: 'Next to Sai Medical Store',
       phone: '9415000014', capacity: 20, timings: '8:30 am to 12:30 pm',
       amenities: ['Wi-Fi', 'Power socket', 'Parking'], status: 'approved',
     },
     {
-      id: 'lib_lakshya', ownerId: 'u_deepak', name: 'Lakshya Self Study', ...LKO, areaId: 'area_gom',
+      id: 'lib_lakshya', ownerId: 'u_deepak', name: 'Lakshya Self Study', ...LKO, area: 'Gomti Nagar',
       address: 'Vibhuti Khand, Gomti Nagar', pincode: '226010', landmark: 'Near Patrakarpuram crossing',
       phone: '9415000015', capacity: 36, timings: '8:30 am to 9:00 pm',
       amenities: ['AC', 'Wi-Fi', 'Power socket', 'Locker', 'CCTV', 'Parking'], status: 'pending',
     },
     {
-      id: 'lib_nest', ownerId: 'u_rekha', name: 'Study Nest', ...KNP, areaId: 'area_swa',
+      id: 'lib_nest', ownerId: 'u_rekha', name: 'Study Nest', ...KNP, area: 'Swaroop Nagar',
       address: '88, Swaroop Nagar', pincode: '208002', landmark: 'Near Kanpur Medical Store',
       phone: '9415000016', capacity: 18, timings: '8:30 am to 12:30 pm',
       amenities: ['Wi-Fi', 'Power socket'], status: 'rejected',
       reason: 'The phone number did not connect and the address has no landmark we could find. Please check both, then resubmit.',
     },
     {
-      id: 'lib_khwai', ownerId: 'u_ibomcha', name: 'Khwairakpam Study Centre', ...IMF, areaId: 'area_sin',
+      id: 'lib_khwai', ownerId: 'u_ibomcha', name: 'Khwairakpam Study Centre', ...IMF, area: 'Singjamei',
       address: 'Singjamei Chingamakha, Near Uripok Road', pincode: '795008', landmark: 'Above Keishampat Stationers',
       phone: '9856000017', capacity: 28, timings: '8:30 am to 9:00 pm',
       amenities: ['Wi-Fi', 'Power socket', 'Water purifier', 'Silent zone', 'Tea & coffee'], status: 'approved',
@@ -154,7 +154,7 @@ export function createSeed(now: Date): DB {
   ]
 
   const libraries: Library[] = libs.map((l) => ({
-    id: l.id, ownerId: l.ownerId, name: l.name, stateId: l.stateId, districtId: l.districtId, cityId: l.cityId, areaId: l.areaId, address: l.address,
+    id: l.id, ownerId: l.ownerId, name: l.name, stateId: l.stateId, districtId: l.districtId, cityId: l.cityId, area: l.area, address: l.address,
     pincode: l.pincode, landmark: l.landmark, phone: l.phone, capacity: l.capacity,
     timings: l.timings, amenities: l.amenities, photos: [],
     approvalStatus: l.status, rejectionReason: l.reason ?? null, createdAt: iso(-90),

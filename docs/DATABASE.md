@@ -28,7 +28,7 @@ Supabase Postgres. All tables have Row Level Security (RLS) enabled. Business lo
 `id`, `name` (unique), `is_active` (default true).
 
 ### areas
-`id`, `city_id` → cities, `name`, `is_active`. `unique (city_id, name)`, `unique (id, city_id)` (for composite FK).
+`id`, `city_id` → cities, `name`, `is_active`. `unique (city_id, name)`, `unique (id, city_id)` (for composite FK). Admin-managed. Since migration 0016 (D-045) libraries no longer point at this table: it only feeds the area list on Discover (`area_names`).
 
 ### libraries
 | Column | Type | Notes |
@@ -36,7 +36,9 @@ Supabase Postgres. All tables have Row Level Security (RLS) enabled. Business lo
 | id | uuid PK | |
 | owner_id | uuid unique | → profiles (one library per owner) |
 | name | text | |
-| city_id, area_id | uuid | FK `(area_id, city_id)` → `areas(id, city_id)` |
+| city_id | uuid | → cities |
+| area | text | typed by the owner, may be empty (`''`). Stored tidied: no spaces at either end, single spaces, at most 60 characters. Enforced by `libraries_area_tidy`; `create_library` tidies it too (migration 0016, D-045) |
+| area_id | uuid null | legacy: emptied by migration 0016 and no longer written or read. Kept for one release so the old website keeps saving; a later migration drops it |
 | address, landmark | text | |
 | pincode | text | `check (pincode ~ '^[1-9][0-9]{5}$')` |
 | phone | text | |
@@ -110,7 +112,8 @@ All are `security definer` with a fixed `search_path`, and each checks the calle
 | `void_fee_payment(fee_id, reason)` | owner, active | marks void |
 | `approve_seat_request(request_id, seat_id, start_date, expiry_date, amount_paise, mode)` | owner, active | creates member, assigns seat, optional fee, marks approved — atomically |
 | `reject_seat_request(request_id)` | owner, active | `pending → rejected` |
-| `public_libraries(city_id, area_id, max_fee_paise, amenities)` | anyone | active libraries + seats-left count; no member data |
+| `public_libraries(state_id, district_id, city_id, area, max_fee_paise, amenities)` | anyone | active libraries + seats-left count; no member data. `area` is a name, matched ignoring case and extra spaces; blank means no area filter |
+| `area_names(city_id)` | anyone | the area names for the Discover filter: the admin's active areas for the town plus the areas typed by libraries students can find, once each (the admin's spelling wins), sorted A-Z. Names only |
 
 ## RLS summary
 

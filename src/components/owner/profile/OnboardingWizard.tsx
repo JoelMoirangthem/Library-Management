@@ -11,6 +11,7 @@ import {
   draftsToShiftInputs,
   type ShiftDraft,
 } from '@/components/owner/profile/shiftDrafts'
+import { cleanArea } from '@/domain/areas'
 import { AMENITIES, formatPhone, normalizePhone } from '@/domain/constants'
 import { formatRupees } from '@/domain/money'
 import { validateShiftFields, validateShiftSet } from '@/domain/shifts'
@@ -23,7 +24,8 @@ type Draft = {
   stateId: string
   districtId: string
   cityId: string
-  areaId: string
+  /** Typed by the owner; empty = no area. */
+  area: string
   address: string
   landmark: string
   pincode: string
@@ -39,7 +41,7 @@ const EMPTY: Draft = {
   stateId: '',
   districtId: '',
   cityId: '',
-  areaId: '',
+  area: '',
   address: '',
   landmark: '',
   pincode: '',
@@ -57,7 +59,7 @@ function toInput(d: Draft): LibraryInput {
     stateId: d.stateId,
     districtId: d.districtId,
     cityId: d.cityId,
-    areaId: d.areaId || null,
+    area: cleanArea(d.area),
     address: d.address.trim(),
     landmark: d.landmark.trim(),
     pincode: d.pincode.trim(),
@@ -73,7 +75,7 @@ const STEP_LABELS = ['Library', 'Shifts', 'Extras']
 const STEP_TITLES = ['Your library', 'Seats and shifts', 'Photos and extras']
 // Which LibraryInput fields each step owns, in focus order.
 const STEP_FIELDS: (keyof LibraryInput)[][] = [
-  ['name', 'stateId', 'districtId', 'cityId', 'areaId', 'address', 'pincode', 'phone'],
+  ['name', 'stateId', 'districtId', 'cityId', 'area', 'address', 'pincode', 'phone'],
   ['capacity', 'timings'],
   [],
 ]
@@ -219,7 +221,7 @@ export function OnboardingWizard({ onSubmit, submitting, error }: Props) {
             errors={errors}
             onChange={(p) => {
               setDraft((d) => ({ ...d, ...p }))
-              setErrors((e) => ({ ...e, stateId: undefined, districtId: undefined, cityId: undefined, areaId: undefined }))
+              setErrors((e) => ({ ...e, stateId: undefined, districtId: undefined, cityId: undefined, area: undefined }))
             }}
           />
           <div data-field="address">

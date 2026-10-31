@@ -32,7 +32,7 @@ export default function Discover() {
     stateId: params.get('state') ?? '',
     districtId: params.get('district') ?? '',
     cityId: params.get('city') ?? '',
-    areaId: params.get('area') ?? '',
+    area: params.get('area') ?? '',
   }
   const maxFee = params.get('maxFee') ?? ''
   const q = params.get('q') ?? ''
@@ -40,8 +40,8 @@ export default function Discover() {
   const sheetOpen = params.get('filters') === '1'
   const amenities = useMemo(() => params.getAll('amenity'), [params])
 
-  // Each list loads only after its parent is picked: a state's districts, then a district's towns, then areas.
-  const places = usePlaceOptions(place)
+  // Each list loads only after its parent is picked: a state's districts, then a district's towns, then the town's area names.
+  const places = usePlaceOptions(place, { areaNames: true })
 
   const results = useAsync(
     () =>
@@ -49,11 +49,11 @@ export default function Discover() {
         stateId: place.stateId || undefined,
         districtId: place.districtId || undefined,
         cityId: place.cityId || undefined,
-        areaId: place.areaId || undefined,
+        area: place.area || undefined,
         maxFeePaise: maxFee ? Number(maxFee) : undefined,
         amenities: amenities.length ? amenities : undefined,
       }),
-    [place.stateId, place.districtId, place.cityId, place.areaId, maxFee, amenities.join(',')],
+    [place.stateId, place.districtId, place.cityId, place.area, maxFee, amenities.join(',')],
   )
 
   const names = chosenPlaceNames(place, places)
@@ -79,7 +79,7 @@ export default function Discover() {
     if (nextPlace.stateId) sp.set('state', nextPlace.stateId)
     if (nextPlace.districtId) sp.set('district', nextPlace.districtId)
     if (nextPlace.cityId) sp.set('city', nextPlace.cityId)
-    if (nextPlace.areaId) sp.set('area', nextPlace.areaId)
+    if (nextPlace.area) sp.set('area', nextPlace.area)
     if (nextFee) sp.set('maxFee', nextFee)
     for (const a of nextAmenities) sp.append('amenity', a)
     if (nextSort !== 'seats') sp.set('sort', nextSort)
@@ -98,7 +98,7 @@ export default function Discover() {
     ['stateId', names.stateName],
     ['districtId', names.districtName],
     ['cityId', names.cityName],
-    ['areaId', names.areaName],
+    ['area', names.areaName],
   ]
   for (const [key, label] of placeChips) {
     // Removing a place also removes the smaller places inside it.

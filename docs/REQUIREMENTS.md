@@ -40,7 +40,7 @@ Library owners manage their study library (seats, students, fees, expiry). Stude
 - **PUB-2** Privacy, Terms, Refund pages.
 
 ### Library profile (LIB)
-- **LIB-1** Owner creates library: name, city, area, address, pincode, landmark, phone, capacity, monthly fee, timings, amenities (fixed list), photos.
+- **LIB-1** Owner creates library: name, city, area (typed by hand, optional, up to 60 characters; no list to pick from), address, pincode, landmark, phone, capacity, monthly fee, timings, amenities (fixed list), photos.
 - **LIB-2** On submit: status `pending`, message "In review, usually within 24 hours."
 - **LIB-3** Owner sees rejection reason, edits, and resubmits.
 - **LIB-4** Owner edits profile while pending, rejected, or active (BR-6).
@@ -48,7 +48,7 @@ Library owners manage their study library (seats, students, fees, expiry). Stude
 ### Admin (ADM)
 - **ADM-1** Pending libraries list with Approve and Reject (reason required).
 - **ADM-2** Payments list with Verify and Fail (reason required).
-- **ADM-3** Manage cities and areas (add, activate/deactivate).
+- **ADM-3** Manage cities and areas (add, activate/deactivate). Areas listed here are added to the students' area filter; they do not limit what an owner can type.
 
 ### Seats (SEAT)
 - **SEAT-1** Seats generated from capacity on approval or setup.
@@ -79,7 +79,7 @@ Library owners manage their study library (seats, students, fees, expiry). Stude
 - **PLAN-4** Expired library: hidden from search, owner dashboard read-only (BR-6).
 
 ### Discovery (DISC)
-- **DISC-1** City and area dropdowns; fee and amenity filters.
+- **DISC-1** City and area dropdowns; fee and amenity filters. The area list is the admin's areas plus the areas libraries typed in that town; matching ignores case and extra spaces.
 - **DISC-2** Library cards with "from ₹X" and seats left per shift (from `public_libraries`).
 - **DISC-3** Detail page: photos, fees, timings, Call button, "Open in Google Maps" link from text address.
 

@@ -77,14 +77,14 @@ export function toCity(t: Town): City {
   return { id: t.id, stateId: t.stateId, name: t.name, isActive: !db.inactiveCityIds.includes(t.id) }
 }
 
-/** Names of a library's state, district, town and area (area empty when none). */
-export function placeNames(p: { stateId: string; districtId: string; cityId: string; areaId: string | null }) {
+/** Names of a library's state, district, town and area (area empty when none). The area is the text the owner typed. */
+export function placeNames(p: { stateId: string; districtId: string; cityId: string; area: string }) {
   const places = placeData()
   return {
     stateName: places.stateById.get(p.stateId)?.name ?? '',
     districtName: places.districtById.get(p.districtId)?.name ?? '',
     cityName: townById(p.cityId)?.name ?? '',
-    areaName: (p.areaId && db.areas.find((a) => a.id === p.areaId)?.name) || '',
+    areaName: p.area,
   }
 }
 

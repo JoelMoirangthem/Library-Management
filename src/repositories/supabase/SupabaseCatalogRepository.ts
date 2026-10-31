@@ -54,6 +54,13 @@ export class SupabaseCatalogRepository implements CatalogRepository {
     return unwrap(await q.returns<AreaRow[]>()).map(toArea)
   }
 
+  /** Area names for the Discover filter. The database merges the admin's areas with the areas libraries typed. */
+  async listAreaNames(cityId: string): Promise<string[]> {
+    const { data, error } = await getSupabase().rpc('area_names', { p_city: cityId })
+    if (error) throw toAppErrorFromSupabase(error)
+    return ((data ?? []) as { name: string }[]).map((r) => r.name)
+  }
+
   async addCity(districtId: string, name: string): Promise<City> {
     const n = name.trim()
     if (!n) throw new AppError('invalid', 'Enter a town name.')

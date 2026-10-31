@@ -21,7 +21,7 @@ export type LibraryRow = {
   state_id: string
   district_id: string
   city_id: string
-  area_id: string | null
+  area: string
   address: string
   landmark: string
   pincode: string
@@ -36,7 +36,7 @@ export type LibraryRow = {
 }
 
 export const LIBRARY_COLUMNS =
-  'id, owner_id, name, state_id, district_id, city_id, area_id, address, landmark, pincode, phone, capacity, timings, amenities, photos, approval_status, rejection_reason, created_at'
+  'id, owner_id, name, state_id, district_id, city_id, area, address, landmark, pincode, phone, capacity, timings, amenities, photos, approval_status, rejection_reason, created_at'
 
 export const toLibrary = (r: LibraryRow): Library => ({
   id: r.id,
@@ -45,7 +45,7 @@ export const toLibrary = (r: LibraryRow): Library => ({
   stateId: r.state_id,
   districtId: r.district_id,
   cityId: r.city_id,
-  areaId: r.area_id,
+  area: r.area ?? '',
   address: r.address,
   landmark: r.landmark,
   pincode: r.pincode,
@@ -193,7 +193,6 @@ export type PublicLibraryRow = {
   district_name: string
   city_id: string
   city_name: string
-  area_id: string | null
   area_name: string
   address: string
   pincode: string
@@ -224,7 +223,6 @@ export const toPublicLibrary = (r: PublicLibraryRow): PublicLibrary => ({
   districtName: r.district_name,
   cityId: r.city_id,
   cityName: r.city_name,
-  areaId: r.area_id,
   areaName: r.area_name ?? '',
   address: r.address,
   pincode: r.pincode,

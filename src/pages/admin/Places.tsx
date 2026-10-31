@@ -43,7 +43,7 @@ export default function Places() {
     <>
       <PageHeader
         title="Places"
-        description="States and districts come from the government's list. Add a town or area that is missing, or switch one off to hide it from search."
+        description="States and districts come from the government's list. Add a town that is missing, or switch one off to hide it from search. Areas added here show up in the students' area filter."
       />
 
       {places.states.error ? (
@@ -131,7 +131,7 @@ export default function Places() {
                 </h2>
                 {!town ? (
                   <div className="mt-3 flex-1">
-                    <EmptyState title="Pick a town" description="Select a town to see and add its areas. Areas are optional." />
+                    <EmptyState title="Pick a town" description="Select a town to see and add areas for the students' area filter." />
                   </div>
                 ) : (
                   <>
