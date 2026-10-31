@@ -7,8 +7,10 @@ export type FieldErrors<K extends string = string> = Partial<Record<K, string>>
 export function validateLibraryInput(i: LibraryInput): FieldErrors<keyof LibraryInput> {
   const e: FieldErrors<keyof LibraryInput> = {}
   if (!i.name.trim()) e.name = 'Enter your library’s name.'
-  if (!i.cityId) e.cityId = 'Choose a city.'
-  if (!i.areaId) e.areaId = 'Choose an area.'
+  if (!i.stateId) e.stateId = 'Choose a state.'
+  if (!i.districtId) e.districtId = 'Choose a district.'
+  if (!i.cityId) e.cityId = 'Choose a city or town.'
+  // The area is optional.
   if (!i.address.trim()) e.address = 'Enter the street address.'
   if (!isValidPincode(i.pincode)) e.pincode = 'Enter a 6-digit pincode.'
   if (!isValidPhone(i.phone)) e.phone = 'Enter a 10-digit mobile number.'

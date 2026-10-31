@@ -11,7 +11,12 @@ export type Profile = {
   role: Role | null
 }
 
-export type City = { id: string; name: string; isActive: boolean }
+/** Places come from the government's Local Government Directory (LGD): state -> district -> town. */
+export type State = { id: string; name: string; isUnionTerritory: boolean }
+export type District = { id: string; stateId: string; name: string }
+/** A town (city) can lie in more than one district, e.g. Imphal is in Imphal West and Imphal East. */
+export type City = { id: string; stateId: string; name: string; isActive: boolean }
+/** Optional finer place inside a town, added by an admin. */
 export type Area = { id: string; cityId: string; name: string; isActive: boolean }
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
@@ -20,8 +25,11 @@ export type Library = {
   id: string
   ownerId: string
   name: string
+  stateId: string
+  districtId: string
   cityId: string
-  areaId: string
+  /** Optional: null when the owner picked no area. */
+  areaId: string | null
   address: string
   pincode: string
   landmark: string
@@ -133,9 +141,14 @@ export type SeatRequest = {
 /** A request plus the library it points at, for the student's "My requests" list. */
 export type MySeatRequest = SeatRequest & {
   libraryName: string
+  /** Empty when the library has no area. */
   areaName: string
   cityName: string
   shiftName: string
+  /** Where the library is, so "Find another library" can open search there. */
+  stateId: string
+  districtId: string
+  cityId: string
 }
 
 /** One shift as students see it, with live seats left for that shift. */
@@ -153,9 +166,14 @@ export type PublicShift = {
 export type PublicLibrary = {
   id: string
   name: string
+  stateId: string
+  stateName: string
+  districtId: string
+  districtName: string
   cityId: string
   cityName: string
-  areaId: string
+  areaId: string | null
+  /** Empty when the library has no area. */
   areaName: string
   address: string
   pincode: string
@@ -173,6 +191,8 @@ export type PublicLibrary = {
 }
 
 export type PublicSearchFilter = {
+  stateId?: string
+  districtId?: string
   cityId?: string
   areaId?: string
   /** Matches libraries with at least one active shift at or under this fee. */
@@ -185,7 +205,10 @@ export type AdminLibraryRow = {
   library: Library
   ownerName: string
   ownerPhone: string
+  stateName: string
+  districtName: string
   cityName: string
+  /** Empty when the library has no area. */
   areaName: string
   subscription: Subscription | null
   shifts: Shift[]

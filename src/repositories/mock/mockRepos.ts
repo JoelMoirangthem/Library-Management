@@ -8,6 +8,7 @@ import type {
   AdminPaymentRow,
   Area,
   City,
+  District,
   FeePayment,
   Library,
   LibraryInput,
@@ -23,6 +24,7 @@ import type {
   SeatRequest,
   Shift,
   ShiftInput,
+  State,
 } from '@/domain/types'
 import { getNow } from '@/lib/devState'
 import type {
@@ -42,12 +44,15 @@ import type {
   SubscriptionRepository,
 } from '@/repositories/interfaces'
 import {
+  allTowns,
   commit,
   createSeats,
   currentUser,
   findLibrary,
   getDb,
+  isCityActive,
   isLibraryActive,
+  placeNames,
   requireActiveOwner,
   requireOwner,
   requireRole,
@@ -57,15 +62,17 @@ import {
   shiftsOf,
   stateOf,
   subscriptionOf,
+  toCity,
+  townById,
   uid,
 } from '@/repositories/mock/db'
+import { placeData } from '@/repositories/mock/places'
 
 const nowIso = () => getNow().toISOString()
 
 // ---------------------------------------------------------------- helpers
 
 function toPublic(lib: Library): PublicLibrary {
-  const db = getDb()
   const shifts: PublicShift[] = sortShifts(shiftsOf(lib.id))
     .filter((s) => s.isActive)
     .map((s) => {
@@ -83,10 +90,11 @@ function toPublic(lib: Library): PublicLibrary {
   return {
     id: lib.id,
     name: lib.name,
+    stateId: lib.stateId,
+    districtId: lib.districtId,
     cityId: lib.cityId,
-    cityName: db.cities.find((c) => c.id === lib.cityId)?.name ?? '',
     areaId: lib.areaId,
-    areaName: db.areas.find((a) => a.id === lib.areaId)?.name ?? '',
+    ...placeNames(lib),
     address: lib.address,
     pincode: lib.pincode,
     landmark: lib.landmark,
@@ -99,11 +107,15 @@ function toPublic(lib: Library): PublicLibrary {
     shifts,
   }
 }
+/** Mirrors the database's foreign keys: district in the state, town in the district, area (if any) in the town. */
 function assertLibraryInput(input: LibraryInput) {
   const db = getDb()
-  const area = db.areas.find((a) => a.id === input.areaId)
-  if (!area || area.cityId !== input.cityId) {
-    throw new AppError('invalid', 'The area must belong to the selected city.')
+  const district = placeData().districtById.get(input.districtId)
+  const town = townById(input.cityId)
+  const area = input.areaId ? db.areas.find((a) => a.id === input.areaId) : null
+  if (!placeData().stateById.has(input.stateId) || !district || district.stateId !== input.stateId || !town ||
+    !town.districtIds.includes(input.districtId) || (input.areaId && area?.cityId !== input.cityId)) {
+    throw new AppError('invalid', 'Pick the district from the chosen state, the city from that district, and an area from that city.')
   }
   if (!Number.isInteger(input.capacity) || input.capacity < 1 || input.capacity > 500) {
     throw new AppError('invalid', 'Seats must be a whole number between 1 and 500.')
@@ -261,10 +273,20 @@ export class MockDemoLogin implements DemoLogin {
 // ---------------------------------------------------------------- catalog
 
 export class MockCatalogRepository implements CatalogRepository {
-  listCities(opts: { includeInactive?: boolean } = {}) {
-    return run(() =>
-      getDb()
-        .cities.filter((c) => opts.includeInactive || c.isActive)
+  listStates() {
+    return run((): State[] => placeData().states)
+  }
+  listDistricts(stateId: string) {
+    return run((): District[] =>
+      placeData().districts.filter((d) => d.stateId === stateId).sort((a, b) => a.name.localeCompare(b.name)),
+    )
+  }
+  listCities(opts: { districtId: string; includeInactive?: boolean }) {
+    return run((): City[] =>
+      allTowns()
+        .filter((t) => t.districtIds.includes(opts.districtId))
+        .map(toCity)
+        .filter((c) => opts.includeInactive || c.isActive)
         .sort((a, b) => a.name.localeCompare(b.name)),
     )
   }
@@ -275,19 +297,21 @@ export class MockCatalogRepository implements CatalogRepository {
         .sort((a, b) => a.name.localeCompare(b.name)),
     )
   }
-  addCity(name: string) {
+  addCity(districtId: string, name: string) {
     return run((): City => {
       requireRole('admin')
       const db = getDb()
-      const n = name.trim()
-      if (!n) throw new AppError('invalid', 'Enter a city name.')
-      if (db.cities.some((c) => c.name.toLowerCase() === n.toLowerCase())) {
-        throw new AppError('conflict', `${n} already exists.`)
+      const n = name.trim().replace(/\s+/g, ' ')
+      if (!n) throw new AppError('invalid', 'Enter a town name.')
+      const district = placeData().districtById.get(districtId)
+      if (!district) throw new AppError('not_found', 'District not found.')
+      if (allTowns().some((t) => t.stateId === district.stateId && t.name.toLowerCase() === n.toLowerCase())) {
+        throw new AppError('conflict', `${n} is already listed in this state. Add the district to the name, for example "${n} (District)".`)
       }
-      const city = { id: uid('city'), name: n, isActive: true }
-      db.cities.push(city)
+      const town = { id: uid('city'), stateId: district.stateId, name: n, districtIds: [districtId] }
+      db.addedCities.push(town)
       commit()
-      return city
+      return toCity(town)
     })
   }
   addArea(cityId: string, name: string) {
@@ -296,9 +320,9 @@ export class MockCatalogRepository implements CatalogRepository {
       const db = getDb()
       const n = name.trim()
       if (!n) throw new AppError('invalid', 'Enter an area name.')
-      if (!db.cities.some((c) => c.id === cityId)) throw new AppError('not_found', 'City not found.')
+      if (!townById(cityId)) throw new AppError('not_found', 'Town not found.')
       if (db.areas.some((a) => a.cityId === cityId && a.name.toLowerCase() === n.toLowerCase())) {
-        throw new AppError('conflict', `${n} already exists in this city.`)
+        throw new AppError('conflict', `${n} already exists in this town.`)
       }
       const area = { id: uid('area'), cityId, name: n, isActive: true }
       db.areas.push(area)
@@ -309,9 +333,10 @@ export class MockCatalogRepository implements CatalogRepository {
   setCityActive(id: string, isActive: boolean) {
     return run(() => {
       requireRole('admin')
-      const c = getDb().cities.find((x) => x.id === id)
-      if (!c) throw new AppError('not_found', 'City not found.')
-      c.isActive = isActive
+      const db = getDb()
+      if (!townById(id)) throw new AppError('not_found', 'Town not found.')
+      db.inactiveCityIds = db.inactiveCityIds.filter((x) => x !== id)
+      if (!isActive) db.inactiveCityIds.push(id)
       commit()
     })
   }
@@ -399,8 +424,11 @@ export class MockLibraryRepository implements LibraryRepository {
       const db = getDb()
       return db.libraries
         .filter((l) => isLibraryActive(l))
-        .filter((l) => db.cities.find((c) => c.id === l.cityId)?.isActive)
-        .filter((l) => db.areas.find((a) => a.id === l.areaId)?.isActive)
+        .filter((l) => isCityActive(l.cityId))
+        // A switched-off area still hides its libraries; a library with no area is not affected.
+        .filter((l) => !l.areaId || db.areas.find((a) => a.id === l.areaId)?.isActive)
+        .filter((l) => !filter.stateId || l.stateId === filter.stateId)
+        .filter((l) => !filter.districtId || l.districtId === filter.districtId)
         .filter((l) => !filter.cityId || l.cityId === filter.cityId)
         .filter((l) => !filter.areaId || l.areaId === filter.areaId)
         .filter(
@@ -439,8 +467,7 @@ export class MockLibraryRepository implements LibraryRepository {
           library,
           ownerName: owner?.name ?? 'Unknown',
           ownerPhone: owner?.phone ?? '',
-          cityName: db.cities.find((c) => c.id === library.cityId)?.name ?? '',
-          areaName: db.areas.find((a) => a.id === library.areaId)?.name ?? '',
+          ...placeNames(library),
           subscription: subscriptionOf(library.id),
           shifts: sortShifts(shiftsOf(library.id)),
         }
@@ -873,12 +900,16 @@ export class MockSeatRequestRepository implements SeatRequestRepository {
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         .map((r) => {
           const lib = findLibrary(r.libraryId)
+          const { areaName, cityName } = placeNames(lib)
           return {
             ...r,
             libraryName: lib.name,
-            areaName: db.areas.find((a) => a.id === lib.areaId)?.name ?? '',
-            cityName: db.cities.find((c) => c.id === lib.cityId)?.name ?? '',
+            areaName,
+            cityName,
             shiftName: db.shifts.find((s) => s.id === r.shiftId)?.name ?? '',
+            stateId: lib.stateId,
+            districtId: lib.districtId,
+            cityId: lib.cityId,
           }
         })
     })

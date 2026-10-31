@@ -26,15 +26,8 @@ const STATUS_META: Record<ApprovalStatus, { tone: BadgeTone; label: string; icon
 
 export default function LibraryProfile() {
   const { library, state, canEditProfile, loading, error, reload } = useOwnerLibrary()
-  const [cityId, setCityId] = useState<string | null>(null)
   const [created, setCreated] = useState(false)
 
-  const cities = useAsync(() => services.listCities(), [])
-  const effectiveCityId = cityId ?? library?.cityId ?? null
-  const areas = useAsync(
-    () => (effectiveCityId ? services.listAreas({ cityId: effectiveCityId }) : Promise.resolve([])),
-    [effectiveCityId],
-  )
   const shiftsQ = useAsync(
     () => (library ? services.listShifts(library.id) : Promise.resolve([])),
     [library?.id],
@@ -127,9 +120,6 @@ export default function LibraryProfile() {
         />
         <div className="mx-auto max-w-2xl">
           <OnboardingWizard
-            cities={cities.data ?? []}
-            areas={areas.data ?? []}
-            onCityChange={setCityId}
             onSubmit={(input, shifts) => void createLib.run(input, shifts)}
             submitting={createLib.loading}
             error={createLib.error?.message}
@@ -180,10 +170,6 @@ export default function LibraryProfile() {
           <LibraryEditor
             library={library}
             shifts={shiftsQ.data ?? []}
-            cities={cities.data ?? []}
-            areas={areas.data ?? []}
-            catalogLoading={cities.loading}
-            onCityChange={setCityId}
             onSave={async (input, changed, added) => (await save.run(input, changed, added)) !== undefined}
             onToggleShift={async (id, on) => (await toggle.run(id, on)) !== undefined}
             saving={save.loading}

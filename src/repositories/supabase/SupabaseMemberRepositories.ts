@@ -96,6 +96,8 @@ export class SupabaseMemberRepository implements MemberRepository {
       library_phone: string
       area_name: string
       city_name: string
+      district_name: string
+      state_name: string
       address: string
       shift_id: string
       shift_name: string
@@ -109,7 +111,9 @@ export class SupabaseMemberRepository implements MemberRepository {
     return ((data ?? []) as Item[]).map((m) => {
       // The student can see the facts of their membership; the library's full public listing may be hidden (plan expired).
       const library: PublicLibrary = {
-        id: m.library_id, name: m.library_name, cityId: '', cityName: m.city_name, areaId: '', areaName: m.area_name,
+        id: m.library_id, name: m.library_name,
+        stateId: '', stateName: m.state_name, districtId: '', districtName: m.district_name,
+        cityId: '', cityName: m.city_name, areaId: null, areaName: m.area_name,
         address: m.address, pincode: '', landmark: '', phone: m.library_phone, fromFeePaise: 0, timings: '',
         amenities: [], photos: [], totalSeats: 0, shifts: [],
       }

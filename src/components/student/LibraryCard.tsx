@@ -4,6 +4,7 @@ import { Badge, type BadgeTone } from '@/components/Badge'
 import { CardFooter, GridCard } from '@/components/CardGrid'
 import { Skeleton } from '@/components/Skeleton'
 import { formatRupees } from '@/domain/money'
+import { shortPlace } from '@/domain/places'
 import { formatShiftRange } from '@/domain/shifts'
 import type { PublicLibrary, PublicShift } from '@/domain/types'
 
@@ -79,7 +80,7 @@ export function LibraryCard({ library }: { library: PublicLibrary }) {
               </Link>
             </h3>
             <p className="mt-0.5 truncate text-sm text-ink-muted">
-              {library.areaName}, {library.cityName}
+              {shortPlace(library)}
             </p>
           </div>
         </div>

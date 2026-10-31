@@ -1,7 +1,6 @@
 import { addDays, todayIST } from '@/domain/dates'
 import type {
   Area,
-  City,
   FeePayment,
   Library,
   Member,
@@ -12,11 +11,15 @@ import type {
   Shift,
   Subscription,
 } from '@/domain/types'
+import type { Town } from '@/repositories/mock/places'
 
 export type DB = {
   version: number
   sessionUserId: string | null
-  cities: City[]
+  /** Towns an admin added. The official towns come from places.generated.json and are never stored here. */
+  addedCities: Town[]
+  /** Towns (official or added) an admin switched off. */
+  inactiveCityIds: string[]
   areas: Area[]
   profiles: Profile[]
   libraries: Library[]
@@ -29,7 +32,7 @@ export type DB = {
   seatRequests: SeatRequest[]
 }
 
-export const DB_VERSION = 2
+export const DB_VERSION = 3
 
 const DAY = 86_400_000
 const FIRST = ['Aarav', 'Ishita', 'Kabir', 'Meera', 'Rohan', 'Ananya', 'Vivek', 'Priya', 'Arjun', 'Neha', 'Siddharth', 'Pooja', 'Harsh', 'Kavya', 'Nikhil', 'Shreya']
@@ -49,25 +52,24 @@ export function createSeed(now: Date): DB {
   const iso = (days: number) => new Date(now.getTime() + days * DAY).toISOString()
   const date = (days: number) => addDays(today, days)
 
-  const cities: City[] = [
-    { id: 'city_lko', name: 'Lucknow', isActive: true },
-    { id: 'city_knp', name: 'Kanpur', isActive: true },
-    { id: 'city_imf', name: 'Imphal', isActive: true },
-    { id: 'city_del', name: 'Delhi', isActive: true },
-    { id: 'city_pat', name: 'Patna', isActive: false },
-  ]
+  // Places use the official LGD ids from places.generated.json (S = state, D = district, C = town).
+  const LKO = { stateId: 'S9', districtId: 'D162', cityId: 'C249234' }
+  const KNP = { stateId: 'S9', districtId: 'D157', cityId: 'C249286' }
+  const IMF = { stateId: 'S14', districtId: 'D256', cityId: 'C276547' }
+  // Patna (Bihar) starts switched off, to show an inactive town in the admin screen.
+  const inactiveCityIds = ['C249650']
   const areaRows: [string, string, string][] = [
-    ['area_faz', 'city_lko', 'Faizabad Road'],
-    ['area_ali', 'city_lko', 'Aliganj'],
-    ['area_ind', 'city_lko', 'Indira Nagar'],
-    ['area_kri', 'city_lko', 'Krishna Nagar'],
-    ['area_gom', 'city_lko', 'Gomti Nagar'],
-    ['area_swa', 'city_knp', 'Swaroop Nagar'],
-    ['area_kak', 'city_knp', 'Kakadeo'],
-    ['area_sin', 'city_imf', 'Singjamei'],
-    ['area_thg', 'city_imf', 'Thangmeiband'],
-    ['area_mkj', 'city_del', 'Mukherjee Nagar'],
-    ['area_ksr', 'city_del', 'Karol Bagh'],
+    ['area_faz', LKO.cityId, 'Faizabad Road'],
+    ['area_ali', LKO.cityId, 'Aliganj'],
+    ['area_ind', LKO.cityId, 'Indira Nagar'],
+    ['area_kri', LKO.cityId, 'Krishna Nagar'],
+    ['area_gom', LKO.cityId, 'Gomti Nagar'],
+    ['area_swa', KNP.cityId, 'Swaroop Nagar'],
+    ['area_kak', KNP.cityId, 'Kakadeo'],
+    ['area_sin', IMF.cityId, 'Singjamei'],
+    ['area_thg', IMF.cityId, 'Thangmeiband'],
+    ['area_mkj', 'C-DELHI', 'Mukherjee Nagar'],
+    ['area_ksr', 'C-DELHI', 'Karol Bagh'],
   ]
   const areas: Area[] = areaRows.map(([id, cityId, name]) => ({ id, cityId, name, isActive: true }))
 
@@ -90,6 +92,8 @@ export function createSeed(now: Date): DB {
     id: string
     ownerId: string
     name: string
+    stateId: string
+    districtId: string
     cityId: string
     areaId: string
     address: string
@@ -105,44 +109,44 @@ export function createSeed(now: Date): DB {
 
   const libs: LibSeed[] = [
     {
-      id: 'lib_gyan', ownerId: 'u_anil', name: 'Gyan Deep Study Hub', cityId: 'city_lko', areaId: 'area_faz',
+      id: 'lib_gyan', ownerId: 'u_anil', name: 'Gyan Deep Study Hub', ...LKO, areaId: 'area_faz',
       address: '2nd Floor, Shanti Complex, Faizabad Road', pincode: '226016', landmark: 'Opposite Axis Bank',
       phone: '9415000011', capacity: 39, timings: '8:30 am to 9:00 pm',
       amenities: ['AC', 'Wi-Fi', 'Power socket', 'Water purifier', 'Silent zone', 'CCTV'], status: 'approved',
     },
     {
-      id: 'lib_nalanda', ownerId: 'u_sunita', name: 'Nalanda Reading Room', cityId: 'city_lko', areaId: 'area_ali',
+      id: 'lib_nalanda', ownerId: 'u_sunita', name: 'Nalanda Reading Room', ...LKO, areaId: 'area_ali',
       address: '14, Sector J, Aliganj', pincode: '226024', landmark: 'Near Aliganj Hanuman Mandir',
       phone: '9415000012', capacity: 30, timings: '8:30 am to 9:00 pm',
       amenities: ['Wi-Fi', 'Power socket', 'Locker', 'Silent zone'], status: 'approved',
     },
     {
-      id: 'lib_quiet', ownerId: 'u_manoj', name: 'Quiet Hours Library', cityId: 'city_lko', areaId: 'area_ind',
+      id: 'lib_quiet', ownerId: 'u_manoj', name: 'Quiet Hours Library', ...LKO, areaId: 'area_ind',
       address: 'B-27, Sector 12, Indira Nagar', pincode: '226016', landmark: 'Behind Munshipulia Chauraha',
       phone: '9415000013', capacity: 24, timings: 'Open 24 hours',
       amenities: ['AC', 'Wi-Fi', 'Power socket', 'Open 24 hours', 'Tea & coffee'], status: 'approved',
     },
     {
-      id: 'lib_scholars', ownerId: 'u_farah', name: "Scholars' Den", cityId: 'city_lko', areaId: 'area_kri',
+      id: 'lib_scholars', ownerId: 'u_farah', name: "Scholars' Den", ...LKO, areaId: 'area_kri',
       address: '41, Krishna Nagar Main Road', pincode: '226023', landmark: 'Next to Sai Medical Store',
       phone: '9415000014', capacity: 20, timings: '8:30 am to 12:30 pm',
       amenities: ['Wi-Fi', 'Power socket', 'Parking'], status: 'approved',
     },
     {
-      id: 'lib_lakshya', ownerId: 'u_deepak', name: 'Lakshya Self Study', cityId: 'city_lko', areaId: 'area_gom',
+      id: 'lib_lakshya', ownerId: 'u_deepak', name: 'Lakshya Self Study', ...LKO, areaId: 'area_gom',
       address: 'Vibhuti Khand, Gomti Nagar', pincode: '226010', landmark: 'Near Patrakarpuram crossing',
       phone: '9415000015', capacity: 36, timings: '8:30 am to 9:00 pm',
       amenities: ['AC', 'Wi-Fi', 'Power socket', 'Locker', 'CCTV', 'Parking'], status: 'pending',
     },
     {
-      id: 'lib_nest', ownerId: 'u_rekha', name: 'Study Nest', cityId: 'city_knp', areaId: 'area_swa',
+      id: 'lib_nest', ownerId: 'u_rekha', name: 'Study Nest', ...KNP, areaId: 'area_swa',
       address: '88, Swaroop Nagar', pincode: '208002', landmark: 'Near Kanpur Medical Store',
       phone: '9415000016', capacity: 18, timings: '8:30 am to 12:30 pm',
       amenities: ['Wi-Fi', 'Power socket'], status: 'rejected',
       reason: 'The phone number did not connect and the address has no landmark we could find. Please check both, then resubmit.',
     },
     {
-      id: 'lib_khwai', ownerId: 'u_ibomcha', name: 'Khwairakpam Study Centre', cityId: 'city_imf', areaId: 'area_sin',
+      id: 'lib_khwai', ownerId: 'u_ibomcha', name: 'Khwairakpam Study Centre', ...IMF, areaId: 'area_sin',
       address: 'Singjamei Chingamakha, Near Uripok Road', pincode: '795008', landmark: 'Above Keishampat Stationers',
       phone: '9856000017', capacity: 28, timings: '8:30 am to 9:00 pm',
       amenities: ['Wi-Fi', 'Power socket', 'Water purifier', 'Silent zone', 'Tea & coffee'], status: 'approved',
@@ -150,7 +154,7 @@ export function createSeed(now: Date): DB {
   ]
 
   const libraries: Library[] = libs.map((l) => ({
-    id: l.id, ownerId: l.ownerId, name: l.name, cityId: l.cityId, areaId: l.areaId, address: l.address,
+    id: l.id, ownerId: l.ownerId, name: l.name, stateId: l.stateId, districtId: l.districtId, cityId: l.cityId, areaId: l.areaId, address: l.address,
     pincode: l.pincode, landmark: l.landmark, phone: l.phone, capacity: l.capacity,
     timings: l.timings, amenities: l.amenities, photos: [],
     approvalStatus: l.status, rejectionReason: l.reason ?? null, createdAt: iso(-90),
@@ -300,7 +304,8 @@ export function createSeed(now: Date): DB {
   return {
     version: DB_VERSION,
     sessionUserId: null,
-    cities,
+    addedCities: [],
+    inactiveCityIds,
     areas,
     profiles,
     libraries,

@@ -21,7 +21,7 @@ export function AdminLayout() {
   const items: NavItemDef[] = [
     { to: '/admin', label: 'Libraries', icon: <Building2 />, end: true, badge: pendingLibs },
     { to: '/admin/payments', label: 'Payments', icon: <Wallet />, badge: pendingPays },
-    { to: '/admin/places', label: 'Cities', icon: <MapPin /> },
+    { to: '/admin/places', label: 'Places', icon: <MapPin /> },
   ]
 
   return (

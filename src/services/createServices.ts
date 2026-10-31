@@ -42,10 +42,12 @@ export function createServices(r: Repositories) {
     chooseRole: (role: 'student' | 'owner') => r.auth.setMyRole(role),
     updateProfile: (patch: { name: string; phone: string }) => r.auth.updateProfile(patch),
 
-    // catalog (cities and areas)
-    listCities: (opts?: { includeInactive?: boolean }) => r.catalog.listCities(opts),
+    // catalog (states, districts, towns and areas)
+    listStates: () => r.catalog.listStates(),
+    listDistricts: (stateId: string) => r.catalog.listDistricts(stateId),
+    listCities: (opts: { districtId: string; includeInactive?: boolean }) => r.catalog.listCities(opts),
     listAreas: (opts?: { cityId?: string; includeInactive?: boolean }) => r.catalog.listAreas(opts),
-    addCity: (name: string) => r.catalog.addCity(name),
+    addCity: (districtId: string, name: string) => r.catalog.addCity(districtId, name),
     addArea: (cityId: string, name: string) => r.catalog.addArea(cityId, name),
     setCityActive: (id: string, on: boolean) => r.catalog.setCityActive(id, on),
     setAreaActive: (id: string, on: boolean) => r.catalog.setAreaActive(id, on),

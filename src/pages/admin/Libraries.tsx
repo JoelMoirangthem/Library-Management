@@ -24,6 +24,7 @@ import { services } from '@/lib/container'
 import { useNow } from '@/lib/devState'
 import { formatDate } from '@/domain/dates'
 import { formatRupees } from '@/domain/money'
+import { fullPlace } from '@/domain/places'
 import { normalizePhone } from '@/domain/constants'
 import { extendedActiveUntil, planState, TRIAL_DAYS } from '@/domain/plan'
 import { formatShiftCount, formatShiftRange, sortShifts } from '@/domain/shifts'
@@ -83,7 +84,7 @@ export default function Libraries() {
   const q = query.trim().toLowerCase()
   const searched = q
     ? byTab.filter(({ row }) => {
-        const hay = `${row.library.name} ${row.ownerName} ${row.areaName} ${row.cityName}`.toLowerCase()
+        const hay = `${row.library.name} ${row.ownerName} ${fullPlace(row)}`.toLowerCase()
         if (hay.includes(q)) return true
         const digits = normalizePhone(q)
         return digits.length > 0 && normalizePhone(row.ownerPhone).includes(digits)
@@ -243,7 +244,7 @@ function LibraryCard({ row, now, state, showRejection, onDetail, onApprove, onRe
       </div>
 
       <p className="mt-1 text-sm text-ink-muted">
-        {row.areaName}, {row.cityName}
+        {fullPlace(row)}
       </p>
 
       <p className="mt-1 text-xs text-ink-muted tabular-nums">
@@ -301,7 +302,7 @@ function LibraryRow({ row, now, state, showRejection, onDetail, onApprove, onRej
         <TelLink phone={row.ownerPhone} className="whitespace-nowrap text-ink-muted" />
       </td>
       <td className="px-4 py-3 text-ink-muted">
-        {row.areaName}, {row.cityName}
+        {fullPlace(row)}
       </td>
       <td className="hidden px-4 py-3 tabular-nums xl:table-cell">{lib.capacity}</td>
       <td className="hidden whitespace-nowrap px-4 py-3 text-ink-muted xl:table-cell">{formatShiftCount(row.shifts.length)}</td>
@@ -343,7 +344,7 @@ function DetailModal({ row, now, onClose }: { row: AdminLibraryRow | null; now: 
       open={!!row}
       onClose={onClose}
       title={lib.name}
-      description={`${row.areaName}, ${row.cityName}`}
+      description={fullPlace(row)}
       footer={
         <Button variant="secondary" onClick={onClose}>
           Close

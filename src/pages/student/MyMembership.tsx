@@ -11,6 +11,7 @@ import { daysBetween, formatDate, todayIST } from '@/domain/dates'
 import { memberDaysLeft, memberPhase } from '@/domain/members'
 import { FEE_MODES, whatsappLink } from '@/domain/constants'
 import { formatRupees } from '@/domain/money'
+import { shortPlace } from '@/domain/places'
 import { formatShiftRange } from '@/domain/shifts'
 import type { FeeMode, MyMembership as Membership } from '@/domain/types'
 import { services } from '@/lib/container'
@@ -121,7 +122,7 @@ function MembershipCard({
           {m.library ? (
             <p className="mt-2 flex items-center gap-1.5 break-words text-sm text-ink-muted">
               <MapPin aria-hidden className="size-4 shrink-0" />
-              {m.library.areaName}, {m.library.cityName}
+              {shortPlace(m.library)}
             </p>
           ) : (
             <p className="mt-2 text-sm text-ink-muted">This library is not currently listed.</p>

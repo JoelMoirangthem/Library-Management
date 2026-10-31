@@ -6,7 +6,7 @@ import { writeFileSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { buildDbUrl, maskSecret, quoteForCmd } from './dbUrl.mjs'
-import { evaluateFacts } from './securityRules.mjs'
+import { evaluateFacts, READ_ONLY_PUBLIC_TABLES } from './securityRules.mjs'
 
 const env = process.env
 let url
@@ -55,7 +55,7 @@ facts.buckets = facts.buckets.map((b) => ({ ...b, mimeTypes: Array.isArray(b.mim
 // Ask the public API, as a stranger, for one row of every table: nothing private may come back.
 const apiUrl = (env.VITE_SUPABASE_URL ?? '').trim().replace(/\/$/, ''); const anon = (env.VITE_SUPABASE_ANON_KEY ?? '').trim()
 if (!apiUrl || !anon) { console.error('VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are needed in .env'); process.exit(2) }
-for (const t of facts.tables.map((x) => x.name).filter((n) => !['cities', 'areas'].includes(n))) {
+for (const t of facts.tables.map((x) => x.name).filter((n) => !READ_ONLY_PUBLIC_TABLES.includes(n))) {
   const r = await fetch(`${apiUrl}/rest/v1/${t}?select=*&limit=1`, { headers: { apikey: anon, authorization: `Bearer ${anon}` } })
   const body = r.ok ? await r.json().catch(() => null) : null
   if (r.ok && Array.isArray(body) && body.length > 0) facts.anonCanReadTables.push(t)

@@ -1,7 +1,8 @@
 import { AppError } from '@/domain/errors'
 import { isActive, planState, type PlanState } from '@/domain/plan'
-import type { Library, Profile, Subscription } from '@/domain/types'
+import type { City, Library, Profile, Subscription } from '@/domain/types'
 import { dataVersion, devFlags, getNow } from '@/lib/devState'
+import { loadPlaces, placeData, type Town } from '@/repositories/mock/places'
 import { createSeed, DB_VERSION, type DB } from '@/repositories/mock/seed'
 
 /**
@@ -50,10 +51,41 @@ export function uid(prefix: string): string {
 
 /** Applies simulated latency and the dev "force error" switch to every repository call. */
 export async function run<T>(fn: () => T): Promise<T> {
+  await loadPlaces()
   const { latencyMs, forceError } = devFlags.get()
   if (latencyMs > 0) await new Promise((r) => setTimeout(r, latencyMs))
   if (forceError) throw new AppError('network', 'Simulated network error (dev panel).')
   return structuredClone(fn())
+}
+
+// ---- places (official lists from places.generated.json, plus towns an admin added) ----
+
+/** An official town or one an admin added. */
+export function townById(id: string): Town | undefined {
+  return placeData().townById.get(id) ?? db.addedCities.find((c) => c.id === id)
+}
+
+export function allTowns(): Town[] {
+  return [...placeData().towns, ...db.addedCities]
+}
+
+export function isCityActive(id: string): boolean {
+  return Boolean(townById(id)) && !db.inactiveCityIds.includes(id)
+}
+
+export function toCity(t: Town): City {
+  return { id: t.id, stateId: t.stateId, name: t.name, isActive: !db.inactiveCityIds.includes(t.id) }
+}
+
+/** Names of a library's state, district, town and area (area empty when none). */
+export function placeNames(p: { stateId: string; districtId: string; cityId: string; areaId: string | null }) {
+  const places = placeData()
+  return {
+    stateName: places.stateById.get(p.stateId)?.name ?? '',
+    districtName: places.districtById.get(p.districtId)?.name ?? '',
+    cityName: townById(p.cityId)?.name ?? '',
+    areaName: (p.areaId && db.areas.find((a) => a.id === p.areaId)?.name) || '',
+  }
 }
 
 // ---- session ----
